@@ -213,10 +213,10 @@ function fillPMTemplate_(docId, p, lang) {
   replacePM_(body, "{{FIRMA_TECNICO_TEXTO}}", p.techSignature);
   replacePM_(body, "{{FIRMA_CLIENTE_TEXTO}}", p.clientSignature);
 
-  const equipmentQty = Number(p.equipmentQty || 5);
+  const equipmentQty = normalizePMEquipmentQty_(p.equipmentQty);
   const rtus = p.rtus || [];
 
-  for (let i = 5; i > equipmentQty; i--) {
+  for (let i = equipmentQty + 1; i <= 5; i++) {
     removeRTUSection_(body, i, lang);
   }
 
@@ -270,6 +270,7 @@ function fillPMTemplate_(docId, p, lang) {
     lang === "EN" ? "DINING AREA TEMPERATURES" : "TEMPERATURAS DINNER"
   );
 
+  cleanupRemainingPMMarkers_(body);
   doc.saveAndClose();
 }
 
@@ -303,14 +304,12 @@ function replacePMTitles_(body, lang) {
 }
 
 function exportPMPdf_(docId, folder, baseName) {
-  DocumentApp.openById(docId).saveAndClose();
+  const doc = DocumentApp.openById(docId);
+  const tabId = getPMFirstTabId_(doc);
+  doc.saveAndClose();
   Utilities.sleep(1500);
 
-  const pdfBlob = DriveApp
-    .getFileById(docId)
-    .getBlob()
-    .getAs(MimeType.PDF)
-    .setName(baseName + ".pdf");
+  const pdfBlob = exportPMPdfBlob_(docId, tabId, baseName + ".pdf");
 
   const pdfFile = folder.createFile(pdfBlob);
 
@@ -318,6 +317,52 @@ function exportPMPdf_(docId, folder, baseName) {
     id: pdfFile.getId(),
     url: pdfFile.getUrl()
   };
+}
+
+function getPMFirstTabId_(doc) {
+  if (!doc || typeof doc.getTabs !== "function") return "";
+
+  const tabs = doc.getTabs();
+  if (!tabs || !tabs.length) return "";
+
+  return tabs[0].getId();
+}
+
+function normalizePMEquipmentQty_(value) {
+  const qty = Number(value || 5);
+  if (!isFinite(qty)) return 5;
+
+  return Math.max(1, Math.min(5, Math.floor(qty)));
+}
+
+function exportPMPdfBlob_(docId, tabId, fileName) {
+  if (!tabId) {
+    return DriveApp
+      .getFileById(docId)
+      .getBlob()
+      .getAs(MimeType.PDF)
+      .setName(fileName);
+  }
+
+  const url =
+    "https://docs.google.com/document/d/" +
+    encodeURIComponent(docId) +
+    "/export?format=pdf&tab=" +
+    encodeURIComponent(tabId);
+
+  const response = UrlFetchApp.fetch(url, {
+    headers: {
+      Authorization: "Bearer " + ScriptApp.getOAuthToken()
+    },
+    muteHttpExceptions: true
+  });
+
+  const code = response.getResponseCode();
+  if (code < 200 || code >= 300) {
+    throw new Error("No se pudo exportar el PDF del reporte PM. HTTP " + code);
+  }
+
+  return response.getBlob().setName(fileName);
 }
 
 function getRTUWorkByLang_(originalText, pmFrequency, lang) {
@@ -389,14 +434,13 @@ function insertPMFilesAtMarker_(body, marker, urls, title) {
   const idx = body.getChildIndex(par);
 
   par.setText(" ");
-  body.insertParagraph(idx + 1, title || "Archivos").setBold(true);
 
   if (!urls || !urls.length) {
-    body.insertParagraph(idx + 2, "(Sin archivos)");
+    body.insertParagraph(idx + 1, "(Sin archivos)");
     return;
   }
 
-  const table = body.insertTable(idx + 2, []);
+  const table = body.insertTable(idx + 1, []);
   table.setBorderWidth(0);
 
   let row = table.appendTableRow();
@@ -418,7 +462,7 @@ function insertPMFilesAtMarker_(body, marker, urls, title) {
 
       if (mime.indexOf("image/") === 0) {
         const img = cell.appendParagraph(" ").appendInlineImage(file.getBlob());
-        img.setWidth(250);
+        normalizePMImageSize_(img);
         img.setLinkUrl(file.getUrl());
       } else {
         const link = cell.appendParagraph("🎬 Archivo / Video");
@@ -432,6 +476,31 @@ function insertPMFilesAtMarker_(body, marker, urls, title) {
   });
 
   if (col === 1) row.appendTableCell(" ");
+}
+
+function normalizePMImageSize_(img) {
+  const maxWidth = 180;
+  const maxHeight = 150;
+  const originalWidth = Number(img.getWidth() || 0);
+  const originalHeight = Number(img.getHeight() || 0);
+
+  if (!originalWidth || !originalHeight) {
+    img.setWidth(maxWidth);
+    img.setHeight(maxHeight);
+    return;
+  }
+
+  const ratio = Math.min(maxWidth / originalWidth, maxHeight / originalHeight);
+  const width = Math.max(1, Math.round(originalWidth * ratio));
+  const height = Math.max(1, Math.round(originalHeight * ratio));
+
+  img.setWidth(width);
+  img.setHeight(height);
+}
+
+function cleanupRemainingPMMarkers_(body) {
+  body.replaceText("\\{\\{[^}]+\\}\\}", "");
+  body.replaceText("\\[\\[[^\\]]+\\]\\]", "");
 }
 
 function updatePMReportLinks_(payload, report) {
