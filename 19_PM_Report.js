@@ -466,11 +466,21 @@ function updatePMReportLinks_(payload, report) {
       throw new Error("No se pudo encontrar la orden PM para guardar links: " + (payload.woNumber || ""));
     }
 
+    const oldPdfUrls = [
+      getPMReportCell_(sh, rowNumber, headers, "PM_REPORT_ES_URL"),
+      getPMReportCell_(sh, rowNumber, headers, "PM_REPORT_EN_URL")
+    ];
+
     setPMReportCell_(sh, rowNumber, headers, "PM_REPORT_ES_URL", report.pdfEsUrl || "");
     setPMReportCell_(sh, rowNumber, headers, "PM_REPORT_EN_URL", report.pdfEnUrl || "");
     setPMReportCell_(sh, rowNumber, headers, "PM_REPORT_FOLDER_URL", report.folderUrl || "");
     setPMReportCell_(sh, rowNumber, headers, "PM_REPORT_DATE", new Date());
     setPMReportCell_(sh, rowNumber, headers, "PM_REPORT_STATUS", "GENERATED");
+
+    trashOldPMReportPdfs_(oldPdfUrls, [
+      report.pdfEsUrl,
+      report.pdfEnUrl
+    ]);
 
     try {
       const companyId = getPMReportCell_(sh, rowNumber, headers, "COMPANY_ID") || CFG.DEFAULT_COMPANY_ID;
@@ -484,6 +494,32 @@ function updatePMReportLinks_(payload, report) {
     Logger.log("ERROR updatePMReportLinks_: " + err);
     return false;
   }
+}
+
+function trashOldPMReportPdfs_(oldUrls, newUrls) {
+  const keepIds = {};
+
+  (newUrls || []).forEach(function(url) {
+    try {
+      const id = extractDriveIdPM_(url);
+      if (id) keepIds[id] = true;
+    } catch (err) {
+      Logger.log("PM report keep-id parse error: " + err);
+    }
+  });
+
+  (oldUrls || []).forEach(function(url) {
+    try {
+      if (!url) return;
+
+      const id = extractDriveIdPM_(url);
+      if (!id || keepIds[id]) return;
+
+      DriveApp.getFileById(id).setTrashed(true);
+    } catch (err) {
+      Logger.log("ERROR trashOldPMReportPdfs_: " + err);
+    }
+  });
 }
 
 function ensurePMReportColumn_(sheet, headers, columnName) {
