@@ -126,6 +126,7 @@ const ROW_NUMBER = Number("<?= row ?>");
 const WO_NUMBER_FROM_URL = "<?= wo ?>";
 const TECH_NAME = "<?= techName ?>";
 const BASE_URL = "<?= baseUrl ?>";
+const RETURN_TO = "<?= returnTo ?>";
 
 let ORDER = null;
 let ORDER_READY = false;
@@ -318,20 +319,14 @@ function saveClose() {
 
   google.script.run
     .withSuccessHandler(function(res) {
-      alert("SUCCESS CLOSE ORDER: " + JSON.stringify(res));
-
-      localStorage.setItem(
-        "lastTechMessage",
+      rememberCloseOrderMessage(
         isPM
-          ? "PM completado, invoice automático creado."
-          : "Orden completada correctamente."
+          ? "PM completado, invoice autom\u00e1tico creado."
+          : "Orden completada correctamente. Invoice creado."
       );
 
-      const tech = TECH_NAME || (ORDER && ORDER.TECHNICIAN) || "";
-      const returnUrl =
-        BASE_URL + "?view=tech&tech=" + encodeURIComponent(tech);
-
-      window.top.location.replace(returnUrl);
+      const closeTech = TECH_NAME || (ORDER && ORDER.TECHNICIAN) || "";
+      return window.top.location.replace(getCloseOrderReturnUrl(closeTech));
     })
     .withFailureHandler(function(err) {
       document.getElementById("saveBtn").disabled = false;
@@ -341,6 +336,21 @@ function saveClose() {
       alert("ERROR guardando invoice: " + msg);
     })
     .saveCloseOrder(payload);
+}
+
+function getCloseOrderReturnUrl(tech) {
+  return RETURN_TO || BASE_URL + "?view=tech&tech=" + encodeURIComponent(tech || "");
+}
+
+function rememberCloseOrderMessage(message) {
+  const targetUrl = getCloseOrderReturnUrl(TECH_NAME || (ORDER && ORDER.TECHNICIAN) || "");
+
+  if (targetUrl.indexOf("view=tech") !== -1) {
+    localStorage.setItem("lastTechMessage", message);
+  } else {
+    localStorage.setItem("lastWOMessage", message);
+    localStorage.setItem("lastWO", WO_NUMBER_FROM_URL || (ORDER && ORDER.WO_NUMBER) || "");
+  }
 }
 
 window.onload = function() {

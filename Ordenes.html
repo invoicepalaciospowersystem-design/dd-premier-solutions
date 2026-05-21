@@ -156,7 +156,7 @@ if (!requireLogin()) {
 }
 
 let data = [];
-let ACTIVE_COMPANY_ID = "";
+let ACTIVE_COMPANY_ID = "<?= companyId ?>";
 
 const BASE_URL = "https://script.google.com/macros/s/AKfycbwAiZ0Dh5BQoX-QTmMbZcRDEr974-X_nNWcW5x2XeYurC_CeXLNSrl1k-f3p1DDKppOCw/exec";
 
@@ -202,7 +202,18 @@ function openQuote(row, woNumber, companyId) {
     "?view=quote" +
     "&row=" + encodeURIComponent(row) +
     "&wo=" + encodeURIComponent(woNumber || "") +
-    "&companyId=" + encodeURIComponent(companyId || ACTIVE_COMPANY_ID);
+    "&companyId=" + encodeURIComponent(companyId || ACTIVE_COMPANY_ID) +
+    "&returnTo=" + encodeURIComponent(getOrdersReturnUrl(companyId || ACTIVE_COMPANY_ID));
+}
+
+function getOrdersReturnUrl(companyId) {
+  let url = BASE_URL + "?view=orders";
+
+  if (companyId) {
+    url += "&companyId=" + encodeURIComponent(companyId);
+  }
+
+  return url;
 }
 
 function updateHeaderCompany(companyId) {

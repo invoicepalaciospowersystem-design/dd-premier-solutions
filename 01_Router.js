@@ -34,6 +34,7 @@ function doGet(e) {
     if (p.view === "orders") {
       const template = HtmlService.createTemplateFromFile("Ordenes");
       template.baseUrl = CFG.WEB_APP_URL;
+      template.companyId = p.companyId || "";
 
       return template.evaluate()
         .setTitle("Work Orders")
@@ -80,6 +81,7 @@ function doGet(e) {
       template.wo = p.wo || "";
       template.techName = p.tech || "";
       template.baseUrl = CFG.WEB_APP_URL;
+      template.returnTo = p.returnTo || "";
 
       return template.evaluate()
         .setTitle("Close Work Order")
@@ -92,6 +94,7 @@ function doGet(e) {
       template.wo = p.wo || "";
       template.techName = p.tech || "";
       template.baseUrl = CFG.WEB_APP_URL;
+      template.returnTo = p.returnTo || "";
 
       return template.evaluate()
         .setTitle("PM Report")
@@ -114,6 +117,7 @@ function doGet(e) {
   template.wo = p.wo || "";
   template.companyId = p.companyId || "";
   template.baseUrl = CFG.WEB_APP_URL;
+  template.returnTo = p.returnTo || "";
 
   return template.evaluate()
     .setTitle("Create Quote")

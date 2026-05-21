@@ -130,6 +130,7 @@ const BASE_URL = "<?= baseUrl ?>";
 const ROW_NUMBER = "<?= row ?>";
 const WO_PARAM = "<?= wo ?>";
 const COMPANY_ID = "<?= companyId ?>";
+const RETURN_TO = "<?= returnTo ?>";
 
 let items = [];
 
@@ -330,12 +331,12 @@ function saveQuote() {
 
   google.script.run
     .withSuccessHandler(function(res) {
-      alert("Quote creado correctamente.");
-
       if (res && res.pdfEnUrl) window.open(res.pdfEnUrl, "_blank");
       if (res && res.pdfEsUrl) window.open(res.pdfEsUrl, "_blank");
 
-      goBack();
+      returnToPreviousScreen(
+        "Quote creado correctamente para WO " + (data.wo_number || WO_PARAM || "") + "."
+      );
     })
     .withFailureHandler(function(err) {
       alert("Error creando quote: " + err.message);
@@ -344,7 +345,28 @@ function saveQuote() {
 }
 
 function goBack() {
-  window.top.location.href = BASE_URL + "?view=orders";
+  returnToPreviousScreen("");
+}
+
+function returnToPreviousScreen(message) {
+  if (message) {
+    localStorage.setItem("lastWOMessage", message);
+    localStorage.setItem("lastWO", WO_PARAM);
+  }
+
+  window.top.location.replace(getQuoteReturnUrl());
+}
+
+function getQuoteReturnUrl() {
+  if (RETURN_TO) return RETURN_TO;
+
+  let url = BASE_URL + "?view=orders";
+
+  if (COMPANY_ID) {
+    url += "&companyId=" + encodeURIComponent(COMPANY_ID);
+  }
+
+  return url;
 }
 
 function splitAddressClient(fullAddress) {

@@ -95,6 +95,7 @@ const ROW = "<?= row ?>";
 const WO = "<?= wo ?>";
 const TECH_NAME = "<?= techName ?>";
 const BASE_URL = "<?= baseUrl ?>";
+const RETURN_TO = "<?= returnTo ?>";
 
 let PM_TEXTS_DATA = {};
 
@@ -324,7 +325,7 @@ async function savePMReport() {
 
     const pdf = await runServer("generatePMReportPDF", payload);
 
-    return returnToTechPortal(
+    return returnToPreviousScreen(
       "Reportes PM generados correctamente en Espa\u00f1ol e Ingl\u00e9s." +
       (pdf.savedToWorkOrder ? "\nLinks guardados en la orden." : "\nPDF creado, pero no se pudieron guardar los links en la orden.")
     );
@@ -340,17 +341,26 @@ async function savePMReport() {
 }
 
 function goBack() {
-  returnToTechPortal("");
+  returnToPreviousScreen("");
 }
 
-function returnToTechPortal(message) {
+function returnToPreviousScreen(message) {
+  const targetUrl = getPMReturnUrl();
+
   if (message) {
-    localStorage.setItem("lastTechMessage", message);
+    if (targetUrl.indexOf("view=tech") !== -1) {
+      localStorage.setItem("lastTechMessage", message);
+    } else {
+      localStorage.setItem("lastWOMessage", message);
+      localStorage.setItem("lastWO", WO);
+    }
   }
 
-  window.top.location.replace(
-    BASE_URL + "?view=tech&tech=" + encodeURIComponent(TECH_NAME)
-  );
+  window.top.location.replace(targetUrl);
+}
+
+function getPMReturnUrl() {
+  return RETURN_TO || BASE_URL + "?view=tech&tech=" + encodeURIComponent(TECH_NAME);
 }
 
 window.onload = function() {

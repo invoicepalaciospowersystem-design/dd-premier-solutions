@@ -469,7 +469,8 @@ function openCloseOrder(row, woNumber) {
   window.top.location.href =
     BASE_URL + "?view=close&row=" + encodeURIComponent(row) +
     "&wo=" + encodeURIComponent(woNumber) +
-    "&tech=" + encodeURIComponent(TECH_NAME);
+    "&tech=" + encodeURIComponent(TECH_NAME) +
+    "&returnTo=" + encodeURIComponent(getTechReturnUrl());
 }
 
 function showTechMessage() {
@@ -486,7 +487,12 @@ function openPMReport(row, woNumber) {
     BASE_URL + "?view=pm_report" +
     "&row=" + encodeURIComponent(row) +
     "&wo=" + encodeURIComponent(woNumber) +
-    "&tech=" + encodeURIComponent(TECH_NAME);
+    "&tech=" + encodeURIComponent(TECH_NAME) +
+    "&returnTo=" + encodeURIComponent(getTechReturnUrl());
+}
+
+function getTechReturnUrl() {
+  return BASE_URL + "?view=tech&tech=" + encodeURIComponent(TECH_NAME);
 }
 
 function initMySummaryDate() {
