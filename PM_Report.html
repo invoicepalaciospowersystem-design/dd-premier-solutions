@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body{font-family:Arial;background:#f3f4f6;margin:0;padding:15px;color:#111827;}
+    .box{background:white;padding:15px;border-radius:14px;margin-bottom:15px;box-shadow:0 3px 10px rgba(0,0,0,.08);}
+    input,textarea,select{width:100%;padding:10px;border-radius:8px;border:1px solid #d1d5db;margin-top:5px;box-sizing:border-box;font-family:Arial;}
+    label{font-weight:bold;display:block;margin-top:12px;}
+    button{padding:12px 16px;border:none;border-radius:10px;color:white;font-weight:bold;cursor:pointer;margin-top:10px;}
+    .purple{background:#7c3aed;}
+    .gray{background:#6b7280;}
+    h2,h3{margin-top:0;}
+  </style>
+</head>
+
+<body>
+
+<div class="box">
+  <h2>📋 PM Report</h2>
+  <div id="orderInfo">Cargando orden... ROW=<?= row ?> WO=<?= wo ?></div>
+</div>
+
+<div class="box">
+  <h3>Información del Servicio</h3>
+
+  <label>WO Number</label>
+  <input id="woNumber" readonly>
+
+  <label>National Store</label>
+  <input id="storeNumber" readonly>
+
+  <label>Dirección</label>
+  <input id="address" readonly>
+
+  <label>Técnico</label>
+  <input id="technician" readonly>
+
+  <label>Fecha del Servicio</label>
+  <input id="serviceDate" type="date">
+
+  <label>Tipo de Servicio</label>
+  <input id="serviceType" value="PREVENTIVO (PM)" readonly>
+
+  <label>Frecuencia PM</label>
+  <select id="pmFrequency" onchange="applyPMTextToAllRTUs()">
+    <option value="MENSUAL">Mensual</option>
+    <option value="TRIMESTRAL">Trimestral</option>
+    <option value="ANNUAL">Anual</option>
+  </select>
+
+  <label>Cantidad de Equipos RTU</label>
+  <select id="equipmentQty" onchange="renderRTUs(); applyPMTextToAllRTUs();">
+    <option value="1">1 RTU</option>
+    <option value="2">2 RTU</option>
+    <option value="3">3 RTU</option>
+    <option value="4">4 RTU</option>
+    <option value="5" selected>5 RTU</option>
+  </select>
+</div>
+
+<div id="rtuContainer"></div>
+
+<div class="box">
+  <h3>Recomendaciones Area Roof</h3>
+
+  <textarea id="roofRecommendations" rows="5"></textarea>
+
+  <label>Temperaturas Cocina</label>
+  <input type="file" id="kitchenTemps" multiple accept="image/*,video/*">
+
+  <label>Temperaturas Dinner</label>
+  <input type="file" id="dinnerTemps" multiple accept="image/*,video/*">
+</div>
+
+<div class="box">
+  <h3>Finalización</h3>
+
+  <label>Firma del Técnico</label>
+  <input id="techSignature" placeholder="Nombre del técnico">
+
+  <label>Firma del Manager / Cliente</label>
+  <input id="clientSignature" placeholder="Escriba nombre del manager">
+</div>
+
+<div class="box">
+  <button class="purple" onclick="savePMReport()">💾 Guardar Reporte PM</button>
+  <button class="gray" onclick="goBack()">Volver</button>
+</div>
+
+<script>
+const ROW = "<?= row ?>";
+const WO = "<?= wo ?>";
+const TECH_NAME = "<?= techName ?>";
+const BASE_URL = "<?= baseUrl ?>";
+
+let PM_TEXTS_DATA = {};
+
+function loadPMOrder() {
+  document.getElementById("orderInfo").innerHTML =
+    "Cargando orden... ROW=" + ROW + " WO=" + WO;
+
+  google.script.run
+    .withSuccessHandler(function(o) {
+      if (!o) {
+        document.getElementById("orderInfo").innerHTML = "No llegó data.";
+        return;
+      }
+
+      document.getElementById("orderInfo").innerHTML =
+        "<b>" + (o.woNumber || WO) + "</b><br>" +
+        "Store: " + (o.nsn || "") + "<br>" +
+        "Address: " + (o.storeAddress || "") + "<br>" +
+        "Status: " + (o.status || "");
+
+      document.getElementById("woNumber").value = o.woNumber || WO;
+      document.getElementById("storeNumber").value = o.nsn || "";
+      document.getElementById("address").value = o.storeAddress || "";
+      document.getElementById("technician").value = o.technician || TECH_NAME;
+      document.getElementById("techSignature").value = o.technician || TECH_NAME;
+      document.getElementById("serviceDate").value = new Date().toISOString().slice(0, 10);
+
+      if (o.pmFrequency) {
+        document.getElementById("pmFrequency").value = o.pmFrequency;
+        applyPMTextToAllRTUs();
+      }
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById("orderInfo").innerHTML =
+        "ERROR getPMOrderData: " + (err.message || err);
+    })
+    .getPMOrderData(ROW);
+}
+
+function loadPMTexts() {
+  google.script.run
+    .withSuccessHandler(function(data) {
+      PM_TEXTS_DATA = data || {};
+      applyPMTextToAllRTUs();
+    })
+    .withFailureHandler(function(err) {
+      alert("ERROR cargando PM_TEXTS: " + (err.message || err));
+    })
+    .getPMTexts();
+}
+
+function getEquipmentQty() {
+  return Number(document.getElementById("equipmentQty").value || 5);
+}
+
+function applyPMTextToAllRTUs() {
+  const freq = document.getElementById("pmFrequency").value;
+
+  if (!PM_TEXTS_DATA[freq]) return;
+
+  const text = PM_TEXTS_DATA[freq].ES || "";
+  const qty = getEquipmentQty();
+
+  for (let i = 1; i <= qty; i++) {
+    const el = document.getElementById("rtu" + i + "_work");
+    if (el) el.value = text;
+  }
+}
+
+function renderRTUs() {
+  let html = "";
+  const qty = getEquipmentQty();
+
+  for (let i = 1; i <= qty; i++) {
+    html +=
+      '<div class="box">' +
+        '<h3>RTU ' + i + '</h3>' +
+
+        '<label>Trabajos Realizados</label>' +
+        '<textarea id="rtu' + i + '_work" rows="10"></textarea>' +
+
+        '<label>Fotos RTU ' + i + '</label>' +
+        '<input type="file" id="rtu' + i + '_photos" multiple accept="image/*,video/*">' +
+
+        '<label>Problemas Encontrados RTU ' + i + '</label>' +
+        '<textarea id="rtu' + i + '_issues" rows="5"></textarea>' +
+
+        '<label>Fotos Problemas RTU ' + i + '</label>' +
+        '<input type="file" id="rtu' + i + '_problemPhotos" multiple accept="image/*,video/*">' +
+      '</div>';
+  }
+
+  document.getElementById("rtuContainer").innerHTML = html;
+}
+
+async function fileToBase64(file) {
+  return new Promise(function(resolve, reject) {
+    const reader = new FileReader();
+
+    reader.onload = function() {
+      const result = String(reader.result || "");
+      const base64 = result.split(",")[1] || "";
+
+      resolve({
+        name: file.name,
+        mimeType: file.type,
+        data: base64
+      });
+    };
+
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function runServer(functionName, arg) {
+  return new Promise(function(resolve, reject) {
+    google.script.run
+      .withSuccessHandler(resolve)
+      .withFailureHandler(reject)[functionName](arg);
+  });
+}
+
+async function savePMReport() {
+  try {
+    const btns = document.querySelectorAll("button");
+    btns.forEach(b => b.disabled = true);
+
+    document.getElementById("orderInfo").innerHTML =
+      "Guardando reporte PM...";
+
+    const equipmentQty = getEquipmentQty();
+
+    const payload = {
+      row: ROW,
+      woNumber: document.getElementById("woNumber").value,
+      storeNumber: document.getElementById("storeNumber").value,
+      address: document.getElementById("address").value,
+      technician: document.getElementById("technician").value,
+      serviceDate: document.getElementById("serviceDate").value,
+      serviceType: document.getElementById("serviceType").value,
+      pmFrequency: document.getElementById("pmFrequency").value,
+      equipmentQty: equipmentQty,
+      roofRecommendations: document.getElementById("roofRecommendations").value,
+      techSignature: document.getElementById("techSignature").value,
+      clientSignature: document.getElementById("clientSignature").value,
+      rtus: []
+    };
+
+    const folder = await runServer("createPMReportFolder", payload);
+
+    payload.folderId = folder.id;
+    payload.folderUrl = folder.url;
+    payload.pdfFolderId = folder.pdfFolderId;
+    payload.filesFolderId = folder.filesFolderId;
+
+    for (let i = 1; i <= equipmentQty; i++) {
+      const rtu = {
+        number: i,
+        work: document.getElementById("rtu" + i + "_work").value,
+        issues: document.getElementById("rtu" + i + "_issues").value,
+        photos: [],
+        problemPhotos: []
+      };
+
+      const photos = document.getElementById("rtu" + i + "_photos").files;
+      for (let f of photos) {
+        const fileObj = await fileToBase64(f);
+        const uploaded = await runServer("uploadPMFile", {
+          folderId: folder.filesFolderId || folder.id,
+          data: fileObj.data,
+          name: "RTU" + i + "_" + fileObj.name,
+          mimeType: fileObj.mimeType
+        });
+        rtu.photos.push(uploaded.url);
+      }
+
+      const probPhotos = document.getElementById("rtu" + i + "_problemPhotos").files;
+      for (let f of probPhotos) {
+        const fileObj = await fileToBase64(f);
+        const uploaded = await runServer("uploadPMFile", {
+          folderId: folder.filesFolderId || folder.id,
+          data: fileObj.data,
+          name: "RTU" + i + "_PROBLEM_" + fileObj.name,
+          mimeType: fileObj.mimeType
+        });
+        rtu.problemPhotos.push(uploaded.url);
+      }
+
+      payload.rtus.push(rtu);
+    }
+
+    payload.kitchenTemps = [];
+    payload.dinnerTemps = [];
+
+    for (let f of document.getElementById("kitchenTemps").files) {
+      const fileObj = await fileToBase64(f);
+      const uploaded = await runServer("uploadPMFile", {
+        folderId: folder.filesFolderId || folder.id,
+        data: fileObj.data,
+        name: "KITCHEN_TEMP_" + fileObj.name,
+        mimeType: fileObj.mimeType
+      });
+      payload.kitchenTemps.push(uploaded.url);
+    }
+
+    for (let f of document.getElementById("dinnerTemps").files) {
+      const fileObj = await fileToBase64(f);
+      const uploaded = await runServer("uploadPMFile", {
+        folderId: folder.filesFolderId || folder.id,
+        data: fileObj.data,
+        name: "DINNER_TEMP_" + fileObj.name,
+        mimeType: fileObj.mimeType
+      });
+      payload.dinnerTemps.push(uploaded.url);
+    }
+
+    document.getElementById("orderInfo").innerHTML =
+      "Generando PDF...";
+
+    const pdf = await runServer("generatePMReportPDF", payload);
+
+    alert("Reportes PM generados correctamente en Español e Inglés.");
+
+    document.getElementById("orderInfo").innerHTML =
+  "Reporte PM generado:<br>" +
+  "<a href='" + pdf.pdfEsUrl + "' target='_blank'>Abrir PDF Español</a><br>" +
+  "<a href='" + pdf.pdfEnUrl + "' target='_blank'>Abrir PDF English</a><br><br>" +
+  "<a href='" + pdf.folderUrl + "' target='_blank'>Abrir carpeta</a>";
+
+  } catch (err) {
+    alert("ERROR guardando PM: " + (err.message || err));
+    document.getElementById("orderInfo").innerHTML =
+      "ERROR guardando PM: " + (err.message || err);
+  } finally {
+    const btns = document.querySelectorAll("button");
+    btns.forEach(b => b.disabled = false);
+  }
+}
+
+function goBack() {
+  window.top.location.href =
+    BASE_URL + "?view=tech&tech=" + encodeURIComponent(TECH_NAME);
+}
+
+window.onload = function() {
+  renderRTUs();
+  loadPMOrder();
+  loadPMTexts();
+};
+</script>
+
+</body>
+</html>

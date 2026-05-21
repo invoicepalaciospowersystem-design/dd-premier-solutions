@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial; background:#f3f4f6; margin:0; padding:20px; color:#111827; }
+    .header, .box { background:white; padding:18px; border-radius:14px; margin-bottom:15px; box-shadow:0 3px 10px rgba(0,0,0,.08); }
+    input, select, button { padding:10px; border-radius:8px; border:1px solid #ccc; margin:4px; }
+    button { background:#111827; color:white; border:none; cursor:pointer; font-weight:bold; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:15px; }
+    .card { background:white; padding:15px; border-radius:14px; box-shadow:0 3px 10px rgba(0,0,0,.08); border-left:6px solid #2563eb; }
+    .line { font-size:14px; margin:5px 0; }
+    .inactive { border-left-color:#dc2626; opacity:.75; }
+  </style>
+</head>
+
+<body>
+
+<div class="header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
+  <div id="companyTitle" style="font-size:22px; font-weight:bold;">
+    Company: Loading...
+  </div>
+
+  <div style="text-align:right;">
+    <div style="font-size:16px; font-weight:bold;">D&D Premier Solutions Corp</div>
+    <div style="font-size:13px; color:#6b7280;">Sistema de Órdenes</div>
+  </div>
+</div>
+
+<div class="box">
+  <h2>Tiendas / Direcciones</h2>
+  <div>Base de datos de NSN, direcciones y Vendor ID</div>
+</div>
+
+<div class="box">
+  <input id="search" placeholder="Buscar NSN, dirección, ciudad..." oninput="render()">
+  <button onclick="newStore()">Nueva Tienda</button>
+  <button onclick="load()">Actualizar</button>
+  <button onclick="goHome()">Volver</button>
+</div>
+
+<div id="formBox" class="box" style="display:none;">
+  <h3 id="formTitle">Nueva Tienda</h3>
+
+  <input id="COMPANY_ID" placeholder="COMPANY_ID">
+  <input id="NSN #" placeholder="NSN #">
+  <input id="CLIENTE" placeholder="CLIENTE">
+  <input id="STORE_NAME" placeholder="STORE NAME">
+  <input id="ADDRESS" placeholder="ADDRESS">
+  <input id="CITY" placeholder="CITY">
+  <input id="STATE" placeholder="STATE">
+  <input id="ZIP" placeholder="ZIP">
+  <input id="VendorID" placeholder="VendorID">
+  <input id="SUPERVISOR_NAME" placeholder="SUPERVISOR NAME">
+  <input id="SUPERVISOR_EMAIL" placeholder="SUPERVISOR EMAIL">
+  <input id="PHONE" placeholder="PHONE">
+
+  <select id="ACTIVE">
+    <option value="YES">ACTIVE YES</option>
+    <option value="NO">ACTIVE NO</option>
+  </select>
+
+  <br>
+  <button onclick="save()">Guardar</button>
+  <button onclick="cancelEdit()">Cancelar</button>
+</div>
+
+<div id="companyBox" class="box"></div>
+
+<div id="stores" class="grid">Loading...</div>
+
+<script>
+
+  function requireLogin() {
+  const user = localStorage.getItem("pps_user");
+
+  if (!user) {
+    window.top.location.href = "<?= baseUrl ?>";
+    return false;
+  }
+
+  try {
+    const parsed = JSON.parse(user);
+    if (!parsed.role && !parsed.ROLE) {
+      localStorage.removeItem("pps_user");
+      window.top.location.href = "<?= baseUrl ?>";
+      return false;
+    }
+  } catch (e) {
+    localStorage.removeItem("pps_user");
+    window.top.location.href = "<?= baseUrl ?>";
+    return false;
+  }
+
+  return true;
+}
+
+if (!requireLogin()) {
+  throw new Error("No autorizado");
+}
+let STORES = [];
+let EDIT_ROW = "";
+let ACTIVE_COMPANY_ID = "";
+
+const BASE_URL = "https://script.google.com/macros/s/AKfycbwAiZ0Dh5BQoX-QTmMbZcRDEr974-X_nNWcW5x2XeYurC_CeXLNSrl1k-f3p1DDKppOCw/exec";
+
+function getCurrentUser() {
+  try {
+    return JSON.parse(localStorage.getItem("pps_user") || "{}");
+  } catch(e) {
+    return {};
+  }
+}
+
+function updateHeaderCompany(companyId) {
+  companyId = String(companyId || "").toUpperCase();
+
+  if (!companyId) {
+    document.getElementById("companyTitle").innerText = "Company: Loading...";
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function(name) {
+      document.getElementById("companyTitle").innerText =
+        "Company: " + (name || companyId);
+    })
+    .withFailureHandler(function() {
+      document.getElementById("companyTitle").innerText =
+        "Company: " + companyId;
+    })
+    .getCompanyName(companyId);
+}
+
+function load() {
+  const user = getCurrentUser();
+
+  if (user.role !== "OWNER") {
+    ACTIVE_COMPANY_ID = String(user.companyId || "").toUpperCase();
+    updateHeaderCompany(ACTIVE_COMPANY_ID);
+    document.getElementById("companyBox").style.display = "none";
+    loadStoresForCompany();
+    return;
+  }
+
+  document.getElementById("companyTitle").innerText = "Company: Seleccione empresa";
+
+  google.script.run
+    .withSuccessHandler(function(companies) {
+      renderCompanySelector(companies || []);
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById("stores").innerHTML = "ERROR: " + err.message;
+    })
+    .getCompaniesForUser(user.companyId, user.role);
+}
+
+function render() {
+  const q = document.getElementById("search").value.toLowerCase();
+
+  const filtered = STORES.filter(function(s) {
+    return JSON.stringify(s).toLowerCase().includes(q);
+  });
+
+  document.getElementById("stores").innerHTML = filtered.length
+    ? filtered.map(card).join("")
+    : "No hay tiendas.";
+}
+
+function card(s) {
+  const inactive = String(s.ACTIVE || "").toUpperCase() === "NO" ? "inactive" : "";
+
+  return `
+    <div class="card ${inactive}">
+      <h3>NSN ${s["NSN #"] || ""}</h3>
+      <div class="line"><b>Company:</b> ${s.COMPANY_ID || ""}</div>
+      <div class="line"><b>Cliente:</b> ${s.CLIENTE || ""}</div>
+      <div class="line"><b>Store:</b> ${s.STORE_NAME || ""}</div>
+      <div class="line"><b>Dirección:</b> ${s.ADDRESS || ""}, ${s.CITY || ""}, ${s.STATE || ""} ${s.ZIP || ""}</div>
+      <div class="line"><b>Vendor ID:</b> ${s.VendorID || ""}</div>
+      <div class="line"><b>Supervisor:</b> ${s.SUPERVISOR_NAME || ""}</div>
+      <div class="line"><b>Email:</b> ${s.SUPERVISOR_EMAIL || ""}</div>
+      <div class="line"><b>Phone:</b> ${s.PHONE || ""}</div>
+      <div class="line"><b>Active:</b> ${s.ACTIVE || ""}</div>
+      <button onclick='editStore(${JSON.stringify(s)})'>Editar</button>
+    </div>
+  `;
+}
+
+function newStore() {
+  EDIT_ROW = "";
+  document.getElementById("formTitle").innerText = "Nueva Tienda";
+  clearForm();
+
+  const user = getCurrentUser();
+  document.getElementById("COMPANY_ID").value = ACTIVE_COMPANY_ID || user.companyId;
+
+  document.getElementById("formBox").style.display = "block";
+}
+
+function editStore(s) {
+  EDIT_ROW = s.ROW_NUMBER || "";
+  document.getElementById("formTitle").innerText = "Editar Tienda";
+
+  [
+    "COMPANY_ID", "NSN #", "CLIENTE", "STORE_NAME", "ADDRESS", "CITY",
+    "STATE", "ZIP", "VendorID", "SUPERVISOR_NAME", "SUPERVISOR_EMAIL",
+    "PHONE", "ACTIVE"
+  ].forEach(function(id) {
+    document.getElementById(id).value = s[id] || "";
+  });
+
+  document.getElementById("formBox").style.display = "block";
+}
+
+function save() {
+  const store = { ROW_NUMBER: EDIT_ROW };
+
+  [
+    "COMPANY_ID", "NSN #", "CLIENTE", "STORE_NAME", "ADDRESS", "CITY",
+    "STATE", "ZIP", "VendorID", "SUPERVISOR_NAME", "SUPERVISOR_EMAIL",
+    "PHONE", "ACTIVE"
+  ].forEach(function(id) {
+    store[id] = document.getElementById(id).value.trim();
+  });
+
+  if (!store.COMPANY_ID || !store["NSN #"] || !store.ADDRESS) {
+    alert("COMPANY_ID, NSN # y ADDRESS son obligatorios.");
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function() {
+      document.getElementById("formBox").style.display = "none";
+      load();
+    })
+    .withFailureHandler(function(err) {
+      alert(err.message);
+    })
+    .saveStore(store);
+}
+
+function clearForm() {
+  [
+    "COMPANY_ID", "NSN #", "CLIENTE", "STORE_NAME", "ADDRESS", "CITY",
+    "STATE", "ZIP", "VendorID", "SUPERVISOR_NAME", "SUPERVISOR_EMAIL",
+    "PHONE"
+  ].forEach(function(id) {
+    document.getElementById(id).value = "";
+  });
+
+  document.getElementById("ACTIVE").value = "YES";
+}
+
+function cancelEdit() {
+  document.getElementById("formBox").style.display = "none";
+}
+
+function goHome() {
+  window.top.location.href = BASE_URL;
+}
+
+function renderCompanySelector(companies) {
+  const box = document.getElementById("companyBox");
+  box.style.display = "block";
+
+  if (!companies.length) {
+    box.innerHTML = "<b>No hay empresas disponibles.</b>";
+    return;
+  }
+
+  box.innerHTML = `
+    <h3>Seleccionar Empresa</h3>
+    <select id="companySelect">
+      ${companies.map(c => `
+        <option value="${c.COMPANY_ID}">
+          ${c.COMPANY_ID} - ${c.COMPANY_NAME || ""}
+        </option>
+      `).join("")}
+    </select>
+    <button onclick="activateCompany()">Activar Empresa</button>
+  `;
+
+  document.getElementById("stores").innerHTML =
+    "Seleccione una empresa para ver sus tiendas.";
+}
+
+function activateCompany() {
+  ACTIVE_COMPANY_ID = document.getElementById("companySelect").value;
+
+  if (!ACTIVE_COMPANY_ID) {
+    alert("Seleccione una empresa.");
+    return;
+  }
+
+  updateHeaderCompany(ACTIVE_COMPANY_ID);
+  loadStoresForCompany();
+}
+
+function loadStoresForCompany() {
+  const user = getCurrentUser();
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      STORES = res || [];
+      render();
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById("stores").innerHTML = "ERROR: " + err.message;
+    })
+    .getStores(ACTIVE_COMPANY_ID, user.role);
+}
+
+load();
+</script>
+
+</body>
+</html>

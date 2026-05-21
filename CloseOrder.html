@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body { font-family: Arial; background:#f3f4f6; margin:0; padding:18px; color:#111827; }
+    .box { background:white; padding:16px; border-radius:14px; margin-bottom:15px; box-shadow:0 3px 10px rgba(0,0,0,0.08); }
+    input, textarea, select, button { width:100%; box-sizing:border-box; padding:11px; border-radius:9px; border:1px solid #d1d5db; margin:6px 0; }
+    button { background:#111827; color:white; border:none; font-weight:bold; cursor:pointer; }
+    button:disabled { background:#9ca3af; cursor:not-allowed; }
+    .save { background:#16a34a; }
+    .row { font-size:14px; margin:5px 0; }
+    .pm-note { background:#ede9fe; color:#4c1d95; padding:12px; border-radius:10px; margin:10px 0; font-weight:bold; }
+  </style>
+</head>
+
+<body>
+
+<div class="box">
+  <h2>Cierre de Orden</h2>
+  <div id="orderInfo">Cargando...</div>
+</div>
+
+<div class="box">
+  <div id="pmInfo" class="pm-note" style="display:none;"></div>
+
+  <div id="repairWorkBox">
+    <h3>Trabajo realizado</h3>
+    <textarea id="WORK_PERFORMED" placeholder="Describa el trabajo realizado"></textarea>
+    <input id="HORAS" type="number" step="0.25" placeholder="Horas trabajadas">
+  </div>
+
+  <h3>Materiales / Piezas usadas</h3>
+
+  <div class="box">
+    <b>Item 1</b>
+    <input id="I1_QTY" type="number" step="0.01" placeholder="Qty">
+    <input id="I1_PART" placeholder="Part #">
+    <input id="I1_DESC" placeholder="Description">
+    <input id="I1_UNIT" type="number" step="0.01" placeholder="Unit Price">
+  </div>
+
+  <div class="box">
+    <b>Item 2</b>
+    <input id="I2_QTY" type="number" step="0.01" placeholder="Qty">
+    <input id="I2_PART" placeholder="Part #">
+    <input id="I2_DESC" placeholder="Description">
+    <input id="I2_UNIT" type="number" step="0.01" placeholder="Unit Price">
+  </div>
+
+  <div class="box">
+    <b>Item 3</b>
+    <input id="I3_QTY" type="number" step="0.01" placeholder="Qty">
+    <input id="I3_PART" placeholder="Part #">
+    <input id="I3_DESC" placeholder="Description">
+    <input id="I3_UNIT" type="number" step="0.01" placeholder="Unit Price">
+  </div>
+
+  <div class="box">
+    <b>Item 4</b>
+    <input id="I4_QTY" type="number" step="0.01" placeholder="Qty">
+    <input id="I4_PART" placeholder="Part #">
+    <input id="I4_DESC" placeholder="Description">
+    <input id="I4_UNIT" type="number" step="0.01" placeholder="Unit Price">
+  </div>
+
+  <input id="PURCHASE_RECEIPT" placeholder="Vale de compra">
+
+  <select id="PURCHASE_LOCATION">
+    <option value="">Lugar de compra</option>
+    <option>United Refrigeration</option>
+    <option>Home Depot</option>
+    <option>Supply House</option>
+    <option>Otro</option>
+  </select>
+
+  <div id="repairEquipmentBox">
+    <h3>Datos del equipo</h3>
+    <input id="EQUIPMENT_MAKE" placeholder="Marca">
+    <input id="EQUIPMENT_MODEL" placeholder="Modelo">
+    <input id="EQUIPMENT_SERIAL" placeholder="Número de serie">
+  </div>
+
+  <textarea id="NOTES" placeholder="Notas adicionales"></textarea>
+
+  <h3>Firma del Cliente</h3>
+  <input id="SIGNATURE_NAME" placeholder="Nombre del cliente que firma">
+
+  <button id="saveBtn" class="save" onclick="saveClose()" disabled>
+    Cargando orden...
+  </button>
+</div>
+
+<script>
+function requireLogin() {
+  const user = localStorage.getItem("pps_user");
+
+  if (!user) {
+    window.top.location.href = "<?= baseUrl ?>";
+    return false;
+  }
+
+  try {
+    const parsed = JSON.parse(user);
+    if (!parsed.role && !parsed.ROLE) {
+      localStorage.removeItem("pps_user");
+      window.top.location.href = "<?= baseUrl ?>";
+      return false;
+    }
+  } catch (e) {
+    localStorage.removeItem("pps_user");
+    window.top.location.href = "<?= baseUrl ?>";
+    return false;
+  }
+
+  return true;
+}
+
+if (!requireLogin()) {
+  throw new Error("No autorizado");
+}
+
+const ROW_NUMBER = Number("<?= row ?>");
+const WO_NUMBER_FROM_URL = "<?= wo ?>";
+const TECH_NAME = "<?= techName ?>";
+const BASE_URL = "<?= baseUrl ?>";
+
+let ORDER = null;
+let ORDER_READY = false;
+
+function isPMOrder() {
+  return String((ORDER && ORDER.WO_TYPE) || "").toUpperCase() === "PM_FORM";
+}
+
+function load() {
+  document.getElementById("orderInfo").innerHTML =
+    "Cargando...<br>ROW: " + ROW_NUMBER + "<br>WO: " + WO_NUMBER_FROM_URL;
+
+  if (!WO_NUMBER_FROM_URL) {
+    document.getElementById("orderInfo").innerHTML =
+      "ERROR: No llegó WO_NUMBER de la orden.";
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      ORDER = res || null;
+
+      if (!ORDER || !ORDER.WO_NUMBER) {
+        ORDER_READY = false;
+        document.getElementById("orderInfo").innerHTML =
+          "<b>DEBUG:</b><pre>" + JSON.stringify(ORDER, null, 2) + "</pre>";
+        return;
+      }
+
+      ORDER_READY = true;
+      renderOrder();
+      applyPMMode();
+
+      document.getElementById("saveBtn").disabled = false;
+      document.getElementById("saveBtn").innerText = "Guardar y completar orden";
+    })
+    .withFailureHandler(function(err) {
+      ORDER_READY = false;
+      document.getElementById("orderInfo").innerHTML =
+        "ERROR cargando orden:<br><pre>" +
+        JSON.stringify(err, null, 2) +
+        "</pre>";
+    })
+    .getCloseOrderData(ROW_NUMBER, WO_NUMBER_FROM_URL);
+}
+
+function renderOrder() {
+  document.getElementById("orderInfo").innerHTML = `
+    <div style="background:#f9fafb; padding:12px; border-radius:10px; border-left:5px solid #2563eb;">
+      <div class="row"><b>WO:</b> ${ORDER.WO_NUMBER}</div>
+      <div class="row"><b>Type:</b> ${ORDER.WO_TYPE || "REPAIR_FORM"}</div>
+      <div class="row"><b>PM Type:</b> ${ORDER.PM_TYPE || ""}</div>
+      <div class="row"><b>Company:</b> ${ORDER.COMPANY_ID || ""}</div>
+      <div class="row"><b>NSN:</b> ${ORDER.NSN || ""}</div>
+
+      <hr style="margin:10px 0;">
+
+      <div class="row"><b>📍 Address:</b><br>${ORDER.STORE_ADDRESS || ""}</div>
+      <div class="row"><b>City:</b> ${ORDER.STORE_CITY || ""}</div>
+      <div class="row"><b>State:</b> ${ORDER.STORE_STATE || ""}</div>
+      <div class="row"><b>Zip:</b> ${ORDER.STORE_ZIP || ""}</div>
+
+      <div class="row"><b>👨‍🔧 Technician:</b> ${ORDER.TECHNICIAN || ""}</div>
+
+      <div class="row"><b>⚠️ Problem:</b><br>
+        ${ORDER.REPORTED_PROBLEM_ES || ORDER.REPORTED_PROBLEM_EN || ""}
+      </div>
+    </div>
+  `;
+}
+
+function applyPMMode() {
+  if (!isPMOrder()) return;
+
+  document.getElementById("pmInfo").style.display = "block";
+  document.getElementById("pmInfo").innerHTML =
+    "PM Invoice automático: " + (ORDER.PM_TYPE || "MENSUAL") +
+    "<br>Subtotal fijo: $391.67 + 7% tax.";
+
+  document.getElementById("repairWorkBox").style.display = "none";
+  document.getElementById("repairEquipmentBox").style.display = "none";
+
+  document.getElementById("WORK_PERFORMED").value = "";
+  document.getElementById("HORAS").value = "";
+}
+
+function money(v) {
+  return Number(v || 0);
+}
+
+function getItem(n) {
+  const qty = money(document.getElementById("I" + n + "_QTY").value);
+  const unit = money(document.getElementById("I" + n + "_UNIT").value);
+
+  return {
+    qty: qty,
+    part: document.getElementById("I" + n + "_PART").value.trim(),
+    desc: document.getElementById("I" + n + "_DESC").value.trim(),
+    unit: unit,
+    amount: qty * unit
+  };
+}
+
+function getPartsTotal() {
+  let total = 0;
+  for (let i = 1; i <= 4; i++) total += getItem(i).amount;
+  return total;
+}
+
+function saveClose() {
+  if (!ORDER_READY || !ORDER || !ORDER.WO_NUMBER) {
+    alert("Orden no cargada.");
+    return;
+  }
+
+  const isPM = isPMOrder();
+  const hours = isPM ? "" : document.getElementById("HORAS").value;
+  const parts = isPM ? 0 : getPartsTotal();
+  const work = isPM ? "" : document.getElementById("WORK_PERFORMED").value.trim();
+
+  if (!isPM && (!hours || !work)) {
+    alert("Horas y Trabajo Realizado son obligatorios.");
+    return;
+  }
+
+  document.getElementById("saveBtn").disabled = true;
+  document.getElementById("saveBtn").innerText = "Guardando...";
+
+  const payload = {
+    ROW_NUMBER: ROW_NUMBER,
+    WO_NUMBER: ORDER.WO_NUMBER,
+    COMPANY_ID: ORDER.COMPANY_ID,
+    WO_TYPE: ORDER.WO_TYPE || "REPAIR_FORM",
+    PM_TYPE: ORDER.PM_TYPE || "",
+    NSN: ORDER.NSN,
+    CLIENT: ORDER.CLIENT,
+
+    STORE_ADDRESS: ORDER.STORE_ADDRESS || "",
+    STORE_STREET: ORDER.STORE_STREET || "",
+    STORE_CITY: ORDER.STORE_CITY || "",
+    STORE_STATE: ORDER.STORE_STATE || "",
+    STORE_ZIP: ORDER.STORE_ZIP || "",
+
+    TECHNICIAN: ORDER.TECHNICIAN,
+
+    REPORTED_PROBLEM:
+      ORDER.REPORTED_PROBLEM_ES ||
+      ORDER.REPORTED_PROBLEM_EN ||
+      ORDER.REPORTED_PROBLEM_ORIGINAL ||
+      "",
+
+    HORAS: hours,
+    PARTS_TOTAL: parts,
+
+    I1_QTY: getItem(1).qty,
+    I1_PART: getItem(1).part,
+    I1_DESC: getItem(1).desc,
+    I1_UNIT: getItem(1).unit,
+    I1_AMOUNT: getItem(1).amount,
+
+    I2_QTY: getItem(2).qty,
+    I2_PART: getItem(2).part,
+    I2_DESC: getItem(2).desc,
+    I2_UNIT: getItem(2).unit,
+    I2_AMOUNT: getItem(2).amount,
+
+    I3_QTY: getItem(3).qty,
+    I3_PART: getItem(3).part,
+    I3_DESC: getItem(3).desc,
+    I3_UNIT: getItem(3).unit,
+    I3_AMOUNT: getItem(3).amount,
+
+    I4_QTY: getItem(4).qty,
+    I4_PART: getItem(4).part,
+    I4_DESC: getItem(4).desc,
+    I4_UNIT: getItem(4).unit,
+    I4_AMOUNT: getItem(4).amount,
+
+    PURCHASE_RECEIPT: document.getElementById("PURCHASE_RECEIPT").value.trim(),
+    PURCHASE_LOCATION: document.getElementById("PURCHASE_LOCATION").value,
+    WORK_PERFORMED: work,
+
+    EQUIPMENT_MAKE: document.getElementById("EQUIPMENT_MAKE").value.trim(),
+    EQUIPMENT_MODEL: document.getElementById("EQUIPMENT_MODEL").value.trim(),
+    EQUIPMENT_SERIAL: document.getElementById("EQUIPMENT_SERIAL").value.trim(),
+
+    NOTES: document.getElementById("NOTES").value.trim(),
+    SIGNATURE: document.getElementById("SIGNATURE_NAME").value.trim()
+  };
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      alert("SUCCESS CLOSE ORDER: " + JSON.stringify(res));
+
+      localStorage.setItem(
+        "lastTechMessage",
+        isPM
+          ? "PM completado, invoice automático creado."
+          : "Orden completada correctamente."
+      );
+
+      const tech = TECH_NAME || (ORDER && ORDER.TECHNICIAN) || "";
+      const returnUrl =
+        BASE_URL + "?view=tech&tech=" + encodeURIComponent(tech);
+
+      window.top.location.replace(returnUrl);
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById("saveBtn").disabled = false;
+      document.getElementById("saveBtn").innerText = "Guardar y completar orden";
+
+      const msg = err && err.message ? err.message : JSON.stringify(err);
+      alert("ERROR guardando invoice: " + msg);
+    })
+    .saveCloseOrder(payload);
+}
+
+window.onload = function() {
+  load();
+};
+</script>
+
+</body>
+</html>

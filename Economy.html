@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: Arial, sans-serif; background:#f3f4f6; margin:0; padding:20px; color:#111827; }
+    .header, .box { background:white; padding:16px; border-radius:14px; margin-bottom:15px; box-shadow:0 3px 10px rgba(0,0,0,0.08); }
+    .topbar { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:15px; }
+    input, select, button, textarea { padding:9px; border-radius:8px; border:1px solid #d1d5db; }
+    button { background:#111827; color:white; border:none; cursor:pointer; font-weight:bold; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(380px,1fr)); gap:15px; }
+    .card { background:white; padding:15px; border-radius:14px; box-shadow:0 3px 10px rgba(0,0,0,0.08); border-left:6px solid #2563eb; }
+    .status { display:inline-block; padding:5px 10px; border-radius:999px; background:#e5e7eb; font-size:12px; font-weight:bold; }
+    .paid { border-left-color:#16a34a; }
+    .invoiced { border-left-color:#f59e0b; }
+    .pending { border-left-color:#dc2626; }
+    .row { margin:6px 0; font-size:14px; }
+    .money { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }
+    .money input { width:100%; box-sizing:border-box; }
+    textarea { width:100%; box-sizing:border-box; min-height:55px; margin-top:8px; }
+
+    .tech-pay-box {
+      background:#f9fafb;
+      border-radius:12px;
+      padding:12px;
+      margin-top:10px;
+      border:1px solid #e5e7eb;
+    }
+
+    .tech-pay-header,
+    .tech-pay-row,
+    .tech-pay-total {
+      display:grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap:10px;
+      align-items:center;
+      font-size:14px;
+    }
+
+    .tech-pay-header {
+      font-weight:bold;
+      color:#374151;
+      border-bottom:1px solid #e5e7eb;
+      padding-bottom:6px;
+      margin-bottom:6px;
+    }
+
+    .tech-pay-row {
+      padding:5px 0;
+      border-bottom:1px solid #edf0f3;
+    }
+
+    .tech-pay-total {
+      margin-top:8px;
+      padding-top:8px;
+      border-top:2px solid #d1d5db;
+      font-weight:bold;
+    }
+
+    .pay-amount {
+      text-align:right;
+      font-weight:bold;
+    }
+
+    .pay-detail {
+      font-size:12px;
+      color:#6b7280;
+      margin-top:2px;
+    }
+
+    .saved { background:#16a34a !important; }
+
+    .pm-box {
+      margin-top:12px;
+      padding:12px;
+      border-radius:12px;
+      background:#eff6ff;
+      border:1px solid #bfdbfe;
+    }
+
+    .pm-title {
+      font-weight:bold;
+      margin-bottom:8px;
+      color:#1d4ed8;
+    }
+
+    .pm-row {
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      margin:6px 0;
+      font-size:14px;
+    }
+
+    .pm-row b {
+      text-align:right;
+    }
+
+    .mode-active {
+      background:#2563eb !important;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
+  <div id="companyTitle" style="font-size:22px; font-weight:bold;">
+    Company: Loading...
+  </div>
+
+  <div style="text-align:right;">
+    <div style="font-size:16px; font-weight:bold;">D&D Premier Solutions Corp</div>
+    <div style="font-size:13px; color:#6b7280;">Sistema de Órdenes</div>
+  </div>
+</div>
+
+<div class="topbar">
+  <button id="regularBtn" class="mode-active" onclick="setMode('REGULAR')">Economy Regular</button>
+  <button id="pmBtn" onclick="setMode('PM')">PM Economy</button>
+
+  <input id="search" placeholder="Buscar..." oninput="render()">
+
+  <select id="statusFilter" onchange="render()">
+    <option value="">All Status</option>
+    <option>PENDING</option>
+    <option>INVOICED</option>
+    <option>PAID</option>
+  </select>
+
+  <select id="periodFilter" onchange="render()">
+    <option value="">All Periods</option>
+  </select>
+
+  <button onclick="load()">Refresh</button>
+
+  <button id="syncInvoicesBtn" onclick="syncInvoices()">Sync Invoices</button>
+
+  <button id="syncOldBtn" onclick="syncOldLog()">Sync Old System</button>
+
+  <button onclick="loadOldDDSummary()">Histórico D&D</button>
+
+  <button onclick="closeMonth()" style="background:#dc2626;">
+    Cerrar Mes
+  </button>
+
+  <span id="periodLabel" style="font-weight:bold; align-self:center;"></span>
+</div>
+
+<div class="box">
+  <select id="summaryMonth">
+    <option value="1">Enero</option>
+    <option value="2">Febrero</option>
+    <option value="3">Marzo</option>
+    <option value="4">Abril</option>
+    <option value="5">Mayo</option>
+    <option value="6">Junio</option>
+    <option value="7">Julio</option>
+    <option value="8">Agosto</option>
+    <option value="9">Septiembre</option>
+    <option value="10">Octubre</option>
+    <option value="11">Noviembre</option>
+    <option value="12">Diciembre</option>
+  </select>
+
+  <input id="summaryYear" type="number" placeholder="Año" style="width:90px;">
+
+  <button onclick="loadTechSummary()">Resumen Técnicos</button>
+</div>
+
+<div id="techSummaryBox" class="box" style="display:none;"></div>
+<div id="oldDDSummaryBox" class="box" style="display:none;"></div>
+<div id="cards" class="grid">Loading...</div>
+
+<script>
+let ECONOMY = [];
+let ACTIVE_COMPANY_ID = "";
+let CURRENT_PERIOD_LABEL = "";
+let VIEW_MODE = "REGULAR";
+
+function getCurrentUser() {
+  try {
+    return JSON.parse(localStorage.getItem("pps_user") || "{}");
+  } catch (e) {
+    return {};
+  }
+}
+
+function setMode(mode) {
+  VIEW_MODE = mode;
+
+  document.getElementById("regularBtn").classList.toggle("mode-active", mode === "REGULAR");
+  document.getElementById("pmBtn").classList.toggle("mode-active", mode === "PM");
+
+  document.getElementById("syncInvoicesBtn").style.display = mode === "REGULAR" ? "inline-block" : "none";
+  document.getElementById("syncOldBtn").style.display = mode === "REGULAR" ? "inline-block" : "none";
+
+  load();
+}
+
+function updateHeaderCompany(companyId) {
+  companyId = String(companyId || "").toUpperCase();
+
+  if (!companyId) {
+    document.getElementById("companyTitle").innerText = "Company: Loading...";
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function(name) {
+      document.getElementById("companyTitle").innerText =
+        "Company: " + (name || companyId) + (VIEW_MODE === "PM" ? " / PM Economy" : "");
+    })
+    .withFailureHandler(function() {
+      document.getElementById("companyTitle").innerText =
+        "Company: " + companyId + (VIEW_MODE === "PM" ? " / PM Economy" : "");
+    })
+    .getCompanyName(companyId);
+}
+
+function initSummaryDate() {
+  const now = new Date();
+  document.getElementById("summaryMonth").value = now.getMonth() + 1;
+  document.getElementById("summaryYear").value = now.getFullYear();
+}
+
+function loadTechSummary() {
+  if (!ACTIVE_COMPANY_ID) {
+    alert("Primero cargue la compañía.");
+    return;
+  }
+
+  const month = Number(document.getElementById("summaryMonth").value);
+  const year = Number(document.getElementById("summaryYear").value);
+
+  document.getElementById("techSummaryBox").style.display = "block";
+  document.getElementById("techSummaryBox").innerHTML = "Cargando resumen técnicos...";
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      renderTechSummary(res || []);
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById("techSummaryBox").innerHTML =
+        "ERROR resumen técnicos: " + err.message;
+    })
+    .getTechMonthlySummary(ACTIVE_COMPANY_ID, month, year);
+}
+
+function renderTechSummary(rows) {
+  if (!rows.length) {
+    document.getElementById("techSummaryBox").innerHTML =
+      "<h3>Resumen Técnicos</h3>No hay datos para este mes.";
+    return;
+  }
+
+  document.getElementById("techSummaryBox").innerHTML = `
+    <h3>Resumen Técnicos</h3>
+
+    <div style="overflow:auto;">
+      <table style="width:100%; border-collapse:collapse; font-size:14px;">
+        <thead>
+          <tr style="background:#f3f4f6;">
+            <th style="padding:8px; border:1px solid #e5e7eb;">Técnico</th>
+            <th style="padding:8px; border:1px solid #e5e7eb;">Órdenes</th>
+            <th style="padding:8px; border:1px solid #e5e7eb;">Horas</th>
+            <th style="padding:8px; border:1px solid #e5e7eb;">Rate</th>
+            <th style="padding:8px; border:1px solid #e5e7eb;">Pago Horas</th>
+            <th style="padding:8px; border:1px solid #e5e7eb;">Materiales</th>
+            <th style="padding:8px; border:1px solid #e5e7eb;">10% Materiales</th>
+            <th style="padding:8px; border:1px solid #e5e7eb;">Total Pagar</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(function(r) {
+            return `
+              <tr>
+                <td style="padding:8px; border:1px solid #e5e7eb;">
+                  <b>${r.name || ""}</b><br>
+                  <small>${(r.workOrders || []).join(", ")}</small>
+                </td>
+                <td style="padding:8px; border:1px solid #e5e7eb; text-align:center;">${r.orders || 0}</td>
+                <td style="padding:8px; border:1px solid #e5e7eb; text-align:center;">${Number(r.hours || 0).toFixed(2)}</td>
+                <td style="padding:8px; border:1px solid #e5e7eb; text-align:right;">${formatMoney(r.rate)}</td>
+                <td style="padding:8px; border:1px solid #e5e7eb; text-align:right;">${formatMoney(r.laborPay)}</td>
+                <td style="padding:8px; border:1px solid #e5e7eb; text-align:right;">${formatMoney(r.materialCost)}</td>
+                <td style="padding:8px; border:1px solid #e5e7eb; text-align:right;">${formatMoney(r.materialBonus)}</td>
+                <td style="padding:8px; border:1px solid #e5e7eb; text-align:right;"><b>${formatMoney(r.totalPay)}</b></td>
+              </tr>
+            `;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function load() {
+  const user = getCurrentUser();
+
+  if (user.role === "OWNER" && !ACTIVE_COMPANY_ID) {
+    loadCompanySelector();
+    return;
+  }
+
+  if (!ACTIVE_COMPANY_ID) {
+    ACTIVE_COMPANY_ID = String(user.companyId || "").toUpperCase();
+  }
+
+  if (!ACTIVE_COMPANY_ID) {
+    document.getElementById("cards").innerHTML = "No hay compañía asignada.";
+    return;
+  }
+
+  updateHeaderCompany(ACTIVE_COMPANY_ID);
+  document.getElementById("cards").innerHTML = "Loading...";
+
+  if (VIEW_MODE === "PM") {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        ECONOMY = res || [];
+        loadPeriodFilter();
+        render();
+      })
+      .withFailureHandler(function(err) {
+        document.getElementById("cards").innerHTML = "ERROR PM_ECONOMY: " + err.message;
+      })
+      .getPMEconomyData();
+
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      ECONOMY = res || [];
+      loadPeriodFilter();
+      render();
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById("cards").innerHTML = "ERROR: " + err.message;
+    })
+    .getEconomyData(ACTIVE_COMPANY_ID, user.role);
+}
+
+function render() {
+  const search = document.getElementById("search").value.toLowerCase();
+  const status = document.getElementById("statusFilter").value;
+  const period = document.getElementById("periodFilter").value;
+
+  const filtered = ECONOMY.filter(function(o) {
+    const text = JSON.stringify(o).toLowerCase();
+
+    return (!search || text.includes(search)) &&
+           (!status || String(o.STATUS || "").toUpperCase() === status) &&
+           (!period || String(o.PERIOD_LABEL || "") === period);
+  });
+
+  document.getElementById("cards").innerHTML =
+    filtered.length
+      ? filtered.map(card).join("")
+      : "No economy records found.";
+}
+
+function parseTechPayDetail(o) {
+  const detailText = String(o.TECH_PAY_DETAIL || "").trim();
+  const techniciansText = String(o.TECHNICIANS || "").trim();
+
+  if (!detailText) {
+    const techs = techniciansText
+      .split(",")
+      .map(function(t) { return t.trim(); })
+      .filter(Boolean);
+
+    if (!techs.length) return [];
+
+    const total = Number(o.TECH_LABOR_COST || 0);
+    const each = techs.length ? total / techs.length : 0;
+
+    return techs.map(function(name) {
+      return {
+        name: name,
+        detail: "",
+        pay: each
+      };
+    });
+  }
+
+  return detailText.split("|").map(function(part) {
+    part = part.trim();
+
+    const pieces = part.split(":");
+    const name = pieces[0] ? pieces[0].trim() : "Técnico";
+
+    let pay = 0;
+
+    const payMatchEqual = part.match(/=\s*\$?([\d,.]+)/);
+    const payMatchDollar = part.match(/\$([\d,.]+)/);
+
+    if (payMatchEqual) {
+      pay = Number(payMatchEqual[1].replace(/,/g, ""));
+    } else if (payMatchDollar) {
+      pay = Number(payMatchDollar[1].replace(/,/g, ""));
+    }
+
+    const detail = pieces.length > 1 ? pieces.slice(1).join(":").trim() : "";
+
+    return {
+      name: name,
+      detail: detail,
+      pay: pay
+    };
+  });
+}
+
+function formatMoney(value) {
+  const n = Number(value || 0);
+  return "$" + n.toFixed(2);
+}
+
+function formatMoneyValue(v) {
+  const n = Number(v || 0);
+  return n.toFixed(2);
+}
+
+function renderTechPay(o) {
+  const list = parseTechPayDetail(o);
+  const total = Number(o.TECH_LABOR_COST || 0);
+
+  if (!list.length) {
+    return `
+      <div class="tech-pay-box">
+        <div class="tech-pay-header">
+          <div>Técnicos</div>
+          <div class="pay-amount">Pago Técnicos</div>
+        </div>
+        <div class="tech-pay-row">
+          <div>No asignado</div>
+          <div class="pay-amount">$0.00</div>
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="tech-pay-box">
+      <div class="tech-pay-header">
+        <div>${list.length === 1 ? "Técnico" : "Técnicos"}</div>
+        <div class="pay-amount">${list.length === 1 ? "Pago Técnico" : "Pago Técnicos"}</div>
+      </div>
+
+      ${list.map(function(t) {
+        return `
+          <div class="tech-pay-row">
+            <div>
+              <b>${t.name}</b>
+              ${t.detail ? `<div class="pay-detail">${t.detail}</div>` : ""}
+            </div>
+            <div class="pay-amount">${formatMoney(t.pay)}</div>
+          </div>
+        `;
+      }).join("")}
+
+      <div class="tech-pay-total">
+        <div>Total pago técnicos</div>
+        <div class="pay-amount">${formatMoney(total)}</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderPMSummary(o) {
+  const isPM = VIEW_MODE === "PM" || String(o.INV_SOURCE || "").toUpperCase() === "PM";
+
+  if (!isPM) return "";
+
+  return `
+    <div class="pm-box">
+      <div class="pm-title">PM Invoice Summary</div>
+
+      <div class="pm-row">
+        <span>Invoice Subtotal:</span>
+        <b>$391.67</b>
+      </div>
+
+      <div class="pm-row">
+        <span>Tax:</span>
+        <b>$27.42</b>
+      </div>
+
+      <div class="pm-row">
+        <span>Invoice Total:</span>
+        <b>$419.09</b>
+      </div>
+
+      <hr style="margin:10px 0; border:none; border-top:1px solid #dbeafe;">
+
+      <div class="pm-row">
+        <span>Paid to D&D:</span>
+        <b>$180.00</b>
+      </div>
+
+      <div class="pm-row">
+        <span>Tech Pay:</span>
+        <b>$80.00</b>
+      </div>
+
+      <div class="pm-row">
+        <span>D&D Profit:</span>
+        <b>$100.00</b>
+      </div>
+    </div>
+  `;
+}
+
+function getInvestmentSplitValues(source, cost) {
+  source = String(source || "").toUpperCase();
+  cost = Number(cost || 0);
+
+  if (source === "YOEL") {
+    return {
+      david: cost * 0.25,
+      yoel: cost * 0.75
+    };
+  }
+
+  if (source === "DAVID") {
+    return {
+      david: cost * 0.75,
+      yoel: cost * 0.25
+    };
+  }
+
+  if (source === "MISCELANEAS") {
+    return {
+      david: cost * 0.50,
+      yoel: cost * 0.50
+    };
+  }
+
+  return {
+    david: 0,
+    yoel: 0
+  };
+}
+
+function card(o) {
+  const row = Number(o.ROW_NUMBER);
+  const status = String(o.STATUS || "PENDING").toUpperCase();
+  const isPM = VIEW_MODE === "PM" || String(o.INV_SOURCE || "").toUpperCase() === "PM";
+
+  const periodLabel = String(o.PERIOD_LABEL || "").trim();
+  const isLocked = periodLabel && CURRENT_PERIOD_LABEL && periodLabel !== CURRENT_PERIOD_LABEL;
+  const lockAttr = isLocked ? "disabled" : "";
+  const lockMsg = isLocked
+    ? `<div class="row" style="color:#dc2626; font-weight:bold;">🔒 Mes cerrado: ${periodLabel}</div>`
+    : "";
+
+  let cls = "pending";
+  if (status === "INVOICED") cls = "invoiced";
+  if (status === "PAID") cls = "paid";
+
+  const split = getInvestmentSplitValues(o.INV_SOURCE, o.COST);
+
+  return `
+    <div class="card ${cls}">
+      <h3>${o.WO_NUMBER || ""}</h3>
+      <div class="status">${status}</div>
+      ${lockMsg}
+
+      <div class="row"><b>Client:</b> ${o.CLIENT || ""}</div>
+      <div class="row"><b>NSN:</b> ${o.NSN || ""}</div>
+      <div class="row"><b>Date Completed:</b> ${o.DATE_COMPLETED || ""}</div>
+      <div class="row"><b>Horas:</b> ${o.HORAS || "0"}</div>
+
+      ${renderTechPay(o)}
+
+      ${renderPMSummary(o)}
+
+      <hr>
+
+      <div class="money" style="grid-template-columns: 1fr 1fr 1fr;">
+        <div>
+          <label>${isPM ? "Paid to D&D" : "Amount"}</label>
+          <input id="amount_${row}" type="number" step="0.01"
+            value="${formatMoneyValue(o.AMOUNT)}" ${lockAttr}>
+        </div>
+
+        <div>
+          <label>Tax</label>
+          <input type="number" step="0.01"
+            value="${formatMoneyValue(o.TAX)}" readonly>
+        </div>
+
+        <div>
+          <label>${isPM ? "Tech Pay" : "Cost"}</label>
+          <input id="cost_${row}" type="number" step="0.01"
+            value="${formatMoneyValue(o.COST)}"
+            oninput="updateInvView(${row})" ${isPM ? "readonly" : lockAttr}>
+        </div>
+      </div>
+
+      ${isPM ? `
+        <div class="row" style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:10px;">
+          <b>Economía D&D:</b><br>
+          Palacios Power System paga a D&D: <b>$180.00</b><br>
+          D&D paga al técnico: <b>$80.00</b><br>
+          Ganancia D&D: <b>$100.00</b>
+        </div>
+      ` : `
+        <div class="row">
+          <label>Origen de Inversión</label>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:5px; align-items:end;">
+            <div>
+              <select id="inv_${row}" onchange="updateInvView(${row})" style="width:100%;" ${lockAttr}>
+                <option value="">Seleccione</option>
+                <option value="YOEL" ${String(o.INV_SOURCE || "").toUpperCase() === "YOEL" ? "selected" : ""}>YOEL</option>
+                <option value="DAVID" ${String(o.INV_SOURCE || "").toUpperCase() === "DAVID" ? "selected" : ""}>DAVID</option>
+                <option value="MISCELANEAS" ${String(o.INV_SOURCE || "").toUpperCase() === "MISCELANEAS" ? "selected" : ""}>MISCELANEAS</option>
+              </select>
+            </div>
+
+            <div style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:10px; padding:8px; text-align:center;">
+              <b>DAVID</b><br>
+              <span id="inv_david_${row}">${formatMoney(split.david)}</span>
+            </div>
+
+            <div style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:10px; padding:8px; text-align:center;">
+              <b>YOEL</b><br>
+              <span id="inv_yoel_${row}">${formatMoney(split.yoel)}</span>
+            </div>
+          </div>
+        </div>
+      `}
+
+      <div class="row"><b>Profit:</b> ${formatMoney(o.PROFIT)}</div>
+
+      <div class="row">
+        <label>Status</label><br>
+        <select id="status_${row}" ${lockAttr}>
+          <option ${status === "PENDING" ? "selected" : ""}>PENDING</option>
+          <option ${status === "INVOICED" ? "selected" : ""}>INVOICED</option>
+          <option ${status === "PAID" ? "selected" : ""}>PAID</option>
+        </select>
+      </div>
+
+      <div class="row">
+        <label>Invoice #</label><br>
+        <input id="invoice_${row}" value="${o.INVOICE_NUMBER || ""}" ${lockAttr}>
+      </div>
+
+      <div class="row"><b>Date Invoice:</b> ${o.DATE_INVOICE || ""}</div>
+      <div class="row"><b>Date Paid:</b> ${o.DATE_PAID || ""}</div>
+
+      <textarea id="notes_${row}" placeholder="Notes" ${lockAttr}>${o.NOTES || ""}</textarea>
+
+      <button onclick="save(${row}, this)" ${lockAttr}>
+        ${isLocked ? "Bloqueado" : "Guardar"}
+      </button>
+    </div>
+  `;
+}
+
+function save(row, btn) {
+  const isPM = VIEW_MODE === "PM";
+
+  const updates = {
+    AMOUNT: document.getElementById("amount_" + row).value,
+    COST: document.getElementById("cost_" + row).value,
+    STATUS: document.getElementById("status_" + row).value,
+    INVOICE_NUMBER: document.getElementById("invoice_" + row).value,
+    NOTES: document.getElementById("notes_" + row).value
+  };
+
+  if (!isPM) {
+    updates.INV_SOURCE = document.getElementById("inv_" + row).value;
+  } else {
+    updates.INV_SOURCE = "PM";
+    updates.TAX = 0;
+    updates.PROFIT = 100;
+    updates.TECH_LABOR_COST = 80;
+    updates.TECH_PAY_DETAIL = "Technician: $80";
+  }
+
+  btn.innerText = "Guardando...";
+  btn.disabled = true;
+
+  const runner = google.script.run
+    .withSuccessHandler(function() {
+      btn.innerText = "Guardado ✔";
+      btn.classList.add("saved");
+      btn.disabled = false;
+      load();
+    })
+    .withFailureHandler(function(err) {
+      btn.innerText = "Error";
+      btn.disabled = false;
+      alert(err.message);
+    });
+
+  if (isPM) {
+    runner.updatePMEconomyRow(row, updates);
+  } else {
+    runner.updateEconomyRow(row, updates);
+  }
+}
+
+function loadCompanySelector() {
+  const user = getCurrentUser();
+
+  document.getElementById("companyTitle").innerText = "Company: Seleccione empresa";
+
+  google.script.run
+    .withSuccessHandler(function(companies) {
+      document.getElementById("cards").innerHTML = `
+        <div class="box">
+          <h3>Seleccionar Empresa</h3>
+          <select id="companySelect">
+            ${(companies || []).map(function(c) {
+              return `
+                <option value="${c.COMPANY_ID}">
+                  ${c.COMPANY_ID} - ${c.COMPANY_NAME || ""}
+                </option>
+              `;
+            }).join("")}
+          </select>
+          <button onclick="activateCompany()">Activar Empresa</button>
+        </div>
+      `;
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById("cards").innerHTML = "ERROR companies: " + err.message;
+    })
+    .getCompaniesForUser(user.companyId, user.role);
+}
+
+function activateCompany() {
+  ACTIVE_COMPANY_ID = document.getElementById("companySelect").value;
+
+  if (!ACTIVE_COMPANY_ID) {
+    alert("Seleccione una empresa.");
+    return;
+  }
+
+  updateHeaderCompany(ACTIVE_COMPANY_ID);
+  loadPeriod();
+  load();
+}
+
+function syncInvoices() {
+  if (!ACTIVE_COMPANY_ID) {
+    alert("Primero cargue la compañía.");
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function() {
+      alert("Invoices sincronizados");
+      load();
+    })
+    .withFailureHandler(function(err) {
+      alert(err.message);
+    })
+    .syncInvoicesToEconomy(ACTIVE_COMPANY_ID);
+}
+
+function updateInvView(row) {
+  if (VIEW_MODE === "PM") return;
+
+  const source = document.getElementById("inv_" + row).value;
+  const cost = document.getElementById("cost_" + row).value;
+
+  const split = getInvestmentSplitValues(source, cost);
+
+  const davidBox = document.getElementById("inv_david_" + row);
+  const yoelBox = document.getElementById("inv_yoel_" + row);
+
+  if (davidBox) davidBox.innerText = formatMoney(split.david);
+  if (yoelBox) yoelBox.innerText = formatMoney(split.yoel);
+}
+
+function loadPeriod() {
+  google.script.run
+    .withSuccessHandler(function(p) {
+      CURRENT_PERIOD_LABEL = p && p.label ? p.label : "";
+
+      document.getElementById("periodLabel").innerText =
+        CURRENT_PERIOD_LABEL ? "Periodo: " + CURRENT_PERIOD_LABEL : "Periodo no definido";
+
+      loadPeriodFilter();
+      render();
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById("periodLabel").innerText =
+        "ERROR periodo: " + err.message;
+    })
+    .getCurrentEconomyPeriod();
+}
+
+function closeMonth() {
+  if (!confirm("¿Cerrar mes económico?")) return;
+
+  google.script.run
+    .withSuccessHandler(function(p) {
+      alert("Mes cerrado. Nuevo periodo: " + p.label);
+      loadPeriod();
+      load();
+    })
+    .withFailureHandler(function(err) {
+      alert(err.message);
+    })
+    .closeEconomyMonth();
+}
+
+function loadPeriodFilter() {
+  const select = document.getElementById("periodFilter");
+  if (!select) return;
+
+  const current = select.value;
+
+  const periods = [...new Set(
+    ECONOMY
+      .map(function(o) {
+        return String(o.PERIOD_LABEL || "").trim();
+      })
+      .filter(Boolean)
+  )].sort().reverse();
+
+  select.innerHTML =
+    `<option value="">All Periods</option>` +
+    periods.map(function(p) {
+      return `<option value="${p}">${p}</option>`;
+    }).join("");
+
+  if (current && periods.includes(current)) {
+    select.value = current;
+  } else if (CURRENT_PERIOD_LABEL && periods.includes(CURRENT_PERIOD_LABEL)) {
+    select.value = CURRENT_PERIOD_LABEL;
+  }
+}
+
+function syncOldLog() {
+  google.script.run
+    .withSuccessHandler(function(res) {
+      alert("Sistema viejo sincronizado. Nuevos invoices: " + (res.added || 0));
+
+      window.open(
+        "https://docs.google.com/spreadsheets/d/1kkOZMlZRcrmnf5fYT6GYJk0Ne8t_but2-1Enknoy7vw/edit?gid=0#gid=0",
+        "_blank"
+      );
+    })
+    .withFailureHandler(function(err) {
+      alert(err.message);
+    })
+    .syncInvoicesToOldLog();
+}
+
+function loadOldDDSummary() {
+  document.getElementById("oldDDSummaryBox").style.display = "block";
+  document.getElementById("oldDDSummaryBox").innerHTML = "Sincronizando histórico D&D...";
+
+  google.script.run
+    .withSuccessHandler(function() {
+      document.getElementById("oldDDSummaryBox").innerHTML = "Cargando histórico D&D...";
+
+      google.script.run
+        .withSuccessHandler(function(rows) {
+          renderOldDDSummary(rows || []);
+        })
+        .withFailureHandler(function(err) {
+          document.getElementById("oldDDSummaryBox").innerHTML =
+            "ERROR histórico D&D: " + err.message;
+        })
+        .getOldDDPremierMonthlyData();
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById("oldDDSummaryBox").innerHTML =
+        "ERROR sincronizando histórico D&D: " + err.message;
+    })
+    .syncOldDDPremierMonthly();
+}
+
+function renderOldDDSummary(rows) {
+  if (!rows.length) {
+    document.getElementById("oldDDSummaryBox").innerHTML =
+      "<h3>Histórico D&D Premier</h3>No hay datos.";
+    return;
+  }
+
+  document.getElementById("oldDDSummaryBox").innerHTML = `
+    <h3>Histórico D&D Premier</h3>
+    <div style="overflow:auto;">
+      <table style="width:100%; border-collapse:collapse; font-size:14px;">
+        <thead>
+          <tr style="background:#f3f4f6;">
+            <th style="padding:8px; border:1px solid #e5e7eb;">Mes</th>
+            <th style="padding:8px; border:1px solid #e5e7eb;">Horas</th>
+            <th style="padding:8px; border:1px solid #e5e7eb;">Parts</th>
+            <th style="padding:8px; border:1px solid #e5e7eb;">Cobro Horas</th>
+            <th style="padding:8px; border:1px solid #e5e7eb;">Cobro Parts</th>
+            <th style="padding:8px; border:1px solid #e5e7eb;">Total D&D</th>
+            <th style="padding:8px; border:1px solid #e5e7eb;">Total Facturado</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(function(r) {
+            return `
+              <tr>
+                <td style="padding:8px; border:1px solid #e5e7eb;">${r.MES || ""}</td>
+                <td style="padding:8px; border:1px solid #e5e7eb; text-align:right;">${Number(r.TOTAL_HORAS || 0).toFixed(2)}</td>
+                <td style="padding:8px; border:1px solid #e5e7eb; text-align:right;">${formatMoney(r.TOTAL_PARTS)}</td>
+                <td style="padding:8px; border:1px solid #e5e7eb; text-align:right;">${formatMoney(r.TOTAL_COBRO_HORAS)}</td>
+                <td style="padding:8px; border:1px solid #e5e7eb; text-align:right;">${formatMoney(r.TOTAL_COBRO_PARTS)}</td>
+                <td style="padding:8px; border:1px solid #e5e7eb; text-align:right;"><b>${formatMoney(r.TOTAL_COMPANIA)}</b></td>
+                <td style="padding:8px; border:1px solid #e5e7eb; text-align:right;">${formatMoney(r.TOTAL_FACTURADO)}</td>
+              </tr>
+            `;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+initSummaryDate();
+loadPeriod();
+load();
+</script>
+
+</body>
+</html>

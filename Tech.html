@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body { font-family: Arial; background:#f3f4f6; margin:0; padding:15px; color:#111827; }
+
+    .header, .box {
+      background:white;
+      padding:15px;
+      border-radius:12px;
+      margin-bottom:15px;
+      box-shadow:0 3px 10px rgba(0,0,0,0.08);
+    }
+
+    .card-top {
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:10px;
+    }
+
+    .age-badge {
+      background:#111827;
+      color:white;
+      padding:6px 10px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:bold;
+      white-space:nowrap;
+    }
+
+    .header {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+
+    .topbar {
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-bottom:15px;
+    }
+
+    button {
+      padding:10px 14px;
+      border-radius:10px;
+      border:none;
+      font-size:14px;
+      color:white;
+      font-weight:bold;
+      cursor:pointer;
+      background:#111827;
+    }
+
+    .refresh { background:#111827; }
+    .notif { background:#2563eb; }
+    .btn { background:#dc2626; }
+    .active { background:#16a34a !important; }
+
+    button:disabled {
+      opacity:1;
+      cursor:not-allowed;
+    }
+
+    .grid {
+      display:grid;
+      grid-template-columns:repeat(auto-fill, minmax(360px, 1fr));
+      gap:15px;
+    }
+
+    .card {
+      background:white;
+      padding:15px;
+      border-radius:14px;
+      box-shadow:0 3px 10px rgba(0,0,0,0.08);
+      border-left:6px solid #16a34a;
+    }
+
+    .urgent { border-left-color:orange; }
+    .emergency { border-left-color:red; }
+    .normal { border-left-color:green; }
+
+    .status {
+      display:inline-block;
+      padding:5px 10px;
+      background:#e5e7eb;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:bold;
+      margin:8px 0;
+    }
+
+    .small {
+      font-size:14px;
+      margin:6px 0;
+    }
+
+    .problem {
+      background:#f9fafb;
+      padding:10px;
+      border-radius:10px;
+      margin-top:8px;
+      font-size:14px;
+    }
+
+    .actions {
+      margin-top:10px;
+      display:flex;
+      gap:6px;
+      flex-wrap:wrap;
+    }
+
+    .actions button {
+      width:auto;
+      flex:1;
+      min-width:145px;
+    }
+
+    #notifCount {
+      background:red;
+      color:white;
+      padding:3px 8px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:bold;
+    }
+
+    #notificationsBox {
+      display:none;
+      background:white;
+      padding:12px;
+      border-radius:12px;
+      margin-bottom:15px;
+      box-shadow:0 3px 10px rgba(0,0,0,0.08);
+    }
+
+    .notif-item {
+      padding:8px;
+      border-bottom:1px solid #e5e7eb;
+      font-size:14px;
+    }
+
+    table th, table td {
+      vertical-align:top;
+    }
+
+    @media (max-width:420px) {
+      .grid { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="header">
+  <div id="companyTitle" style="font-size:20px; font-weight:bold;">
+    Company: Loading...
+  </div>
+
+  <div style="text-align:right;">
+    <div style="font-size:16px; font-weight:bold;">D&D Premier Solutions Corp</div>
+    <div style="font-size:13px; color:#6b7280;">Sistema de Órdenes</div>
+  </div>
+</div>
+
+<div class="topbar">
+  <button class="refresh" onclick="loadOrders()">Actualizar</button>
+  <button class="notif" onclick="toggleNotifications()">🔔 Notificaciones <span id="notifCount"></span></button>
+</div>
+
+<div id="notificationsBox"></div>
+<div id="techStatusMetrics" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:15px;"></div>
+
+<div class="card" style="border-left:6px solid #2563eb;">
+  <h3>💰 Mi Resumen del Mes</h3>
+
+  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    <select id="mySummaryMonth" style="padding:10px; border-radius:8px;">
+      <option value="1">Enero</option>
+      <option value="2">Febrero</option>
+      <option value="3">Marzo</option>
+      <option value="4">Abril</option>
+      <option value="5">Mayo</option>
+      <option value="6">Junio</option>
+      <option value="7">Julio</option>
+      <option value="8">Agosto</option>
+      <option value="9">Septiembre</option>
+      <option value="10">Octubre</option>
+      <option value="11">Noviembre</option>
+      <option value="12">Diciembre</option>
+    </select>
+
+    <input id="mySummaryYear" type="number" style="padding:10px; border-radius:8px; width:100px;">
+    <button onclick="loadMyTechSummary()" style="width:auto;">Ver Resumen</button>
+    <button onclick="loadMyTechInvoiceTable()" style="width:auto; background:#7c3aed;">Ver Tabla de Invoices</button>
+  </div>
+
+  <div id="myTechSummaryBox" style="margin-top:10px;">Cargando resumen...</div>
+  <div id="myTechInvoiceTableBox" style="margin-top:15px;"></div>
+</div>
+
+<div id="orders" class="grid">Cargando...</div>
+
+<script>
+function requireLogin() {
+  const user = localStorage.getItem("pps_user");
+
+  if (!user) {
+    window.top.location.href = "<?= baseUrl ?>";
+    return false;
+  }
+
+  try {
+    const parsed = JSON.parse(user);
+    if (!parsed.role && !parsed.ROLE) {
+      localStorage.removeItem("pps_user");
+      window.top.location.href = "<?= baseUrl ?>";
+      return false;
+    }
+  } catch (e) {
+    localStorage.removeItem("pps_user");
+    window.top.location.href = "<?= baseUrl ?>";
+    return false;
+  }
+
+  return true;
+}
+
+if (!requireLogin()) {
+  throw new Error("No autorizado");
+}
+
+const TECH_NAME = "<?= techName ?>";
+const BASE_URL = "https://script.google.com/macros/s/AKfycbwAiZ0Dh5BQoX-QTmMbZcRDEr974-X_nNWcW5x2XeYurC_CeXLNSrl1k-f3p1DDKppOCw/exec";
+
+function getCurrentUser() {
+  try {
+    return JSON.parse(localStorage.getItem("pps_user") || "{}");
+  } catch (e) {
+    return {};
+  }
+}
+
+function getCurrentCompanyId() {
+  const user = getCurrentUser();
+  return String(user.companyId || "").toUpperCase();
+}
+
+function loadHeader() {
+  const companyId = getCurrentCompanyId();
+
+  google.script.run
+    .withSuccessHandler(function(name) {
+      document.getElementById("companyTitle").innerText =
+        "Company: " + (name || companyId);
+    })
+    .withFailureHandler(function() {
+      document.getElementById("companyTitle").innerText =
+        "Company: " + companyId;
+    })
+    .getCompanyName(companyId);
+}
+
+function loadOrders() {
+  if (!TECH_NAME) {
+    document.getElementById("orders").innerHTML = "No se recibió el técnico.";
+    return;
+  }
+
+  document.getElementById("orders").innerHTML = "Cargando...";
+
+  google.script.run
+    .withSuccessHandler(function(data) {
+      renderOrders(data || []);
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById("orders").innerHTML = "ERROR: " + err.message;
+    })
+    .getTechnicianOrders(TECH_NAME);
+}
+
+function renderOrders(data) {
+  if (!data.length) {
+    document.getElementById("orders").innerHTML = "No hay órdenes activas.";
+    renderTechStatusMetrics([]);
+    return;
+  }
+
+  renderTechStatusMetrics(data);
+  document.getElementById("orders").innerHTML = data.map(card).join("");
+}
+
+function getAssignedAgeText(o) {
+  const rawDate = o.DATE_SENT_TO_TECH || o.EMAIL_SENT_DATE || o.DATE_CREATED || "";
+
+  if (!rawDate) return "Sin fecha";
+
+  const assignedDate = new Date(rawDate);
+
+  if (isNaN(assignedDate.getTime())) {
+    return "Fecha inválida";
+  }
+
+  const now = new Date();
+  const diffMs = now - assignedDate;
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays <= 0) return "Hoy";
+  if (diffDays === 1) return "1 día";
+  return diffDays + " días";
+}
+
+function card(o) {
+  const status = String(o.STATUS || "").toUpperCase();
+  const priority = String(o.ORDER_PRIORITY || "").toLowerCase();
+
+  let cls = "normal";
+  if (priority.includes("urgent") || priority.includes("urgente")) cls = "urgent";
+  if (priority.includes("emergency") || priority.includes("emergencia")) cls = "emergency";
+
+  function isActive(s) {
+    const order = [
+      "SENT TO TECH",
+      "IN PROGRESS",
+      "REQUEST PARTS",
+      "PARTS IN TRANSIT",
+      "PARTS IN STORE",
+      "COMPLETED"
+    ];
+
+    const currentIndex = order.indexOf(status);
+    const targetIndex = order.indexOf(s);
+
+    if (currentIndex === -1 || targetIndex === -1) return "";
+    return currentIndex >= targetIndex ? "active" : "";
+  }
+
+  const row = Number(o.ROW_NUMBER);
+  const equipment = o.REPORTED_EQUIPMENT || o.REPORTED_EQUIPMENT_EN || o["REPORTED EQUIPMENT"] || "No especificado";
+  const problem = o.REPORTED_PROBLEM_ES || o.REPORTED_PROBLEM_EN || o.REPORTED_PROBLEM_ORIGINAL || "";
+
+  const assignedAge = getAssignedAgeText(o);
+
+  return `
+    <div class="card ${cls}" id="wo_${o.WO_NUMBER || ""}">
+      <div class="card-top">
+        <div>
+          <b>${o.WO_NUMBER || ""}</b> | NSN ${o.NSN || ""}<br>
+          <div class="status">${o.STATUS || ""}</div>
+        </div>
+
+        <div class="age-badge">
+          ${assignedAge} asignada
+        </div>
+      </div>
+
+      <div class="small"><b>Company:</b> ${o.COMPANY_ID || ""}</div>
+      <div class="small"><b>Técnico:</b> ${o.TECHNICIAN || TECH_NAME}</div>
+      <div class="small"><b>Dirección:</b> ${o.STORE_ADDRESS || "No disponible"}</div>
+      <div class="small"><b>Equipo:</b> ${equipment}</div>
+      <div class="small"><b>Prioridad:</b> ${o.ORDER_PRIORITY || ""}</div>
+
+      <div class="problem">
+        <b>Problema:</b><br>${problem}
+      </div>
+
+      <div class="actions">
+        <button class="btn ${isActive('IN PROGRESS')}" onclick="updateStatus(${row}, 'IN PROGRESS')">
+          Iniciar Trabajo
+        </button>
+
+        <button class="btn ${isActive('REQUEST PARTS')}" onclick="updateStatus(${row}, 'REQUEST PARTS')">
+          Pedir Piezas
+        </button>
+      </div>
+
+      <div class="actions">
+        <button class="btn ${isActive('PARTS IN TRANSIT')}" disabled>
+          Piezas en Envío
+        </button>
+
+        <button class="btn ${isActive('PARTS IN STORE')}" disabled>
+          Piezas en Store
+        </button>
+      </div>
+
+      <div class="actions">
+  <button class="btn ${isActive('COMPLETED')}" onclick="openCloseOrder(${row}, '${o.WO_NUMBER || ""}')">
+    Trabajo Completado
+  </button>
+
+  ${
+    String(o.WO_TYPE || "")
+      .toUpperCase()
+      .includes("PM")
+      ? `
+        <button style="background:#7c3aed;" onclick="openPMReport(${row}, '${o.WO_NUMBER || ""}')">
+          📋 Reporte PM
+        </button>
+      `
+      : ""
+  }
+</div>
+    </div>
+  `;
+}
+
+function updateStatus(row, status) {
+  google.script.run
+    .withSuccessHandler(function() {
+      loadOrders();
+      loadNotifications();
+    })
+    .withFailureHandler(function(err) {
+      alert(err.message);
+    })
+    .updateTechOrderStatus(row, status);
+}
+
+function loadNotifications() {
+  google.script.run
+    .withSuccessHandler(function(res) {
+      res = res || [];
+
+      const unread = res.filter(function(n) {
+        return String(n.READ || "").toUpperCase() !== "YES";
+      }).length;
+
+      document.getElementById("notifCount").innerText = unread || "";
+
+      document.getElementById("notificationsBox").innerHTML =
+        res.length
+          ? res.map(function(n) {
+              return `<div class="notif-item">${n.MESSAGE || ""}</div>`;
+            }).join("")
+          : "No hay notificaciones.";
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById("notificationsBox").innerHTML =
+        "ERROR: " + err.message;
+    })
+    .getNotificationsByUser(TECH_NAME, getCurrentCompanyId());
+}
+
+function toggleNotifications() {
+  const box = document.getElementById("notificationsBox");
+
+  if (box.style.display === "none" || box.style.display === "") {
+    box.style.display = "block";
+
+    google.script.run
+      .withSuccessHandler(loadNotifications)
+      .withFailureHandler(function(err) {
+        alert(err.message);
+      })
+      .markNotificationsReadByUser(TECH_NAME, getCurrentCompanyId());
+
+  } else {
+    box.style.display = "none";
+  }
+}
+
+function openCloseOrder(row, woNumber) {
+  window.top.location.href =
+    BASE_URL + "?view=close&row=" + encodeURIComponent(row) +
+    "&wo=" + encodeURIComponent(woNumber) +
+    "&tech=" + encodeURIComponent(TECH_NAME);
+}
+
+function showTechMessage() {
+  const msg = localStorage.getItem("lastTechMessage");
+
+  if (msg) {
+    alert(msg);
+    localStorage.removeItem("lastTechMessage");
+  }
+}
+
+function openPMReport(row, woNumber) {
+  window.top.location.href =
+    BASE_URL + "?view=pm_report" +
+    "&row=" + encodeURIComponent(row) +
+    "&wo=" + encodeURIComponent(woNumber) +
+    "&tech=" + encodeURIComponent(TECH_NAME);
+}
+
+function initMySummaryDate() {
+  const now = new Date();
+  document.getElementById("mySummaryMonth").value = now.getMonth() + 1;
+  document.getElementById("mySummaryYear").value = now.getFullYear();
+}
+
+function loadMyTechSummary() {
+  const companyId = getCurrentCompanyId();
+  const month = Number(document.getElementById("mySummaryMonth").value);
+  const year = Number(document.getElementById("mySummaryYear").value);
+
+  document.getElementById("myTechSummaryBox").innerHTML = "Cargando...";
+
+  google.script.run
+    .withSuccessHandler(function(r) {
+      renderMyTechSummary(r || {});
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById("myTechSummaryBox").innerHTML =
+        "ERROR resumen: " + err.message;
+    })
+    .getMyTechMonthlySummary(companyId, TECH_NAME, month, year);
+}
+
+function renderMyTechSummary(r) {
+  document.getElementById("myTechSummaryBox").innerHTML = `
+    <div style="background:#f9fafb; padding:12px; border-radius:10px;">
+      <div><b>Técnico:</b> ${r.name || TECH_NAME}</div>
+      <div><b>Órdenes completadas:</b> ${r.orders || 0}</div>
+      <div><b>Horas:</b> ${Number(r.hours || 0).toFixed(2)}</div>
+      <div><b>Rate:</b> ${formatMoneyTech(r.rate || 0)}</div>
+      <div><b>Pago por horas:</b> ${formatMoneyTech(r.laborPay || 0)}</div>
+      <div><b>Materiales asignados:</b> ${formatMoneyTech(r.materialCost || 0)}</div>
+      <div><b>10% materiales:</b> ${formatMoneyTech(r.materialBonus || 0)}</div>
+      <hr>
+      <div style="font-size:18px;"><b>Total estimado:</b> ${formatMoneyTech(r.totalPay || 0)}</div>
+      <small>WO: ${(r.workOrders || []).join(", ") || "N/A"}</small>
+    </div>
+  `;
+}
+
+function loadMyTechInvoiceTable() {
+  const companyId = getCurrentCompanyId();
+  const month = Number(document.getElementById("mySummaryMonth").value);
+  const year = Number(document.getElementById("mySummaryYear").value);
+
+  document.getElementById("myTechInvoiceTableBox").innerHTML = "Cargando tabla...";
+
+  google.script.run
+    .withSuccessHandler(function(r) {
+      renderMyTechInvoiceTable(r || {});
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById("myTechInvoiceTableBox").innerHTML =
+        "ERROR tabla: " + err.message;
+    })
+    .getMyTechInvoiceSummary(companyId, TECH_NAME, month, year);
+}
+
+function renderMyTechInvoiceTable(r) {
+  const rows = r.rows || [];
+  const totals = r.totals || {};
+
+  if (!rows.length) {
+    document.getElementById("myTechInvoiceTableBox").innerHTML =
+      "<div style='background:#f9fafb; padding:12px; border-radius:10px;'>No invoices found for this period.</div>";
+    return;
+  }
+
+  document.getElementById("myTechInvoiceTableBox").innerHTML = `
+    <div style="background:#f9fafb; padding:12px; border-radius:10px; overflow:auto;">
+      <h3>Invoice Detail</h3>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+        <div><b>Invoices:</b> ${totals.invoices || 0}</div>
+        <div><b>Hours:</b> ${Number(totals.hours || 0).toFixed(2)}</div>
+        <div><b>Labor Pay:</b> ${formatMoneyTech(totals.laborPay || 0)}</div>
+        <div><b>Material 10%:</b> ${formatMoneyTech(totals.materialBonus || 0)}</div>
+        <div><b>Total Earned:</b> ${formatMoneyTech(totals.totalEarned || 0)}</div>
+      </div>
+
+      <table style="width:100%; border-collapse:collapse; font-size:13px; min-width:1100px;">
+        <thead>
+          <tr style="background:#111827; color:white;">
+            <th style="padding:8px; text-align:left;">WO #</th>
+            <th style="padding:8px; text-align:left;">Invoice #</th>
+            <th style="padding:8px; text-align:left;">Store #</th>
+            <th style="padding:8px; text-align:left;">Equipment</th>
+            <th style="padding:8px; text-align:left;">Problem</th>
+            <th style="padding:8px; text-align:right;">Hours</th>
+            <th style="padding:8px; text-align:right;">Labor Pay</th>
+            <th style="padding:8px; text-align:right;">Material 10%</th>
+            <th style="padding:8px; text-align:right;">Total Earned</th>
+                      </tr>
+        </thead>
+        <tbody>
+          ${rows.map(function(x) {
+            return `
+              <tr style="border-bottom:1px solid #e5e7eb;">
+                <td style="padding:8px;">${x.woNumber || ""}</td>
+                <td style="padding:8px;">${x.invoiceNumber || ""}</td>
+                <td style="padding:8px;">${x.storeNumber || ""}</td>
+                <td style="padding:8px;">${x.equipment || ""}</td>
+                <td style="padding:8px; max-width:260px;">${x.problem || ""}</td>
+                <td style="padding:8px; text-align:right;">${Number(x.hours || 0).toFixed(2)}</td>
+                <td style="padding:8px; text-align:right;">${formatMoneyTech(x.laborPay || 0)}</td>
+                <td style="padding:8px; text-align:right;">${formatMoneyTech(x.materialBonus || 0)}</td>
+                <td style="padding:8px; text-align:right;"><b>${formatMoneyTech(x.totalEarned || 0)}</b></td>
+                              </tr>
+            `;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderTechStatusMetrics(list) {
+  const statuses = [
+    "SENT TO TECH",
+    "IN PROGRESS",
+    "REQUEST PARTS",
+    "PARTS IN TRANSIT",
+    "PARTS IN STORE"
+  ];
+
+  const counts = {};
+  statuses.forEach(s => counts[s] = 0);
+
+  list.forEach(function(o) {
+    const st = String(o.STATUS || "").toUpperCase();
+    if (counts[st] !== undefined) counts[st]++;
+  });
+
+  document.getElementById("techStatusMetrics").innerHTML =
+    statuses.map(function(s) {
+      return `
+        <div style="background:white; padding:10px 14px; border-radius:12px; box-shadow:0 2px 6px rgba(0,0,0,.08);">
+          <b>${s}</b><br>
+          <span style="font-size:22px; font-weight:bold;">${counts[s]}</span>
+        </div>
+      `;
+    }).join("");
+}
+
+function formatMoneyTech(v) {
+  return "$" + Number(v || 0).toFixed(2);
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+  loadHeader();
+  initMySummaryDate();
+  loadMyTechSummary();
+  loadOrders();
+  loadNotifications();
+  showTechMessage();
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: Arial; background: #f3f4f6; margin: 0; padding: 20px; }
+    .topbar { display: flex; gap: 10px; margin: 20px 0; flex-wrap: wrap; align-items: center; }
+    input, select, button, textarea { padding: 8px; border-radius: 8px; border: 1px solid #ccc; }
+    button { background: #111; color: white; cursor: pointer; border: none; }
+    .new-order { background: #16a34a; font-weight: bold; }
+    .notif-btn { background:#2563eb; font-weight:bold; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 15px; }
+    .card { background: white; padding: 15px; border-radius: 12px; border-left: 6px solid #ccc; }
+    .urgent { border-left-color: orange; }
+    .emergency { border-left-color: red; }
+    .normal { border-left-color: green; }
+    .status { background: #eee; padding: 5px 10px; border-radius: 999px; font-size: 12px; display: inline-block; margin-bottom: 10px; }
+    .actions { margin-top: 10px; display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+    textarea { width: 100%; min-height: 50px; margin-top: 8px; box-sizing:border-box; }
+    a { font-size: 13px; margin-right: 8px; }
+    .tech-box { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+    .tech-box label { font-size: 13px; cursor: pointer; }
+
+    #notifCount {
+      background:red;
+      color:white;
+      padding:3px 7px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:bold;
+    }
+
+    .card-top {
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:10px;
+    }
+
+    .age-badge {
+      background:#111827;
+      color:white;
+      padding:6px 10px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:bold;
+      white-space:nowrap;
+    }
+
+    .btn-red { background:#dc2626; color:white; }
+    .btn-green { background:#16a34a; color:white; }
+    .btn-black { background:#111827; color:white; }
+
+    #notificationsBox,
+    #companyBox {
+      display:none;
+      background:white;
+      padding:15px;
+      border-radius:12px;
+      margin-bottom:15px;
+      box-shadow:0 3px 10px rgba(0,0,0,0.08);
+    }
+
+    .notif-item {
+      padding:8px;
+      border-bottom:1px solid #e5e7eb;
+      font-size:14px;
+    }
+  </style>
+</head>
+
+<body>
+
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; background:white; padding:15px; border-radius:12px; margin-bottom:15px; box-shadow:0 3px 10px rgba(0,0,0,0.08);">
+  <div id="companyTitle" style="font-size:22px; font-weight:bold;">
+    Company: Loading...
+  </div>
+
+  <div style="text-align:right;">
+    <div style="font-size:16px; font-weight:bold;">D&D Premier Solutions Corp</div>
+    <div style="font-size:13px; color:#6b7280;">Sistema de Órdenes</div>
+  </div>
+</div>
+
+<div class="topbar">
+  <input id="search" placeholder="Search..." oninput="render()">
+
+  <select id="statusFilter" onchange="render()">
+    <option value="">All Status</option>
+    <option>ORDER RECEIVED</option>
+    <option>SENT TO TECH</option>
+    <option>IN PROGRESS</option>
+    <option>REQUEST PARTS</option>
+    <option>PARTS IN TRANSIT</option>
+    <option>PARTS IN STORE</option>
+    <option>COMPLETED</option>
+    <option>CLOSED</option>
+  </select>
+
+  <input id="filterNSN" placeholder="NSN..." oninput="render()">
+
+  <select id="filterTech" onchange="render()">
+    <option value="">All Techs</option>
+    <option>David Dominguez</option>
+    <option>Miguel Rodriguez</option>
+    <option>Osnier Huerta</option>
+    <option>Alain Mora</option>
+  </select>
+
+  <select id="filterPriority" onchange="render()">
+    <option value="">All Priorities</option>
+    <option>Normal</option>
+    <option>Urgent</option>
+    <option>Emergency</option>
+    <option>URGENTE</option>
+  </select>
+
+  <button onclick="load()">Refresh</button>
+  <button class="new-order" onclick="newOrder()">New Order</button>
+  <button class="new-order" onclick="openPartsTown()">New Parts</button>
+  <button class="notif-btn" onclick="toggleNotifications()">🔔 Notifications <span id="notifCount"></span></button>
+</div>
+
+<div id="companyBox"></div>
+<div id="notificationsBox"></div>
+<div id="statusMetrics" class="box" style="display:flex; gap:10px; flex-wrap:wrap;"></div>
+<div id="cards" class="grid"></div>
+
+<script>
+function requireLogin() {
+  const user = localStorage.getItem("pps_user");
+
+  if (!user) {
+    window.top.location.href = "<?= baseUrl ?>";
+    return false;
+  }
+
+  try {
+    const parsed = JSON.parse(user);
+    if (!parsed.role && !parsed.ROLE) {
+      localStorage.removeItem("pps_user");
+      window.top.location.href = "<?= baseUrl ?>";
+      return false;
+    }
+  } catch (e) {
+    localStorage.removeItem("pps_user");
+    window.top.location.href = "<?= baseUrl ?>";
+    return false;
+  }
+
+  return true;
+}
+
+if (!requireLogin()) {
+  throw new Error("No autorizado");
+}
+
+let data = [];
+let ACTIVE_COMPANY_ID = "";
+
+const BASE_URL = "https://script.google.com/macros/s/AKfycbwAiZ0Dh5BQoX-QTmMbZcRDEr974-X_nNWcW5x2XeYurC_CeXLNSrl1k-f3p1DDKppOCw/exec";
+
+function getCurrentUser() {
+  try {
+    return JSON.parse(localStorage.getItem("pps_user") || "{}");
+  } catch (e) {
+    return {};
+  }
+}
+
+function getCurrentCompanyId() {
+  const user = getCurrentUser();
+  return String(user.companyId || "").toUpperCase();
+}
+
+function getCurrentRole() {
+  const user = getCurrentUser();
+  return String(user.role || user.ROLE || "").toUpperCase();
+}
+
+function normalizeRole(role) {
+  return String(role || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .trim();
+}
+
+function canCreateQuote() {
+  const role = normalizeRole(getCurrentRole());
+  return ["ADMIN", "SYSTEM", "ORDENES", "OWNER"].includes(role);
+}
+
+function canDeleteWO() {
+  const role = normalizeRole(getCurrentRole());
+  return ["ADMIN", "SYSTEM", "ORDENES"].includes(role);
+}
+
+function openQuote(row, woNumber, companyId) {
+  window.top.location.href =
+    BASE_URL +
+    "?view=quote" +
+    "&row=" + encodeURIComponent(row) +
+    "&wo=" + encodeURIComponent(woNumber || "") +
+    "&companyId=" + encodeURIComponent(companyId || ACTIVE_COMPANY_ID);
+}
+
+function updateHeaderCompany(companyId) {
+  companyId = String(companyId || "").toUpperCase();
+
+  if (!companyId) {
+    document.getElementById("companyTitle").innerText = "Company: Loading...";
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function(name) {
+      document.getElementById("companyTitle").innerText =
+        "Company: " + (name || companyId);
+    })
+    .withFailureHandler(function() {
+      document.getElementById("companyTitle").innerText =
+        "Company: " + companyId;
+    })
+    .getCompanyName(companyId);
+}
+
+function newOrder() {
+  if (!ACTIVE_COMPANY_ID) {
+    alert("Primero seleccione una empresa.");
+    return;
+  }
+
+  window.top.location.href =
+    BASE_URL + "?view=createOrder&companyId=" + encodeURIComponent(ACTIVE_COMPANY_ID);
+}
+
+function load() {
+  const user = getCurrentUser();
+
+  if (!ACTIVE_COMPANY_ID) {
+    if (normalizeRole(user.role || user.ROLE) === "OWNER") {
+      loadCompanySelector();
+      return;
+    } else {
+      ACTIVE_COMPANY_ID = String(user.companyId || "").toUpperCase();
+    }
+  }
+
+  updateHeaderCompany(ACTIVE_COMPANY_ID);
+
+  document.getElementById("cards").innerHTML = "Loading...";
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      data = res || [];
+      render();
+
+      setTimeout(function() {
+        showLastWOMessage();
+        scrollToLastWO();
+      }, 300);
+
+      loadNotifications();
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById("cards").innerHTML =
+        "ERROR loading dashboard: " + err.message;
+    })
+    .getDashboardData(ACTIVE_COMPANY_ID, user.role || user.ROLE);
+}
+
+function loadCompanySelector() {
+  const user = getCurrentUser();
+
+  document.getElementById("companyTitle").innerText = "Company: Seleccione empresa";
+
+  google.script.run
+    .withSuccessHandler(function(companies) {
+      renderCompanySelector(companies || []);
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById("cards").innerHTML = "ERROR companies: " + err.message;
+    })
+    .getCompaniesForUser(user.companyId, user.role || user.ROLE);
+}
+
+function renderCompanySelector(companies) {
+  const box = document.getElementById("companyBox");
+  box.style.display = "block";
+
+  if (!companies.length) {
+    box.innerHTML = "<b>No hay empresas disponibles.</b>";
+    return;
+  }
+
+  box.innerHTML = `
+    <h3>Seleccionar Empresa</h3>
+    <select id="companySelect">
+      ${companies.map(function(c) {
+        return `
+          <option value="${c.COMPANY_ID}">
+            ${c.COMPANY_ID} - ${c.COMPANY_NAME || ""}
+          </option>
+        `;
+      }).join("")}
+    </select>
+    <button onclick="activateCompany()">Activar Empresa</button>
+  `;
+
+  document.getElementById("cards").innerHTML =
+    "Seleccione una empresa para ver sus órdenes.";
+}
+
+function activateCompany() {
+  ACTIVE_COMPANY_ID = document.getElementById("companySelect").value;
+
+  if (!ACTIVE_COMPANY_ID) {
+    alert("Seleccione una empresa.");
+    return;
+  }
+
+  document.getElementById("companyBox").style.display = "none";
+  updateHeaderCompany(ACTIVE_COMPANY_ID);
+  load();
+}
+
+function loadNotifications() {
+  if (!ACTIVE_COMPANY_ID) return;
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      const notifications = res || [];
+      const unread = notifications.filter(function(n) {
+        return String(n.READ || "").toUpperCase() !== "YES";
+      }).length;
+
+      document.getElementById("notifCount").innerText = unread ? unread : "";
+
+      document.getElementById("notificationsBox").innerHTML =
+        notifications.length
+          ? notifications.map(function(n) {
+              return `
+                <div class="notif-item">
+                  <b>${n.TYPE || ""}</b> — ${n.MESSAGE || ""}
+                  <br>
+                  <small>WO: ${n.WO_NUMBER || ""} | ${n.TIMESTAMP || ""}</small>
+                </div>
+              `;
+            }).join("")
+          : "No notifications.";
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById("notificationsBox").innerHTML =
+        "ERROR loading notifications: " + err.message;
+    })
+    .getNotifications(ACTIVE_COMPANY_ID, getCurrentRole());
+}
+
+function toggleNotifications() {
+  const box = document.getElementById("notificationsBox");
+
+  if (box.style.display === "none" || box.style.display === "") {
+    box.style.display = "block";
+
+    loadNotifications();
+
+    google.script.run
+      .withSuccessHandler(loadNotifications)
+      .withFailureHandler(function(err) {
+        alert(err.message);
+      })
+      .markNotificationsRead(ACTIVE_COMPANY_ID);
+
+  } else {
+    box.style.display = "none";
+  }
+}
+
+function render() {
+  const search = document.getElementById("search").value.toLowerCase();
+  const statusFilter = document.getElementById("statusFilter").value;
+  const nsnFilter = document.getElementById("filterNSN").value.toLowerCase();
+  const techFilter = document.getElementById("filterTech").value;
+  const priorityFilter = document.getElementById("filterPriority").value;
+
+  const filtered = data.filter(function(o) {
+    const text = JSON.stringify(o).toLowerCase();
+
+    return (
+      (!search || text.includes(search)) &&
+      (!statusFilter || o.STATUS === statusFilter) &&
+      (!nsnFilter || String(o.NSN || "").toLowerCase().includes(nsnFilter)) &&
+      (!techFilter || String(o.TECHNICIAN || "").includes(techFilter)) &&
+      (!priorityFilter || String(o.ORDER_PRIORITY || "").toUpperCase() === priorityFilter.toUpperCase())
+    );
+  });
+
+  renderStatusMetrics(filtered);
+
+  document.getElementById("cards").innerHTML =
+    filtered.length ? filtered.map(function(o) { return card(o); }).join("") : "No work orders found.";
+}
+
+function getCreatedAgeText(o) {
+  const rawDate = o.DATE_CREATED || "";
+
+  if (!rawDate) return "Sin fecha";
+
+  const createdDate = new Date(rawDate);
+
+  if (isNaN(createdDate.getTime())) {
+    return "Fecha inválida";
+  }
+
+  const now = new Date();
+  const diffMs = now - createdDate;
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays <= 0) return "Hoy";
+  if (diffDays === 1) return "1 día";
+  return diffDays + " días";
+}
+
+function getBtnClass(currentStatus, targetStatus) {
+  const flow = [
+    "ORDER RECEIVED",
+    "SENT TO TECH",
+    "IN PROGRESS",
+    "REQUEST PARTS",
+    "PARTS IN TRANSIT",
+    "PARTS IN STORE",
+    "COMPLETED",
+    "CLOSED"
+  ];
+
+  const currentIndex = flow.indexOf(String(currentStatus || "").toUpperCase());
+  const targetIndex = flow.indexOf(targetStatus);
+
+  if (currentIndex >= targetIndex && targetIndex !== -1) {
+    return "btn-green";
+  }
+
+  return "btn-red";
+}
+
+function card(o) {
+  let cls = "normal";
+  const p = String(o.ORDER_PRIORITY || "").toLowerCase();
+
+  if (p.includes("urgent") || p.includes("urgente")) cls = "urgent";
+  if (p.includes("emergency") || p.includes("emergencia")) cls = "emergency";
+
+  const row = Number(o.ROW_NUMBER);
+  const equipment = o.REPORTED_EQUIPMENT || o["Reported Equipment"] || o["REPORTED EQUIPMENT"] || "No especificado";
+
+  const currentTechs = String(o.TECHNICIAN || "")
+    .split(",")
+    .map(function(t) { return t.trim(); })
+    .filter(Boolean);
+
+  function checked(name) {
+    return currentTechs.includes(name) ? "checked" : "";
+  }
+
+  const age = getCreatedAgeText(o);
+
+  return `
+    <div class="card ${cls}" id="wo_${o.WO_NUMBER}">
+      <div class="card-top">
+        <div>
+          <b>${o.WO_NUMBER || ""}</b> | NSN ${o.NSN || ""}<br>
+          <div class="status">${o.STATUS || ""}</div>
+        </div>
+
+        <div class="age-badge">
+          ${age}
+        </div>
+      </div>
+
+      <div><b>Company:</b> ${o.COMPANY_ID || ""}</div>
+      <div><b>Técnico:</b> ${o.TECHNICIAN || "Sin asignar"}</div>
+      <div><b>Dirección:</b> ${o.STORE_ADDRESS || "No disponible"}</div>
+      <div><b>Equipo:</b> ${equipment}</div>
+      <div><b>Prioridad:</b> ${o.ORDER_PRIORITY || ""}</div>
+
+      <div><b>Problema:</b><br>${o.REPORTED_PROBLEM_ES || o.REPORTED_PROBLEM_ORIGINAL || ""}</div>
+
+      <textarea id="note_${row}" placeholder="Notas internas">${o.NOTES || ""}</textarea>
+
+      <div class="tech-box" id="techbox_${row}">
+        <label><input type="checkbox" value="David Dominguez" ${checked("David Dominguez")}> David Dominguez</label>
+        <label><input type="checkbox" value="Miguel Rodriguez" ${checked("Miguel Rodriguez")}> Miguel Rodriguez</label>
+        <label><input type="checkbox" value="Osnier Huerta" ${checked("Osnier Huerta")}> Osnier Huerta</label>
+        <label><input type="checkbox" value="Alain Mora" ${checked("Alain Mora")}> Alain Mora</label>
+      </div>
+
+      <div class="actions">
+        <button onclick="assignAndSend(${row})">Asignar</button>
+        <button onclick="sendWO(${row})">Reenviar</button>
+      </div>
+
+      <div class="actions">
+        <button class="${getBtnClass(o.STATUS,'IN PROGRESS')}" onclick="setStatus(${row},'IN PROGRESS')">En Proceso</button>
+        <button class="${getBtnClass(o.STATUS,'REQUEST PARTS')}" onclick="setStatus(${row},'REQUEST PARTS')">Pedir Piezas</button>
+        <button class="${getBtnClass(o.STATUS,'PARTS IN TRANSIT')}" onclick="setStatus(${row},'PARTS IN TRANSIT')">Piezas en Envío</button>
+        <button class="${getBtnClass(o.STATUS,'PARTS IN STORE')}" onclick="setStatus(${row},'PARTS IN STORE')">Piezas en Store</button>
+        <button class="${getBtnClass(o.STATUS,'COMPLETED')}" onclick="setStatus(${row},'COMPLETED')">Completado</button>
+        <button class="${getBtnClass(o.STATUS,'CLOSED')}" onclick="setStatus(${row},'CLOSED')">Cerrar</button>
+      </div>
+
+      <div class="actions">
+        <button onclick="saveNotes(${row})">Guardar Notas</button>
+
+        ${canCreateQuote() ? `
+  <button
+    style="background:${String(o.QUOTE_STATUS || "").toUpperCase() === "APPROVED" ? "#16a34a" : "#2563eb"};color:white;font-weight:bold;"
+    onclick="openQuote(${row}, '${o.WO_NUMBER || ""}', '${o.COMPANY_ID || ""}')">
+    ${String(o.QUOTE_STATUS || "").toUpperCase() === "APPROVED" ? "QUOTE APPROVED" : "QUOTE"}
+  </button>
+` : ""}
+
+        ${canDeleteWO() ? `
+          <button
+            style="background:#dc2626;color:white;font-weight:bold;"
+            onclick="deleteWO(${row}, '${o.WO_NUMBER || ""}')">
+            ELIMINAR
+          </button>
+        ` : ""}
+      </div>
+    </div>
+  `;
+}
+
+function getSelectedTechs(row) {
+  const box = document.getElementById("techbox_" + row);
+  const checks = box.querySelectorAll("input[type=checkbox]:checked");
+
+  return Array.from(checks)
+    .map(function(c) { return c.value; })
+    .filter(Boolean);
+}
+
+function assignAndSend(row) {
+  const techs = getSelectedTechs(row);
+
+  if (!techs.length) {
+    return alert("Seleccione al menos un técnico.");
+  }
+
+  const techText = techs.join(", ");
+
+  google.script.run
+    .withSuccessHandler(function() {
+      google.script.run
+        .withSuccessHandler(function() {
+          alert("Asignado y enviado correctamente.");
+          load();
+        })
+        .withFailureHandler(function(err) {
+          alert(err.message);
+        })
+        .sendWorkOrderFromDashboard(row);
+    })
+    .withFailureHandler(function(err) {
+      alert(err.message);
+    })
+    .updateWorkOrderFromDashboard(row, { TECHNICIAN: techText });
+}
+
+function sendWO(row) {
+  if (!confirm("¿Reenviar esta orden al técnico?")) return;
+
+  google.script.run
+    .withSuccessHandler(function() {
+      alert("Orden enviada.");
+      load();
+    })
+    .withFailureHandler(function(err) {
+      alert(err.message);
+    })
+    .sendWorkOrderFromDashboard(row);
+}
+
+function setStatus(row, st) {
+  google.script.run
+    .withSuccessHandler(function() {
+      load();
+    })
+    .withFailureHandler(function(err) {
+      alert(err.message);
+    })
+    .updateWorkOrderFromDashboard(row, { STATUS: st });
+}
+
+function saveNotes(row) {
+  const notes = document.getElementById("note_" + row).value;
+
+  google.script.run
+    .withSuccessHandler(load)
+    .withFailureHandler(function(err) {
+      alert(err.message);
+    })
+    .updateWorkOrderFromDashboard(row, { NOTES: notes });
+}
+
+function deleteWO(row, woNumber) {
+  if (!confirm("¿Seguro que deseas eliminar la orden " + woNumber + "?")) return;
+  if (!confirm("Esta acción eliminará la fila completa del Sheet WORK_ORDERS. ¿Confirmas?")) return;
+
+  google.script.run
+    .withSuccessHandler(function() {
+      alert("Orden eliminada correctamente.");
+      load();
+    })
+    .withFailureHandler(function(err) {
+      alert(err.message);
+    })
+    .deleteWorkOrder(row);
+}
+
+function scrollToLastWO() {
+  const lastWO = localStorage.getItem("lastWO");
+
+  if (!lastWO) return;
+
+  const el = document.getElementById("wo_" + lastWO);
+
+  if (el) {
+    el.scrollIntoView({
+      behavior: "smooth",
+      block: "center"
+    });
+
+    localStorage.removeItem("lastWO");
+  }
+}
+
+function showLastWOMessage() {
+  const msg = localStorage.getItem("lastWOMessage");
+
+  if (msg) {
+    alert(msg);
+    localStorage.removeItem("lastWOMessage");
+  }
+}
+
+function renderStatusMetrics(list) {
+  const statuses = [
+    "ORDER RECEIVED",
+    "SENT TO TECH",
+    "IN PROGRESS",
+    "REQUEST PARTS",
+    "PARTS IN TRANSIT",
+    "PARTS IN STORE",
+    "COMPLETED",
+    "CLOSED"
+  ];
+
+  const counts = {};
+  statuses.forEach(s => counts[s] = 0);
+
+  list.forEach(function(o) {
+    const st = String(o.STATUS || "").toUpperCase();
+    if (counts[st] !== undefined) counts[st]++;
+  });
+
+  document.getElementById("statusMetrics").innerHTML =
+    statuses.map(function(s) {
+      return `
+        <div style="background:white; padding:10px 14px; border-radius:12px; box-shadow:0 2px 6px rgba(0,0,0,.08);">
+          <b>${s}</b><br>
+          <span style="font-size:22px; font-weight:bold;">${counts[s]}</span>
+        </div>
+      `;
+    }).join("");
+}
+
+function openPartsTown() {
+  window.open("https://www.partstown.com/", "_blank");
+}
+
+load();
+
+window.addEventListener("pageshow", function() {
+  load();
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body { font-family: Arial, sans-serif; background:#f3f4f6; margin:0; padding:20px; color:#111827; }
+    .box { max-width:420px; margin:60px auto; background:white; padding:25px; border-radius:16px; box-shadow:0 4px 14px rgba(0,0,0,0.08); }
+    .panel { max-width:900px; margin:30px auto; background:white; padding:25px; border-radius:16px; box-shadow:0 4px 14px rgba(0,0,0,0.08); display:none; }
+    .global-header { display:none; max-width:900px; margin:0 auto 15px auto; background:white; padding:15px; border-radius:12px; box-shadow:0 3px 10px rgba(0,0,0,0.08); justify-content:space-between; align-items:center; flex-wrap:wrap; }
+    input, button { width:100%; box-sizing:border-box; padding:13px; margin:8px 0; border-radius:10px; border:1px solid #d1d5db; font-size:15px; }
+    button { background:#111827; color:white; border:none; font-weight:bold; cursor:pointer; }
+    .muted { color:#6b7280; font-size:14px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:15px; margin-top:20px; }
+    .module { background:#f9fafb; border:1px solid #e5e7eb; border-radius:14px; padding:18px; cursor:pointer; }
+    .module-title { font-size:18px; font-weight:bold; margin-bottom:6px; }
+    .module-desc { font-size:14px; color:#6b7280; }
+    #error { color:#dc2626; font-size:14px; margin-top:10px; font-weight:bold; }
+    .logout { background:#dc2626; max-width:180px; }
+  </style>
+</head>
+
+<body>
+
+<div id="globalHeader" class="global-header">
+  <div id="companyTitle" style="font-size:22px; font-weight:bold;">Company: Loading...</div>
+  <div style="text-align:right;">
+    <div style="font-size:16px; font-weight:bold;">D&D Premier Solutions Corp</div>
+    <div style="font-size:13px; color:#6b7280;">Sistema de Órdenes</div>
+  </div>
+</div>
+
+<div id="loginBox" class="box">
+  <h2>D&D Premier Solutions Corp</h2>
+  <div class="muted">Login de acceso</div>
+
+  <input id="email" type="email" placeholder="Email">
+  <input id="password" type="password" placeholder="Password">
+
+  <button onclick="login()">Entrar</button>
+  <div id="error"></div>
+</div>
+
+<div id="mainPanel" class="panel">
+  <h1>Panel Principal</h1>
+  <div class="muted" id="userInfo"></div>
+
+  <div id="modules" class="grid"></div>
+
+  <button class="logout" onclick="logout()">Salir</button>
+</div>
+
+<script>
+const BASE_URL = "https://script.google.com/macros/s/AKfycbwAiZ0Dh5BQoX-QTmMbZcRDEr974-X_nNWcW5x2XeYurC_CeXLNSrl1k-f3p1DDKppOCw/exec";
+
+let CURRENT_USER = null;
+
+const MODULES = [
+  {
+    title: "Órdenes",
+    desc: "Manejo de work orders, técnicos y estados.",
+    roles: ["OWNER", "ADMIN", "ORDENES"],
+    url: "?view=orders"
+  },
+  {
+    title: "Economía",
+    desc: "Facturación, costos, pagos y profit.",
+    roles: ["OWNER", "ADMIN", "ECONOMIA"],
+    url: "?view=economy"
+  },
+  {
+    title: "Tiendas / Direcciones",
+    desc: "Base de datos de NSN, direcciones y clientes.",
+    roles: ["OWNER", "ADMIN"],
+    url: "?view=stores"
+  },
+  {
+    title: "Empresas",
+    desc: "Administración multi-empresa.",
+    roles: ["OWNER"],
+    url: "?view=companies"
+  },
+  {
+    title: "Usuarios",
+    desc: "Crear usuarios y asignar roles.",
+    roles: ["OWNER", "ADMIN"],
+    url: "?view=users"
+  },
+  {
+    title: "Portal Técnico",
+    desc: "Vista de órdenes para técnicos.",
+    roles: ["OWNER", "ADMIN", "TECH"],
+    url: "?view=tech&tech="
+  },
+  {
+    title: "Portal Supervisor",
+    desc: "Vista de estados para supervisores.",
+    roles: ["OWNER", "ADMIN", "SUPERVISOR"],
+    url: "?view=customer&supervisor="
+  }
+];
+
+function login() {
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value.trim();
+
+  document.getElementById("error").innerText = "";
+
+  google.script.run
+    .withSuccessHandler(function(user) {
+      CURRENT_USER = user || {};
+      localStorage.setItem("pps_user", JSON.stringify(CURRENT_USER));
+      showPanel();
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById("error").innerText = err.message;
+    })
+    .loginUser(email, password);
+}
+
+function normalizeUser(user) {
+  user = user || {};
+
+  return {
+    success: user.success,
+    email: user.email || user.EMAIL || "",
+    name: user.name || user.NAME || "",
+    role: String(user.role || user.ROLE || "").trim().toUpperCase(),
+    companyId: String(user.companyId || user.COMPANY_ID || "").trim().toUpperCase()
+  };
+}
+
+function showPanel() {
+  CURRENT_USER = normalizeUser(CURRENT_USER);
+
+  document.getElementById("loginBox").style.display = "none";
+  document.getElementById("globalHeader").style.display = "flex";
+  document.getElementById("mainPanel").style.display = "block";
+
+  updateHeaderCompany(CURRENT_USER.companyId);
+
+  document.getElementById("userInfo").innerText =
+    CURRENT_USER.name + " | " + CURRENT_USER.role + " | Company: " + CURRENT_USER.companyId;
+
+  renderModules();
+}
+
+function renderModules() {
+  const role = String(CURRENT_USER.role || "").trim().toUpperCase();
+
+  const allowed = MODULES.filter(function(m) {
+    return m.roles.includes(role);
+  });
+
+  if (!allowed.length) {
+    document.getElementById("modules").innerHTML = `
+      <div class="module">
+        <div class="module-title">No hay módulos disponibles</div>
+        <div class="module-desc">
+          Rol detectado: <b>${role || "VACÍO"}</b><br>
+          Company: <b>${CURRENT_USER.companyId || "VACÍO"}</b><br>
+          Revisa la hoja USERS: ROLE debe ser OWNER, ADMIN, TECH, SUPERVISOR, ECONOMIA u ORDENES.
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  document.getElementById("modules").innerHTML =
+    allowed.map(function(m) {
+      return `
+        <div class="module" onclick="openModule('${m.url}')">
+          <div class="module-title">${m.title}</div>
+          <div class="module-desc">${m.desc}</div>
+        </div>
+      `;
+    }).join("");
+}
+
+function openModule(url) {
+  if (url === "?view=tech&tech=") {
+    window.top.location.href =
+      BASE_URL + url + encodeURIComponent(CURRENT_USER.name);
+    return;
+  }
+
+  if (url === "?view=customer&supervisor=") {
+    window.top.location.href =
+      BASE_URL + url + encodeURIComponent(CURRENT_USER.name);
+    return;
+  }
+
+  window.top.location.href = BASE_URL + url;
+}
+
+function updateHeaderCompany(companyId) {
+  companyId = String(companyId || "").toUpperCase();
+
+  if (!companyId) {
+    document.getElementById("companyTitle").innerText = "Company: Loading...";
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function(name) {
+      document.getElementById("companyTitle").innerText =
+        "Company: " + (name || companyId);
+    })
+    .withFailureHandler(function() {
+      document.getElementById("companyTitle").innerText =
+        "Company: " + companyId;
+    })
+    .getCompanyName(companyId);
+}
+
+function logout() {
+  localStorage.removeItem("pps_user");
+  CURRENT_USER = null;
+
+  document.getElementById("globalHeader").style.display = "none";
+  document.getElementById("mainPanel").style.display = "none";
+  document.getElementById("loginBox").style.display = "block";
+  document.getElementById("password").value = "";
+}
+
+window.onload = function() {
+  const saved = localStorage.getItem("pps_user");
+
+  if (saved) {
+    try {
+      CURRENT_USER = JSON.parse(saved);
+      showPanel();
+    } catch (e) {
+      localStorage.removeItem("pps_user");
+    }
+  }
+};
+</script>
+
+</body>
+</html>

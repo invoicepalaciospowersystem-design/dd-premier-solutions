@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body { font-family: Arial; background:#f3f4f6; margin:0; padding:20px; color:#111827; }
+    .header, .box { background:white; padding:16px; border-radius:14px; margin-bottom:15px; box-shadow:0 3px 10px rgba(0,0,0,0.08); }
+    input, select, textarea, button { width:100%; box-sizing:border-box; padding:12px; border-radius:10px; border:1px solid #d1d5db; margin:7px 0; font-size:15px; }
+    textarea { min-height:110px; }
+    button { background:#111827; color:white; border:none; font-weight:bold; cursor:pointer; }
+    .save { background:#16a34a; }
+    .cancel { background:#dc2626; }
+    .muted { color:#6b7280; font-size:14px; }
+  </style>
+</head>
+
+<body>
+
+<div class="header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
+  <div id="companyTitle" style="font-size:22px; font-weight:bold;">
+    Company: Loading...
+  </div>
+
+  <div style="text-align:right;">
+    <div style="font-size:16px; font-weight:bold;">D&D Premier Solutions Corp</div>
+    <div style="font-size:13px; color:#6b7280;">Sistema de Órdenes</div>
+  </div>
+</div>
+
+<div class="box">
+  <h2>Create Work Order</h2>
+  <div class="muted">All fields are required. NSN # identifies the McDonald's store.</div>
+
+  <select id="WO_TYPE" onchange="togglePMType()">
+    <option value="">Select Order Type</option>
+    <option value="REPAIR_FORM">REPAIR_FORM</option>
+    <option value="PM_FORM">PM_FORM</option>
+  </select>
+
+  <select id="PM_TYPE" style="display:none;">
+    <option value="">Select PM Type</option>
+    <option value="MENSUAL">MENSUAL</option>
+    <option value="TRIMESTRAL">TRIMESTRAL</option>
+    <option value="ANNUAL">ANNUAL</option>
+  </select>
+
+  <input id="NSN" placeholder="NSN #">
+
+  <input id="REPORTED_EQUIPMENT" placeholder="Reported Equipment">
+
+  <select id="ORDER_PRIORITY">
+    <option value="">Order Priority</option>
+    <option>Normal</option>
+    <option>Urgent</option>
+    <option>Emergency</option>
+  </select>
+
+  <textarea id="REPORTED_PROBLEM" placeholder="Reported Problem"></textarea>
+
+  <input id="MANAGER" placeholder="Manager Name">
+
+  <button class="save" onclick="saveOrder()">Create Order</button>
+  <button class="cancel" onclick="goBack()">Cancel</button>
+</div>
+
+<script>
+function requireLogin() {
+  const user = localStorage.getItem("pps_user");
+
+  if (!user) {
+    window.top.location.href = "<?= baseUrl ?>";
+    return false;
+  }
+
+  try {
+    const parsed = JSON.parse(user);
+    if (!parsed.role && !parsed.ROLE) {
+      localStorage.removeItem("pps_user");
+      window.top.location.href = "<?= baseUrl ?>";
+      return false;
+    }
+  } catch (e) {
+    localStorage.removeItem("pps_user");
+    window.top.location.href = "<?= baseUrl ?>";
+    return false;
+  }
+
+  return true;
+}
+
+if (!requireLogin()) {
+  throw new Error("No autorizado");
+}
+
+const COMPANY_ID_FROM_URL = "<?= companyId ?>";
+const BASE_URL = "<?= baseUrl ?>";
+
+function getCurrentUser() {
+  try {
+    return JSON.parse(localStorage.getItem("pps_user") || "{}");
+  } catch (e) {
+    return {};
+  }
+}
+
+function getCompanyId() {
+  const user = getCurrentUser();
+  return String(COMPANY_ID_FROM_URL || user.companyId || "").toUpperCase();
+}
+
+function togglePMType() {
+  const woType = document.getElementById("WO_TYPE").value;
+  const pmType = document.getElementById("PM_TYPE");
+
+  if (woType === "PM_FORM") {
+    pmType.style.display = "block";
+  } else {
+    pmType.style.display = "none";
+    pmType.value = "";
+  }
+}
+
+function loadHeader() {
+  const companyId = getCompanyId();
+
+  google.script.run
+    .withSuccessHandler(function(name) {
+      document.getElementById("companyTitle").innerText =
+        "Company: " + (name || companyId);
+    })
+    .withFailureHandler(function() {
+      document.getElementById("companyTitle").innerText =
+        "Company: " + companyId;
+    })
+    .getCompanyName(companyId);
+}
+
+function saveOrder() {
+  const companyId = getCompanyId();
+
+  const payload = {
+    COMPANY_ID: companyId,
+    WO_TYPE: document.getElementById("WO_TYPE").value.trim(),
+    PM_TYPE: document.getElementById("PM_TYPE").value.trim(),
+    NSN: document.getElementById("NSN").value.trim(),
+    REPORTED_EQUIPMENT: document.getElementById("REPORTED_EQUIPMENT").value.trim(),
+    ORDER_PRIORITY: document.getElementById("ORDER_PRIORITY").value.trim(),
+    REPORTED_PROBLEM: document.getElementById("REPORTED_PROBLEM").value.trim(),
+    MANAGER: document.getElementById("MANAGER").value.trim()
+  };
+
+  if (!payload.WO_TYPE) {
+    alert("Select Order Type.");
+    return;
+  }
+
+  if (payload.WO_TYPE === "PM_FORM" && !payload.PM_TYPE) {
+    alert("Select PM Type.");
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      localStorage.setItem("lastWO", res.woNumber);
+      localStorage.setItem("lastWOMessage", "Orden creada: " + res.woNumber);
+
+      window.top.location.href = BASE_URL + "?view=orders";
+    })
+    .withFailureHandler(function(err) {
+      alert(err.message);
+    })
+    .createWorkOrderFromApp(payload);
+}
+
+function goBack() {
+  window.top.location.href = BASE_URL + "?view=orders";
+}
+
+loadHeader();
+</script>
+
+</body>
+</html>

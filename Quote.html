@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: Arial; background:#f3f4f6; margin:0; padding:20px; }
+    .box { background:white; padding:18px; border-radius:12px; margin-bottom:15px; box-shadow:0 2px 8px rgba(0,0,0,.08); }
+    h2, h3 { margin-top:0; }
+    input, textarea { width:100%; padding:8px; border:1px solid #ccc; border-radius:8px; box-sizing:border-box; }
+    input[readonly] { background:#f3f4f6; }
+    textarea { min-height:80px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
+    label { font-size:13px; font-weight:bold; color:#374151; }
+    table { width:100%; border-collapse:collapse; margin-top:10px; }
+    th, td { border:1px solid #ddd; padding:6px; font-size:13px; }
+    th { background:#111827; color:white; }
+    button { padding:10px 14px; border:none; border-radius:8px; cursor:pointer; font-weight:bold; }
+    .save { background:#16a34a; color:white; }
+    .back { background:#111827; color:white; }
+    .add { background:#2563eb; color:white; }
+    .remove { background:#dc2626; color:white; }
+    .totals { max-width:360px; margin-left:auto; }
+  </style>
+</head>
+
+<body>
+
+<div class="box">
+  <h2>Create Quote</h2>
+  <p><b>WO:</b> <span id="woLabel">Loading...</span></p>
+</div>
+
+<div class="box">
+  <h3>Quote Info</h3>
+  <div class="grid">
+    <div>
+      <label>Quote Number</label>
+      <input id="quote_number" readonly>
+    </div>
+    <div>
+      <label>WO Number</label>
+      <input id="wo_number" readonly>
+    </div>
+    <div>
+      <label>Date</label>
+      <input id="quote_date" type="date">
+    </div>
+  </div>
+</div>
+
+<div class="box">
+  <h3>Customer Information</h3>
+  <div class="grid">
+    <div><label>Name</label><input id="nombre_cliente"></div>
+    <div><label>Address</label><input id="direccion"></div>
+    <div><label>City</label><input id="ciudad"></div>
+    <div><label>State</label><input id="estado"></div>
+    <div><label>Zip</label><input id="zip_code"></div>
+  </div>
+</div>
+
+<div class="box">
+  <h3>Description of Unit</h3>
+  <div class="grid">
+    <div><label>NS#</label><input id="ns_number"></div>
+    <div><label>Make</label><input id="marca"></div>
+    <div><label>Model</label><input id="modelo"></div>
+    <div><label>Serial Number</label><input id="numero_serie"></div>
+  </div>
+</div>
+
+<div class="box">
+  <h3>Service Requested</h3>
+  <textarea id="servicio_solicitado"></textarea>
+</div>
+
+<div class="box">
+  <h3>Description of Proposed Work</h3>
+  <textarea id="trabajo_propuesto"></textarea>
+</div>
+
+<div class="box">
+  <h3>Materials & Services</h3>
+
+  <button class="add" onclick="addItem()">+ Add Item</button>
+
+  <table>
+    <thead>
+      <tr>
+        <th>QTY</th>
+        <th>PART #</th>
+        <th>MATERIALS & SERVICES</th>
+        <th>UNIT PRICE</th>
+        <th>LABOR HOURS</th>
+        <th>RATE</th>
+        <th>AMOUNT</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="itemsBody"></tbody>
+  </table>
+</div>
+
+<div class="box totals">
+  <h3>Total Summary</h3>
+
+  <label>Total Material</label>
+  <input id="total_material" type="number" step="0.01" readonly>
+
+  <label>Total Labor</label>
+  <input id="total_labor" type="number" step="0.01" readonly>
+
+  <label>Sub Total</label>
+  <input id="sub_total" type="number" step="0.01" readonly>
+
+  <label>Tax 7%</label>
+  <input id="tax" type="number" step="0.01" readonly>
+
+  <label>Total</label>
+  <input id="total" type="number" step="0.01" readonly>
+</div>
+
+<div class="box">
+  <button class="save" onclick="saveQuote()">Create Quote & Generate PDFs</button>
+  <button class="back" onclick="goBack()">Back</button>
+</div>
+
+<script>
+const BASE_URL = "<?= baseUrl ?>";
+const ROW_NUMBER = "<?= row ?>";
+const WO_PARAM = "<?= wo ?>";
+const COMPANY_ID = "<?= companyId ?>";
+
+let items = [];
+
+function todayISO() {
+  return new Date().toISOString().slice(0,10);
+}
+
+function loadQuotePage() {
+  document.getElementById("quote_date").value = todayISO();
+  document.getElementById("woLabel").innerText = WO_PARAM || "Loading WO...";
+  document.getElementById("wo_number").value = WO_PARAM || "";
+
+  google.script.run
+    .withSuccessHandler(function(order) {
+      console.log("ORDER QUOTE:", order);
+
+      if (!order) {
+        alert("No se encontró la orden para crear el quote: " + WO_PARAM);
+        document.getElementById("woLabel").innerText = WO_PARAM || "WO no encontrado";
+        document.getElementById("wo_number").value = WO_PARAM || "";
+        generateQuoteNumberOnPage();
+        addItem();
+        return;
+      }
+
+      document.getElementById("woLabel").innerText = order.woNumber || WO_PARAM || "";
+      document.getElementById("wo_number").value = order.woNumber || WO_PARAM || "";
+      document.getElementById("nombre_cliente").value = order.client || "";
+
+      const addr = splitAddressClient(order.address || "");
+
+      document.getElementById("direccion").value = addr.address;
+      document.getElementById("ciudad").value = addr.city;
+      document.getElementById("estado").value = addr.state;
+      document.getElementById("zip_code").value = addr.zip;
+
+      document.getElementById("ns_number").value = order.nsn || "";
+      document.getElementById("servicio_solicitado").value = order.problemEn || order.problemEs || "";
+      document.getElementById("trabajo_propuesto").value = "";
+
+      generateQuoteNumberOnPage();
+      addItem();
+    })
+    .withFailureHandler(function(err) {
+      alert("Error cargando orden para quote: " + err.message);
+      document.getElementById("woLabel").innerText = WO_PARAM || "ERROR";
+      generateQuoteNumberOnPage();
+      addItem();
+    })
+    .getWorkOrderForQuoteByWO(WO_PARAM);
+}
+
+function generateQuoteNumberOnPage() {
+  google.script.run
+    .withSuccessHandler(function(qn) {
+      document.getElementById("quote_number").value = qn || "";
+    })
+    .withFailureHandler(function(err) {
+      alert("Error generando número de quote: " + err.message);
+    })
+    .generateQuoteNumber(COMPANY_ID);
+}
+
+function addItem() {
+  items.push({
+    qty: "",
+    part: "",
+    desc: "",
+    unit: "",
+    labor: "",
+    rate: "",
+    amount: "",
+    material_total: 0
+  });
+
+  renderItems();
+  calculateTotals();
+}
+
+function removeItem(index) {
+  items.splice(index, 1);
+  renderItems();
+  calculateTotals();
+}
+
+function updateItem(index, field, value) {
+  items[index][field] = value;
+
+  const qty = Number(items[index].qty || 0);
+  const unit = Number(items[index].unit || 0);
+  const hours = Number(items[index].labor || 0);
+
+  items[index].material_total = qty * unit;
+
+  const laborTotal = calculateLaborAmount(hours);
+  items[index].amount = laborTotal.toFixed(2);
+  items[index].rate = getLaborRateText(hours);
+
+  const rateInput = document.getElementById("rate_" + index);
+  const amountInput = document.getElementById("amount_" + index);
+
+  if (rateInput) rateInput.value = items[index].rate;
+  if (amountInput) amountInput.value = items[index].amount;
+
+  calculateTotals();
+}
+
+function calculateLaborAmount(hours) {
+  hours = Number(hours || 0);
+
+  if (hours <= 0) return 0;
+  if (hours <= 1) return 200;
+
+  return 200 + ((hours - 1) * 130);
+}
+
+function getLaborRateText(hours) {
+  hours = Number(hours || 0);
+
+  if (hours <= 0) return "";
+  if (hours <= 1) return "200";
+
+  return "200 + " + (hours - 1) + "x130";
+}
+
+function renderItems() {
+  document.getElementById("itemsBody").innerHTML = items.map(function(item, i) {
+    return `
+      <tr>
+        <td><input value="${escapeHtml(item.qty)}" oninput="updateItem(${i}, 'qty', this.value)"></td>
+        <td><input value="${escapeHtml(item.part)}" oninput="updateItem(${i}, 'part', this.value)"></td>
+        <td><input value="${escapeHtml(item.desc)}" oninput="updateItem(${i}, 'desc', this.value)"></td>
+        <td><input value="${escapeHtml(item.unit)}" oninput="updateItem(${i}, 'unit', this.value)"></td>
+        <td><input value="${escapeHtml(item.labor)}" oninput="updateItem(${i}, 'labor', this.value)"></td>
+        <td><input id="rate_${i}" value="${escapeHtml(item.rate)}" readonly></td>
+        <td><input id="amount_${i}" value="${escapeHtml(item.amount)}" readonly></td>
+        <td><button class="remove" onclick="removeItem(${i})">X</button></td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function calculateTotals() {
+  const totalMaterial = items.reduce(function(sum, item) {
+    const qty = Number(item.qty || 0);
+    const unit = Number(item.unit || 0);
+    return sum + (qty * unit);
+  }, 0);
+
+  const totalLabor = items.reduce(function(sum, item) {
+    const hours = Number(item.labor || 0);
+    return sum + calculateLaborAmount(hours);
+  }, 0);
+
+  const subTotal = totalMaterial + totalLabor;
+  const tax = subTotal * 0.07;
+  const total = subTotal + tax;
+
+  document.getElementById("total_material").value = totalMaterial.toFixed(2);
+  document.getElementById("total_labor").value = totalLabor.toFixed(2);
+  document.getElementById("sub_total").value = subTotal.toFixed(2);
+  document.getElementById("tax").value = tax.toFixed(2);
+  document.getElementById("total").value = total.toFixed(2);
+}
+
+function saveQuote() {
+  calculateTotals();
+
+  const data = {
+    rowNumber: ROW_NUMBER,
+    companyId: COMPANY_ID,
+    quote_number: document.getElementById("quote_number").value,
+    wo_number: document.getElementById("wo_number").value,
+    quote_date: document.getElementById("quote_date").value,
+
+    nombre_cliente: document.getElementById("nombre_cliente").value,
+    direccion: document.getElementById("direccion").value,
+    ciudad: document.getElementById("ciudad").value,
+    estado: document.getElementById("estado").value,
+    zip_code: document.getElementById("zip_code").value,
+
+    ns_number: document.getElementById("ns_number").value,
+    marca: document.getElementById("marca").value,
+    modelo: document.getElementById("modelo").value,
+    numero_serie: document.getElementById("numero_serie").value,
+
+    servicio_solicitado: document.getElementById("servicio_solicitado").value,
+    trabajo_propuesto: document.getElementById("trabajo_propuesto").value,
+
+    items: items,
+
+    total_material: document.getElementById("total_material").value,
+    total_labor: document.getElementById("total_labor").value,
+    sub_total: document.getElementById("sub_total").value,
+    tax: document.getElementById("tax").value,
+    total: document.getElementById("total").value
+  };
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      alert("Quote creado correctamente.");
+
+      if (res && res.pdfEnUrl) window.open(res.pdfEnUrl, "_blank");
+      if (res && res.pdfEsUrl) window.open(res.pdfEsUrl, "_blank");
+
+      goBack();
+    })
+    .withFailureHandler(function(err) {
+      alert("Error creando quote: " + err.message);
+    })
+    .createQuote(data);
+}
+
+function goBack() {
+  window.top.location.href = BASE_URL + "?view=orders";
+}
+
+function splitAddressClient(fullAddress) {
+  fullAddress = String(fullAddress || "").trim();
+
+  const result = {
+    address: fullAddress,
+    city: "",
+    state: "",
+    zip: ""
+  };
+
+  if (!fullAddress) return result;
+
+  const parts = fullAddress.split(",").map(function(p) {
+    return String(p || "").trim();
+  });
+
+  if (parts.length >= 3) {
+    result.address = parts[0];
+    result.city = parts[1];
+
+    const stateZip = parts[2].split(/\s+/);
+    result.state = stateZip[0] || "";
+    result.zip = stateZip.slice(1).join(" ") || "";
+  }
+
+  return result;
+}
+
+function escapeHtml(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+loadQuotePage();
+</script>
+
+</body>
+</html>

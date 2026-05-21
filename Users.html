@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: Arial; background:#f3f4f6; padding:20px; margin:0; }
+    .header, .box { background:white; padding:15px; border-radius:12px; margin-bottom:15px; box-shadow:0 3px 10px rgba(0,0,0,0.08); }
+    input, select { width:100%; margin:5px 0; padding:8px; box-sizing:border-box; }
+    button { padding:10px; background:#111; color:white; border:none; cursor:pointer; border-radius:8px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:10px; }
+    .filters { display:grid; grid-template-columns: 1fr 260px; gap:10px; }
+  </style>
+</head>
+
+<body>
+
+<div class="header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
+  <div id="companyTitle" style="font-size:22px; font-weight:bold;">
+    Company: Loading...
+  </div>
+
+  <div style="text-align:right;">
+    <div style="font-size:16px; font-weight:bold;">D&D Premier Solutions Corp</div>
+    <div style="font-size:13px; color:#6b7280;">Sistema de Órdenes</div>
+  </div>
+</div>
+
+<h2>Usuarios</h2>
+
+<div class="box">
+  <div class="filters">
+    <input id="search" placeholder="Buscar usuario, email, role, empresa..." oninput="render()">
+
+    <select id="companyFilter" onchange="render()">
+      <option value="">Todas las empresas</option>
+    </select>
+  </div>
+</div>
+
+<div class="box">
+  <h3>Crear / Editar Usuario</h3>
+
+  <input id="email" placeholder="Email">
+  <input id="name" placeholder="Nombre">
+  <input id="password" placeholder="Password">
+
+  <select id="role">
+    <option>OWNER</option>
+    <option>ADMIN</option>
+    <option>TECH</option>
+    <option>SUPERVISOR</option>
+    <option>ECONOMIA</option>
+    <option>ORDENES</option>
+  </select>
+
+  <input id="company" placeholder="COMPANY_ID">
+  <input id="rate" placeholder="HOURLY_RATE">
+
+  <select id="active">
+    <option>YES</option>
+    <option>NO</option>
+  </select>
+
+  <button onclick="saveUser()">Guardar</button>
+</div>
+
+<div id="users" class="grid"></div>
+
+<script>
+
+  function requireLogin() {
+  const user = localStorage.getItem("pps_user");
+
+  if (!user) {
+    window.top.location.href = "<?= baseUrl ?>";
+    return false;
+  }
+
+  try {
+    const parsed = JSON.parse(user);
+    if (!parsed.role && !parsed.ROLE) {
+      localStorage.removeItem("pps_user");
+      window.top.location.href = "<?= baseUrl ?>";
+      return false;
+    }
+  } catch (e) {
+    localStorage.removeItem("pps_user");
+    window.top.location.href = "<?= baseUrl ?>";
+    return false;
+  }
+
+  return true;
+}
+
+if (!requireLogin()) {
+  throw new Error("No autorizado");
+}
+let DATA = [];
+let CURRENT_ROW = null;
+
+function getUser() {
+  return JSON.parse(localStorage.getItem("pps_user") || "{}");
+}
+
+function updateHeaderCompany(companyId) {
+  companyId = String(companyId || "").toUpperCase();
+
+  if (!companyId) {
+    document.getElementById("companyTitle").innerText = "Company: Loading...";
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function(name) {
+      document.getElementById("companyTitle").innerText =
+        "Company: " + (name || companyId);
+    })
+    .withFailureHandler(function() {
+      document.getElementById("companyTitle").innerText =
+        "Company: " + companyId;
+    })
+    .getCompanyName(companyId);
+}
+
+function load() {
+  const u = getUser();
+
+  updateHeaderCompany(u.companyId);
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      DATA = res || [];
+      render();
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById("users").innerHTML = "ERROR: " + err.message;
+    })
+    .getUsers(u.companyId, u.role);
+}
+
+function render() {
+  const current = getUser();
+  const search = String(document.getElementById("search").value || "").toLowerCase();
+  const companyFilter = String(document.getElementById("companyFilter").value || "").toUpperCase();
+
+  const list = DATA.filter(function(user) {
+    const text = JSON.stringify(user).toLowerCase();
+
+    if (search && !text.includes(search)) return false;
+
+    if (current.role === "OWNER") {
+      if (companyFilter && String(user.COMPANY_ID || "").toUpperCase() !== companyFilter) return false;
+      return true;
+    }
+
+    return String(user.COMPANY_ID || "").toUpperCase() === String(current.companyId || "").toUpperCase();
+  });
+
+  document.getElementById("users").innerHTML =
+    list.length
+      ? list.map(function(u) {
+          return `
+            <div class="box">
+              <b>${u.NAME || ""}</b><br>
+              ${u.EMAIL || ""}<br>
+              Role: ${u.ROLE || ""}<br>
+              Company: ${u.COMPANY_ID || ""}<br>
+              Rate: ${u.HOURLY_RATE || ""}<br>
+              Active: ${u.ACTIVE || ""}<br><br>
+
+              <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                <button onclick="edit(${u.ROW_NUMBER})">Editar</button>
+
+                <button style="background:#f59e0b;" onclick="toggleActive(${u.ROW_NUMBER}, '${u.ACTIVE}')">
+                  ${u.ACTIVE === "YES" ? "Desactivar" : "Activar"}
+                </button>
+
+                <button style="background:#dc2626;" onclick="del(${u.ROW_NUMBER})">
+                  DEL
+                </button>
+              </div>
+            </div>
+          `;
+        }).join("")
+      : "No hay usuarios.";
+}
+
+function edit(row) {
+  const u = DATA.find(x => Number(x.ROW_NUMBER) === Number(row));
+  if (!u) return;
+
+  CURRENT_ROW = row;
+
+  document.getElementById("email").value = u.EMAIL || "";
+  document.getElementById("name").value = u.NAME || "";
+  document.getElementById("password").value = u.PASSWORD || "";
+  document.getElementById("role").value = u.ROLE || "TECH";
+  document.getElementById("company").value = u.COMPANY_ID || "";
+  document.getElementById("rate").value = u.HOURLY_RATE || "";
+  document.getElementById("active").value = u.ACTIVE || "YES";
+}
+
+function saveUser() {
+  const data = {
+    EMAIL: document.getElementById("email").value.trim(),
+    NAME: document.getElementById("name").value.trim(),
+    PASSWORD: document.getElementById("password").value.trim(),
+    ROLE: document.getElementById("role").value.trim().toUpperCase(),
+    COMPANY_ID: document.getElementById("company").value.trim().toUpperCase(),
+    HOURLY_RATE: document.getElementById("rate").value.trim(),
+    ACTIVE: document.getElementById("active").value.trim().toUpperCase()
+  };
+
+  google.script.run
+    .withSuccessHandler(function() {
+      CURRENT_ROW = null;
+      clearForm();
+      load();
+    })
+    .withFailureHandler(function(err) {
+      alert(err.message);
+    })
+    .saveUser(CURRENT_ROW, data);
+}
+
+function del(row) {
+  if (!confirm("¿Eliminar este usuario?")) return;
+
+  google.script.run
+    .withSuccessHandler(function() {
+      load();
+    })
+    .withFailureHandler(function(err) {
+      alert(err.message);
+    })
+    .deleteUser(row);
+}
+
+function toggleActive(row, current) {
+  const user = DATA.find(x => Number(x.ROW_NUMBER) === Number(row));
+
+  if (!user) return;
+
+  user.ACTIVE = current === "YES" ? "NO" : "YES";
+
+  google.script.run
+    .withSuccessHandler(function() {
+      load();
+    })
+    .withFailureHandler(function(err) {
+      alert(err.message);
+    })
+    .saveUser(row, user);
+}
+
+function clearForm() {
+  document.getElementById("email").value = "";
+  document.getElementById("name").value = "";
+  document.getElementById("password").value = "";
+  document.getElementById("role").value = "TECH";
+  document.getElementById("company").value = "";
+  document.getElementById("rate").value = "";
+  document.getElementById("active").value = "YES";
+}
+
+function loadCompanyFilter() {
+  const u = getUser();
+
+  if (u.role !== "OWNER") {
+    document.getElementById("companyFilter").style.display = "none";
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function(companies) {
+      const select = document.getElementById("companyFilter");
+
+      select.innerHTML =
+        `<option value="">Todas las empresas</option>` +
+        (companies || []).map(function(c) {
+          return `
+            <option value="${c.COMPANY_ID}">
+              ${c.COMPANY_ID} - ${c.COMPANY_NAME || ""}
+            </option>
+          `;
+        }).join("");
+    })
+    .getCompaniesForUser(u.companyId, u.role);
+}
+
+loadCompanyFilter();
+load();
+</script>
+
+</body>
+</html>
