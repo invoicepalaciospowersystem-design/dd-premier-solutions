@@ -354,10 +354,9 @@ function card(o) {
 function renderPMReportButtons(o) {
   const reportEs = o.PM_REPORT_ES_URL || "";
   const reportEn = o.PM_REPORT_EN_URL || "";
-  const folderUrl = o.PM_REPORT_FOLDER_URL || "";
   const isPM = String(o.WO_TYPE || "").toUpperCase().includes("PM");
 
-  if (!reportEs && !reportEn && !folderUrl) {
+  if (!reportEs && !reportEn) {
     return isPM
       ? `<button class="report-btn missing" disabled>No PM Report Yet</button>`
       : "";
@@ -367,7 +366,6 @@ function renderPMReportButtons(o) {
     <div style="margin-top:10px;">
       ${reportEn ? `<button class="report-btn" onclick="openPMReportPdf('${jsEsc(reportEn)}')">View PM Report EN</button>` : ""}
       ${reportEs ? `<button class="report-btn" onclick="openPMReportPdf('${jsEsc(reportEs)}')">View PM Report ES</button>` : ""}
-      ${folderUrl ? `<button class="report-btn" onclick="openPMReportPdf('${jsEsc(folderUrl)}')">Open PM Folder</button>` : ""}
     </div>
   `;
 }
