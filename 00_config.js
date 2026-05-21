@@ -12,6 +12,7 @@
 
 const CFG = {
   APP_NAME: "D&D Premier Solutions Corp",
+  COMPANY_LOGO_FILE_ID: "1UMXXSPDelny_QR-ANISgwfGCN49fW_Hf",
   PM_REPORTS_FOLDER_ID: "1eCiT7if6s_bqpQPTIi8HLy9_Hl5wfgUi",
 PM_REPORT_TEMPLATE_ID: "1wuLdLD_W4IAb4MoA8IHf0birHG6f1rJ0O7Umf5ahbMg",
   TEST_MODE: true,

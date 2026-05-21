@@ -192,6 +192,7 @@ function fillPMTemplate_(docId, p, lang) {
   const body = doc.getBody();
 
   replacePMTitles_(body, lang);
+  insertPMLogoAtMarker_(body, "[[LOGO_COMPANY]]");
 
   const serviceType = lang === "EN" ? "PREVENTIVE (PM)" : p.serviceType;
   const pmFrequency = formatPMFrequency_(p.pmFrequency, lang);
@@ -376,6 +377,32 @@ function replacePM_(body, marker, value) {
     marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
     String(value || "")
   );
+}
+
+function insertPMLogoAtMarker_(body, marker) {
+  const found = body.findText(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  if (!found) return;
+
+  const el = found.getElement();
+  const par = el.getParent().asParagraph();
+  par.setText("");
+
+  const logoId = String(CFG.COMPANY_LOGO_FILE_ID || "").trim();
+  if (!logoId) return;
+
+  const blob = DriveApp.getFileById(logoId).getBlob();
+  const img = par.appendInlineImage(blob);
+
+  const targetWidth = 160;
+  const width = img.getWidth();
+  const height = img.getHeight();
+
+  if (width && height) {
+    img.setWidth(targetWidth);
+    img.setHeight(Math.round(height * (targetWidth / width)));
+  } else {
+    img.setWidth(targetWidth);
+  }
 }
 
 function insertPMFilesAtMarker_(body, marker, urls, title) {
