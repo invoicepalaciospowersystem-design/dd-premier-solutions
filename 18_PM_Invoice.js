@@ -188,6 +188,13 @@ function createPMInvoiceFromCloseOrder_(data) {
     emailResult = sendInvoiceCreatedClientEmail_(invoiceRow, rowNumber, invoiceSheetRow);
   } catch (emailErr) {
     Logger.log("ERROR sendInvoiceCreatedClientEmail_ PM: " + emailErr);
+    notifySystemError_("PM_INVOICE_EMAIL_ERROR", emailErr, {
+      module: "PM_INVOICE",
+      companyId: companyId,
+      woNumber: woNumber,
+      invoiceNumber: invoiceNumber,
+      pmType: pmType
+    });
     emailResult = {
       sent: false,
       status: "ERROR: " + emailErr
@@ -208,18 +215,39 @@ function createPMInvoiceFromCloseOrder_(data) {
     });
   } catch (err) {
     Logger.log("ERROR save PM economy: " + err);
+    notifySystemError_("PM_ECONOMY_SAVE_ERROR", err, {
+      module: "PM_INVOICE",
+      companyId: companyId,
+      woNumber: woNumber,
+      invoiceNumber: invoiceNumber,
+      pmType: pmType
+    });
   }
 
   try {
     syncCloseOrderToOldSystem_(invoiceRow);
   } catch (err) {
     Logger.log("ERROR sync PM old system: " + err);
+    notifySystemError_("PM_OLD_SYSTEM_SYNC_ERROR", err, {
+      module: "PM_INVOICE",
+      companyId: companyId,
+      woNumber: woNumber,
+      invoiceNumber: invoiceNumber,
+      pmType: pmType
+    });
   }
 
   try {
     updateTechOrderStatus(rowNumber, "COMPLETED");
   } catch (err) {
     Logger.log("ERROR updateTechOrderStatus PM: " + err);
+    notifySystemError_("PM_ORDER_STATUS_UPDATE_ERROR", err, {
+      module: "PM_INVOICE",
+      companyId: companyId,
+      woNumber: woNumber,
+      rowNumber: rowNumber,
+      targetStatus: "COMPLETED"
+    });
   }
 
   return {

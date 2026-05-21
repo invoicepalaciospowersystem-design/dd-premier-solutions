@@ -81,6 +81,14 @@ function trySendClientDocumentEmail_(info) {
     return sendClientDocumentEmail_(info);
   } catch (err) {
     Logger.log("ERROR trySendClientDocumentEmail_: " + err);
+    notifySystemError_("CLIENT_DOCUMENT_EMAIL_ERROR", err, {
+      module: "CLIENT_EMAIL",
+      docType: info && info.docType,
+      companyId: info && info.companyId,
+      woNumber: info && info.woNumber,
+      nsn: info && info.nsn,
+      title: info && info.title
+    });
     return {
       sent: false,
       to: "",
@@ -103,6 +111,13 @@ function sendClientDocumentEmail_(info) {
   const recipients = resolveClientEmailRecipients_(info.docType, info.companyId, info.nsn);
 
   if (!recipients.actualTo.length) {
+    notifySystemError_("CLIENT_EMAIL_NO_RECIPIENTS", new Error("No client email recipients configured."), {
+      module: "CLIENT_EMAIL",
+      docType: info.docType || "",
+      companyId: info.companyId || "",
+      woNumber: info.woNumber || "",
+      nsn: info.nsn || ""
+    });
     return {
       sent: false,
       to: "",
@@ -112,6 +127,14 @@ function sendClientDocumentEmail_(info) {
   }
 
   if (!recipients.to.length) {
+    notifySystemError_("CLIENT_EMAIL_TEST_RECIPIENT_MISSING", new Error("Client email test recipient is missing."), {
+      module: "CLIENT_EMAIL",
+      docType: info.docType || "",
+      companyId: info.companyId || "",
+      woNumber: info.woNumber || "",
+      nsn: info.nsn || "",
+      actualTo: recipients.actualTo.join(", ")
+    });
     return {
       sent: false,
       to: "",

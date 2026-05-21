@@ -94,6 +94,20 @@ function getPMTexts() {
 }
 
 function uploadPMFile(fileObj) {
+  try {
+    return uploadPMFile_(fileObj);
+  } catch (err) {
+    notifySystemError_("PM_FILE_UPLOAD_ERROR", err, {
+      module: "PM_REPORT",
+      fileName: fileObj && fileObj.name,
+      mimeType: fileObj && fileObj.mimeType,
+      folderId: fileObj && fileObj.folderId
+    });
+    throw err;
+  }
+}
+
+function uploadPMFile_(fileObj) {
   if (!fileObj || !fileObj.data) throw new Error("Archivo inválido.");
   if (!fileObj.folderId) throw new Error("Falta folderId para subir archivo.");
 
@@ -117,6 +131,20 @@ function uploadPMFile(fileObj) {
 }
 
 function createPMReportFolder(data) {
+  try {
+    return createPMReportFolder_(data);
+  } catch (err) {
+    notifySystemError_("PM_REPORT_FOLDER_ERROR", err, {
+      module: "PM_REPORT",
+      woNumber: data && data.woNumber,
+      nsn: data && data.storeNumber,
+      pmFrequency: data && data.pmFrequency
+    });
+    throw err;
+  }
+}
+
+function createPMReportFolder_(data) {
   const root = DriveApp.getFolderById(CFG.PM_REPORTS_FOLDER_ID);
   const freq = String(data.pmFrequency || "MENSUAL").toUpperCase();
   const store = safeName_(data.storeNumber || "NO_STORE");
@@ -137,6 +165,21 @@ function createPMReportFolder(data) {
 }
 
 function generatePMReportPDF(payload) {
+  try {
+    return generatePMReportPDF_(payload);
+  } catch (err) {
+    notifySystemError_("PM_REPORT_PDF_ERROR", err, {
+      module: "PM_REPORT",
+      woNumber: payload && payload.woNumber,
+      nsn: payload && payload.storeNumber,
+      pmFrequency: payload && payload.pmFrequency,
+      equipmentQty: payload && payload.equipmentQty
+    });
+    throw err;
+  }
+}
+
+function generatePMReportPDF_(payload) {
   if (!payload) throw new Error("No llegó payload.");
   if (!payload.folderId) throw new Error("Falta folderId.");
   if (!CFG.PM_REPORT_TEMPLATE_ID) throw new Error("Falta CFG.PM_REPORT_TEMPLATE_ID.");
@@ -188,6 +231,11 @@ function generatePMReportPDF(payload) {
     result.emailResult = sendPMReportClientEmail_(payload, result);
   } catch (emailErr) {
     Logger.log("ERROR sendPMReportClientEmail_: " + emailErr);
+    notifySystemError_("PM_REPORT_EMAIL_ERROR", emailErr, {
+      module: "PM_REPORT",
+      woNumber: payload.woNumber || "",
+      nsn: payload.storeNumber || ""
+    });
     result.emailResult = {
       sent: false,
       status: "ERROR: " + emailErr
@@ -571,6 +619,11 @@ function updatePMReportLinks_(payload, report) {
     return true;
   } catch (err) {
     Logger.log("ERROR updatePMReportLinks_: " + err);
+    notifySystemError_("PM_REPORT_LINK_SAVE_ERROR", err, {
+      module: "PM_REPORT",
+      woNumber: payload && payload.woNumber,
+      nsn: payload && payload.storeNumber
+    });
     return false;
   }
 }

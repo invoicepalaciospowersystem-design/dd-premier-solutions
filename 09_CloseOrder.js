@@ -70,6 +70,21 @@ function getCloseOrderData(rowNumber, woNumber) {
 }
 
 function saveCloseOrder(data) {
+  try {
+    return saveCloseOrder_(data);
+  } catch (err) {
+    notifySystemError_("INVOICE_SAVE_ERROR", err, {
+      module: "INVOICE",
+      companyId: data && data.COMPANY_ID,
+      woNumber: data && data.WO_NUMBER,
+      woType: data && data.WO_TYPE,
+      nsn: data && data.NSN
+    });
+    throw err;
+  }
+}
+
+function saveCloseOrder_(data) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const shInv = ss.getSheetByName("INVOICES");
   const shWO = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
@@ -233,6 +248,13 @@ function saveCloseOrder(data) {
     invoiceRow.DOC_ES_URL = pdfs.docEsUrl;
   } catch (pdfErr) {
     Logger.log("ERROR generando PDF invoice: " + pdfErr);
+    notifySystemError_("INVOICE_PDF_ERROR", pdfErr, {
+      module: "INVOICE",
+      companyId: companyId,
+      woNumber: woNumber,
+      invoiceNumber: invoiceNumber,
+      generator: "generateInvoicePDFs_"
+    });
   }
 
   try {
@@ -241,6 +263,13 @@ function saveCloseOrder(data) {
     invoiceRow.PDF_EN_URL = pdfLinks.PDF_EN_URL;
   } catch (pdfErr) {
     Logger.log("ERROR generando PDFs desde CloseOrder: " + pdfErr);
+    notifySystemError_("INVOICE_PDF_ERROR", pdfErr, {
+      module: "INVOICE",
+      companyId: companyId,
+      woNumber: woNumber,
+      invoiceNumber: invoiceNumber,
+      generator: "generatePdfFromCloseOrder_"
+    });
   }
 
   const rowValues = invHeaders.map(function(h) {
@@ -255,6 +284,12 @@ function saveCloseOrder(data) {
     emailResult = sendInvoiceCreatedClientEmail_(invoiceRow, rowNumber, invoiceSheetRow);
   } catch (emailErr) {
     Logger.log("ERROR sendInvoiceCreatedClientEmail_: " + emailErr);
+    notifySystemError_("INVOICE_EMAIL_ERROR", emailErr, {
+      module: "INVOICE",
+      companyId: companyId,
+      woNumber: woNumber,
+      invoiceNumber: invoiceNumber
+    });
     emailResult = {
       sent: false,
       status: "ERROR: " + emailErr
@@ -267,12 +302,25 @@ function saveCloseOrder(data) {
     oldSyncResult = syncCloseOrderToOldSystem_(invoiceRow);
   } catch (syncErr) {
     Logger.log("ERROR sincronizando con sistema viejo: " + syncErr);
+    notifySystemError_("OLD_SYSTEM_SYNC_ERROR", syncErr, {
+      module: "INVOICE",
+      companyId: companyId,
+      woNumber: woNumber,
+      invoiceNumber: invoiceNumber
+    });
   }
 
   try {
     updateTechOrderStatus(rowNumber, "COMPLETED");
   } catch (statusErr) {
     Logger.log("ERROR updateTechOrderStatus desde saveCloseOrder: " + statusErr);
+    notifySystemError_("ORDER_STATUS_UPDATE_ERROR", statusErr, {
+      module: "INVOICE",
+      companyId: companyId,
+      woNumber: woNumber,
+      rowNumber: rowNumber,
+      targetStatus: "COMPLETED"
+    });
     throw statusErr;
   }
 

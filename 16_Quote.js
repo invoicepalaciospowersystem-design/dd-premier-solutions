@@ -126,6 +126,21 @@ function getStoreInfoForQuote_(ss, nsn) {
 }
 
 function createQuote(data) {
+  try {
+    return createQuote_(data);
+  } catch (err) {
+    notifySystemError_("QUOTE_CREATE_ERROR", err, {
+      module: "QUOTE",
+      companyId: data && data.companyId,
+      woNumber: data && data.wo_number,
+      quoteNumber: data && data.quote_number,
+      nsn: data && data.ns_number
+    });
+    throw err;
+  }
+}
+
+function createQuote_(data) {
   if (!data) throw new Error("No quote data received.");
 
   setupQuotesModule();
@@ -179,6 +194,13 @@ function createQuote(data) {
     emailResult = sendQuoteCreatedClientEmail_(data, quoteRow, quoteSheetRow);
   } catch (emailErr) {
     Logger.log("ERROR sendQuoteCreatedClientEmail_: " + emailErr);
+    notifySystemError_("QUOTE_EMAIL_ERROR", emailErr, {
+      module: "QUOTE",
+      companyId: data.companyId || CFG.DEFAULT_COMPANY_ID || "",
+      woNumber: data.wo_number || "",
+      quoteNumber: data.quote_number || "",
+      nsn: data.ns_number || ""
+    });
     emailResult = {
       sent: false,
       status: "ERROR: " + emailErr

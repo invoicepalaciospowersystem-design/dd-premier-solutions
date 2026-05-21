@@ -132,6 +132,10 @@ function doGet(e) {
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 
   } catch (err) {
+    notifySystemError_("WEB_APP_DOGET_ERROR", err, {
+      module: "ROUTER",
+      parameters: e && e.parameter ? e.parameter : {}
+    });
     return HtmlService.createHtmlOutput(
       "<h2>Error</h2><p>" + err.message + "</p>"
     );
@@ -223,6 +227,11 @@ function onFormSubmit(e) {
 
   } catch (err) {
     Logger.log("ERROR onFormSubmit: " + err);
+    notifySystemError_("FORM_SUBMIT_ERROR", err, {
+      module: "FORM_SUBMIT",
+      sheetName: e && e.range ? e.range.getSheet().getName() : "",
+      namedValues: e && e.namedValues ? e.namedValues : {}
+    });
     throw err;
   }
 }
@@ -249,5 +258,8 @@ function onInvoiceFormSubmit(e) {
 
   } catch (err) {
     Logger.log("ERROR onInvoiceFormSubmit: " + err);
+    notifySystemError_("INVOICE_FORM_SUBMIT_ERROR", err, {
+      module: "FORM_SUBMIT"
+    });
   }
 }
