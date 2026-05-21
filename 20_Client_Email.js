@@ -121,7 +121,8 @@ function sendClientDocumentEmail_(info) {
   }
 
   const attachmentInfo = buildClientEmailAttachments_(info.links || []);
-  const subject = (CFG.TEST_MODE ? "[TEST] " : "") + String(info.subject || info.title || "Document");
+  const isTest = isClientEmailTestMode_();
+  const subject = (isTest ? "[TEST] " : "") + String(info.subject || info.title || "Document");
   const htmlBody = buildClientDocumentEmailBody_(info, recipients, attachmentInfo);
 
   MailApp.sendEmail({
@@ -135,7 +136,7 @@ function sendClientDocumentEmail_(info) {
     sent: true,
     to: recipients.to.join(", "),
     actualTo: recipients.actualTo.join(", "),
-    status: CFG.TEST_MODE
+    status: isTest
       ? "TEST_SENT" + (attachmentInfo.omitted ? "_LINKS_ONLY" : "")
       : "SENT" + (attachmentInfo.omitted ? "_LINKS_ONLY" : "")
   };
@@ -143,29 +144,31 @@ function sendClientDocumentEmail_(info) {
 
 function resolveClientEmailRecipients_(docType, companyId, nsn) {
   const store = getStoreByNSN_(nsn, companyId) || {};
-  const fields = [
-    store.storeEmails,
-    store.supervisorEmail,
-    store.supervisorEmails
-  ];
-
   const type = String(docType || "").toUpperCase();
+  let fields = [];
 
   if (type === "PM_REPORT") {
-    fields.push(store.pmReportEmails);
+    fields = [
+      store.storeEmails,
+      store.supervisorEmail
+    ];
   }
 
   if (type === "QUOTE") {
-    fields.push(store.quoteEmails);
+    fields = [
+      store.supervisorEmail
+    ];
   }
 
   if (type === "INVOICE") {
-    fields.push(store.billingEmails);
-    fields.push(store.invoiceEmails);
+    fields = [
+      store.storeEmails,
+      store.supervisorEmail
+    ];
   }
 
   const actualTo = parseEmailList_(fields.join(","));
-  const to = CFG.TEST_MODE
+  const to = isClientEmailTestMode_()
     ? parseEmailList_(CFG.CLIENT_EMAIL_TEST_TO || "")
     : actualTo;
 
@@ -189,7 +192,7 @@ function buildClientDocumentEmailBody_(info, recipients, attachmentInfo) {
       }).join("") + "</ul>"
     : "<p>No PDF links were available.</p>";
 
-  const testBanner = CFG.TEST_MODE
+  const testBanner = isClientEmailTestMode_()
     ? "<div style='background:#fff7ed;border:1px solid #fed7aa;padding:12px;border-radius:8px;margin-bottom:12px;'>" +
       "<b>TEST MODE:</b> This email was sent only to " + escapeHtmlForEmail_(recipients.to.join(", ")) +
       ". Real recipients would be: " + escapeHtmlForEmail_(recipients.actualTo.join(", ")) +
@@ -213,6 +216,10 @@ function buildClientDocumentEmailBody_(info, recipients, attachmentInfo) {
     "<hr>" +
     attachmentNote +
     linkHtml;
+}
+
+function isClientEmailTestMode_() {
+  return CFG.CLIENT_EMAIL_TEST_MODE === true;
 }
 
 function buildClientEmailAttachments_(links) {

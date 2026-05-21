@@ -55,10 +55,6 @@
   <input id="STORE_EMAIL" placeholder="STORE EMAIL">
   <input id="SUPERVISOR_NAME" placeholder="SUPERVISOR NAME">
   <input id="SUPERVISOR_EMAIL" placeholder="SUPERVISOR EMAIL">
-  <input id="BILLING_EMAILS" placeholder="BILLING EMAILS">
-  <input id="PM_REPORT_EMAILS" placeholder="PM REPORT EMAILS">
-  <input id="QUOTE_EMAILS" placeholder="QUOTE EMAILS">
-  <input id="INVOICE_EMAILS" placeholder="INVOICE EMAILS">
   <input id="PHONE" placeholder="PHONE">
 
   <select id="ACTIVE">
@@ -187,7 +183,6 @@ function card(s) {
       <div class="line"><b>Store Email:</b> ${s.STORE_EMAIL || ""}</div>
       <div class="line"><b>Supervisor:</b> ${s.SUPERVISOR_NAME || ""}</div>
       <div class="line"><b>Supervisor Email:</b> ${s.SUPERVISOR_EMAIL || ""}</div>
-      <div class="line"><b>Billing Emails:</b> ${s.BILLING_EMAILS || ""}</div>
       <div class="line"><b>Phone:</b> ${s.PHONE || ""}</div>
       <div class="line"><b>Active:</b> ${s.ACTIVE || ""}</div>
       <button onclick='editStore(${JSON.stringify(s)})'>Editar</button>
@@ -213,7 +208,6 @@ function editStore(s) {
   [
     "COMPANY_ID", "NSN #", "CLIENTE", "STORE_NAME", "ADDRESS", "CITY",
     "STATE", "ZIP", "VendorID", "STORE_EMAIL", "SUPERVISOR_NAME", "SUPERVISOR_EMAIL",
-    "BILLING_EMAILS", "PM_REPORT_EMAILS", "QUOTE_EMAILS", "INVOICE_EMAILS",
     "PHONE", "ACTIVE"
   ].forEach(function(id) {
     document.getElementById(id).value = s[id] || "";
@@ -228,7 +222,6 @@ function save() {
   [
     "COMPANY_ID", "NSN #", "CLIENTE", "STORE_NAME", "ADDRESS", "CITY",
     "STATE", "ZIP", "VendorID", "STORE_EMAIL", "SUPERVISOR_NAME", "SUPERVISOR_EMAIL",
-    "BILLING_EMAILS", "PM_REPORT_EMAILS", "QUOTE_EMAILS", "INVOICE_EMAILS",
     "PHONE", "ACTIVE"
   ].forEach(function(id) {
     store[id] = document.getElementById(id).value.trim();
@@ -254,7 +247,6 @@ function clearForm() {
   [
     "COMPANY_ID", "NSN #", "CLIENTE", "STORE_NAME", "ADDRESS", "CITY",
     "STATE", "ZIP", "VendorID", "STORE_EMAIL", "SUPERVISOR_NAME", "SUPERVISOR_EMAIL",
-    "BILLING_EMAILS", "PM_REPORT_EMAILS", "QUOTE_EMAILS", "INVOICE_EMAILS",
     "PHONE"
   ].forEach(function(id) {
     document.getElementById(id).value = "";

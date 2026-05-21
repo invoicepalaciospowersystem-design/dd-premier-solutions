@@ -16,6 +16,7 @@ const CFG = {
 PM_REPORT_TEMPLATE_ID: "1wuLdLD_W4IAb4MoA8IHf0birHG6f1rJ0O7Umf5ahbMg",
   TEST_MODE: true,
   AUTO_SEND_CLIENT_EMAILS: true,
+  CLIENT_EMAIL_TEST_MODE: false,
   CLIENT_EMAIL_TEST_TO: "ddpremiersolutions.corp@gmail.com",
   INVOICES_FOLDER_ID: "1nHOt6jpoGPmTcRAkndkaDtNjsIal7WDy",
   QUOTES_FOLDER_ID: "1OHZ9Mxffsi1_P2wenpIwgZ95o0wubWop",

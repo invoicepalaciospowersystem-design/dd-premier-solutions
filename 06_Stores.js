@@ -255,12 +255,7 @@ function saveStore(store) {
 }
 
 function ensureStoreEmailColumns_(sh) {
-  const required = [
-    "BILLING_EMAILS",
-    "PM_REPORT_EMAILS",
-    "QUOTE_EMAILS",
-    "INVOICE_EMAILS"
-  ];
+  const required = [];
 
   let headers = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1))
     .getValues()[0]
