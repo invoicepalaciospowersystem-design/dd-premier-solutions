@@ -326,7 +326,7 @@ function saveClose() {
       );
 
       const closeTech = TECH_NAME || (ORDER && ORDER.TECHNICIAN) || "";
-      return window.top.location.replace(getCloseOrderReturnUrl(closeTech));
+      return navigateTop(getCloseOrderReturnUrl(closeTech));
     })
     .withFailureHandler(function(err) {
       document.getElementById("saveBtn").disabled = false;
@@ -340,6 +340,38 @@ function saveClose() {
 
 function getCloseOrderReturnUrl(tech) {
   return RETURN_TO || BASE_URL + "?view=tech&tech=" + encodeURIComponent(tech || "");
+}
+
+function navigateTop(url) {
+  showCloseReturnLink(url);
+
+  try {
+    window.open(url, "_top");
+    return;
+  } catch (err) {
+    console.log("Top navigation blocked:", err);
+  }
+
+  try {
+    window.location.href = url;
+  } catch (err2) {
+    console.log("Frame navigation blocked:", err2);
+  }
+}
+
+function showCloseReturnLink(url) {
+  document.getElementById("orderInfo").innerHTML =
+    "Invoice creado. Regresando a la pantalla anterior...<br><br>" +
+    "<a href='" + escapeAttr(url) + "' target='_top'>Volver</a>";
+}
+
+function escapeAttr(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 function rememberCloseOrderMessage(message) {

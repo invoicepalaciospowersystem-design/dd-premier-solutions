@@ -354,7 +354,7 @@ function returnToPreviousScreen(message) {
     localStorage.setItem("lastWO", WO_PARAM);
   }
 
-  window.top.location.replace(getQuoteReturnUrl());
+  navigateTop(getQuoteReturnUrl());
 }
 
 function getQuoteReturnUrl() {
@@ -367,6 +367,38 @@ function getQuoteReturnUrl() {
   }
 
   return url;
+}
+
+function navigateTop(url) {
+  showQuoteReturnLink(url);
+
+  try {
+    window.open(url, "_top");
+    return;
+  } catch (err) {
+    console.log("Top navigation blocked:", err);
+  }
+
+  try {
+    window.location.href = url;
+  } catch (err2) {
+    console.log("Frame navigation blocked:", err2);
+  }
+}
+
+function showQuoteReturnLink(url) {
+  let box = document.getElementById("returnBox");
+
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "returnBox";
+    box.className = "box";
+    document.body.insertBefore(box, document.body.firstChild);
+  }
+
+  box.innerHTML =
+    "Regresando a la pantalla anterior...<br><br>" +
+    "<a href='" + escapeAttr(url) + "' target='_top'>Volver</a>";
 }
 
 function splitAddressClient(fullAddress) {
@@ -403,6 +435,10 @@ function escapeHtml(value) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value).replace(/'/g, "&#039;");
 }
 
 loadQuotePage();
