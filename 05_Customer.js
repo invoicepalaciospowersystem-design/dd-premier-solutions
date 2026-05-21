@@ -65,7 +65,6 @@ function getCustomerOrdersBySupervisor(supervisorName) {
     obj.QUOTE_STATUS = obj.QUOTE_STATUS || "";
     obj.PM_REPORT_ES_URL = obj.PM_REPORT_ES_URL || "";
     obj.PM_REPORT_EN_URL = obj.PM_REPORT_EN_URL || "";
-    obj.PM_REPORT_FOLDER_URL = obj.PM_REPORT_FOLDER_URL || "";
     obj.HAS_PM_REPORT_PDF = (obj.PM_REPORT_ES_URL || obj.PM_REPORT_EN_URL) ? "YES" : "NO";
 
     result.push(obj);

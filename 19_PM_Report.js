@@ -56,7 +56,6 @@ function getPMOrderData(row, woNumber) {
     status: obj.STATUS || "",
     pmReportEsUrl: obj.PM_REPORT_ES_URL || "",
     pmReportEnUrl: obj.PM_REPORT_EN_URL || "",
-    pmReportFolderUrl: obj.PM_REPORT_FOLDER_URL || "",
     pmReportStatus: obj.PM_REPORT_STATUS || ""
   };
 }
@@ -132,7 +131,6 @@ function createPMReportFolder(data) {
 
   return {
     id: woFolder.getId(),
-    url: woFolder.getUrl(),
     pdfFolderId: pdfFolder.getId(),
     filesFolderId: filesFolder.getId()
   };
@@ -171,16 +169,20 @@ function generatePMReportPDF(payload) {
   DriveApp.getFileById(docFileEs.getId()).setTrashed(true);
   DriveApp.getFileById(docFileEn.getId()).setTrashed(true);
 
+  const folderUrl = mainFolder.getUrl();
+
   const result = {
     pdfEsId: pdfEs.id,
     pdfEsUrl: pdfEs.url,
     pdfEnId: pdfEn.id,
     pdfEnUrl: pdfEn.url,
-    folderUrl: mainFolder.getUrl(),
     savedToWorkOrder: false
   };
 
-  result.savedToWorkOrder = updatePMReportLinks_(payload, result);
+  result.savedToWorkOrder = updatePMReportLinks_(
+    payload,
+    Object.assign({ folderUrl: folderUrl }, result)
+  );
 
   return result;
 }

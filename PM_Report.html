@@ -110,11 +110,10 @@ function loadPMOrder() {
       }
 
       const reportLinks =
-        (o.pmReportEsUrl || o.pmReportEnUrl || o.pmReportFolderUrl)
+        (o.pmReportEsUrl || o.pmReportEnUrl)
           ? "<br><br><b>Reporte PM existente:</b><br>" +
             (o.pmReportEsUrl ? "<a href='" + o.pmReportEsUrl + "' target='_blank'>PDF Español</a><br>" : "") +
-            (o.pmReportEnUrl ? "<a href='" + o.pmReportEnUrl + "' target='_blank'>PDF English</a><br>" : "") +
-            (o.pmReportFolderUrl ? "<a href='" + o.pmReportFolderUrl + "' target='_blank'>Carpeta</a>" : "")
+            (o.pmReportEnUrl ? "<a href='" + o.pmReportEnUrl + "' target='_blank'>PDF English</a>" : "")
           : "";
 
       document.getElementById("orderInfo").innerHTML =
@@ -256,7 +255,6 @@ async function savePMReport() {
     const folder = await runServer("createPMReportFolder", payload);
 
     payload.folderId = folder.id;
-    payload.folderUrl = folder.url;
     payload.pdfFolderId = folder.pdfFolderId;
     payload.filesFolderId = folder.filesFolderId;
 
@@ -335,7 +333,6 @@ async function savePMReport() {
   "Reporte PM generado:<br>" +
   "<a href='" + pdf.pdfEsUrl + "' target='_blank'>Abrir PDF Español</a><br>" +
   "<a href='" + pdf.pdfEnUrl + "' target='_blank'>Abrir PDF English</a><br><br>" +
-  "<a href='" + pdf.folderUrl + "' target='_blank'>Abrir carpeta</a><br><br>" +
   (pdf.savedToWorkOrder ? "Links guardados en la orden." : "PDF creado, pero los links no se guardaron en la orden.");
 
   } catch (err) {
