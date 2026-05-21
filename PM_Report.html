@@ -324,16 +324,10 @@ async function savePMReport() {
 
     const pdf = await runServer("generatePMReportPDF", payload);
 
-    alert(
-      "Reportes PM generados correctamente en Español e Inglés." +
+    return returnToTechPortal(
+      "Reportes PM generados correctamente en Espa\u00f1ol e Ingl\u00e9s." +
       (pdf.savedToWorkOrder ? "\nLinks guardados en la orden." : "\nPDF creado, pero no se pudieron guardar los links en la orden.")
     );
-
-    document.getElementById("orderInfo").innerHTML =
-  "Reporte PM generado:<br>" +
-  "<a href='" + pdf.pdfEsUrl + "' target='_blank'>Abrir PDF Español</a><br>" +
-  "<a href='" + pdf.pdfEnUrl + "' target='_blank'>Abrir PDF English</a><br><br>" +
-  (pdf.savedToWorkOrder ? "Links guardados en la orden." : "PDF creado, pero los links no se guardaron en la orden.");
 
   } catch (err) {
     alert("ERROR guardando PM: " + (err.message || err));
@@ -346,8 +340,17 @@ async function savePMReport() {
 }
 
 function goBack() {
-  window.top.location.href =
-    BASE_URL + "?view=tech&tech=" + encodeURIComponent(TECH_NAME);
+  returnToTechPortal("");
+}
+
+function returnToTechPortal(message) {
+  if (message) {
+    localStorage.setItem("lastTechMessage", message);
+  }
+
+  window.top.location.replace(
+    BASE_URL + "?view=tech&tech=" + encodeURIComponent(TECH_NAME)
+  );
 }
 
 window.onload = function() {
