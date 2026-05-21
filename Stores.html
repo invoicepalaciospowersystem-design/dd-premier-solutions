@@ -52,7 +52,7 @@
   <input id="STATE" placeholder="STATE">
   <input id="ZIP" placeholder="ZIP">
   <input id="VendorID" placeholder="VendorID">
-  <input id="STORE_EMAILS" placeholder="STORE EMAILS">
+  <input id="STORE_EMAIL" placeholder="STORE EMAIL">
   <input id="SUPERVISOR_NAME" placeholder="SUPERVISOR NAME">
   <input id="SUPERVISOR_EMAIL" placeholder="SUPERVISOR EMAIL">
   <input id="BILLING_EMAILS" placeholder="BILLING EMAILS">
@@ -184,7 +184,7 @@ function card(s) {
       <div class="line"><b>Store:</b> ${s.STORE_NAME || ""}</div>
       <div class="line"><b>Dirección:</b> ${s.ADDRESS || ""}, ${s.CITY || ""}, ${s.STATE || ""} ${s.ZIP || ""}</div>
       <div class="line"><b>Vendor ID:</b> ${s.VendorID || ""}</div>
-      <div class="line"><b>Store Emails:</b> ${s.STORE_EMAILS || ""}</div>
+      <div class="line"><b>Store Email:</b> ${s.STORE_EMAIL || ""}</div>
       <div class="line"><b>Supervisor:</b> ${s.SUPERVISOR_NAME || ""}</div>
       <div class="line"><b>Supervisor Email:</b> ${s.SUPERVISOR_EMAIL || ""}</div>
       <div class="line"><b>Billing Emails:</b> ${s.BILLING_EMAILS || ""}</div>
@@ -212,7 +212,7 @@ function editStore(s) {
 
   [
     "COMPANY_ID", "NSN #", "CLIENTE", "STORE_NAME", "ADDRESS", "CITY",
-    "STATE", "ZIP", "VendorID", "STORE_EMAILS", "SUPERVISOR_NAME", "SUPERVISOR_EMAIL",
+    "STATE", "ZIP", "VendorID", "STORE_EMAIL", "SUPERVISOR_NAME", "SUPERVISOR_EMAIL",
     "BILLING_EMAILS", "PM_REPORT_EMAILS", "QUOTE_EMAILS", "INVOICE_EMAILS",
     "PHONE", "ACTIVE"
   ].forEach(function(id) {
@@ -227,7 +227,7 @@ function save() {
 
   [
     "COMPANY_ID", "NSN #", "CLIENTE", "STORE_NAME", "ADDRESS", "CITY",
-    "STATE", "ZIP", "VendorID", "STORE_EMAILS", "SUPERVISOR_NAME", "SUPERVISOR_EMAIL",
+    "STATE", "ZIP", "VendorID", "STORE_EMAIL", "SUPERVISOR_NAME", "SUPERVISOR_EMAIL",
     "BILLING_EMAILS", "PM_REPORT_EMAILS", "QUOTE_EMAILS", "INVOICE_EMAILS",
     "PHONE", "ACTIVE"
   ].forEach(function(id) {
@@ -253,7 +253,7 @@ function save() {
 function clearForm() {
   [
     "COMPANY_ID", "NSN #", "CLIENTE", "STORE_NAME", "ADDRESS", "CITY",
-    "STATE", "ZIP", "VendorID", "STORE_EMAILS", "SUPERVISOR_NAME", "SUPERVISOR_EMAIL",
+    "STATE", "ZIP", "VendorID", "STORE_EMAIL", "SUPERVISOR_NAME", "SUPERVISOR_EMAIL",
     "BILLING_EMAILS", "PM_REPORT_EMAILS", "QUOTE_EMAILS", "INVOICE_EMAILS",
     "PHONE"
   ].forEach(function(id) {

@@ -23,6 +23,7 @@ function getStoreByNSN_(nsn, companyId) {
   const idxZip = headers.indexOf("ZIP");
   const idxVendor = headers.indexOf("VendorID");
   const idxActive = headers.indexOf("ACTIVE");
+  const idxStoreEmail = headers.indexOf("STORE_EMAIL");
   const idxStoreEmails = headers.indexOf("STORE_EMAILS");
   const idxSupervisorName = headers.indexOf("SUPERVISOR_NAME");
   const idxSupervisorEmail = headers.indexOf("SUPERVISOR_EMAIL");
@@ -63,7 +64,11 @@ function getStoreByNSN_(nsn, companyId) {
         state: normalized.STATE,
         zip: normalized.ZIP,
         vendorId: idxVendor >= 0 ? data[i][idxVendor] || "" : "",
-        storeEmails: idxStoreEmails >= 0 ? data[i][idxStoreEmails] || "" : "",
+        storeEmail: idxStoreEmail >= 0 ? data[i][idxStoreEmail] || "" : "",
+        storeEmails: [
+          idxStoreEmail >= 0 ? data[i][idxStoreEmail] || "" : "",
+          idxStoreEmails >= 0 ? data[i][idxStoreEmails] || "" : ""
+        ].filter(Boolean).join(","),
         supervisorName: idxSupervisorName >= 0 ? data[i][idxSupervisorName] || "" : "",
         supervisorEmail: idxSupervisorEmail >= 0 ? data[i][idxSupervisorEmail] || "" : "",
         supervisorEmails: idxSupervisorEmail >= 0 ? data[i][idxSupervisorEmail] || "" : "",
@@ -251,7 +256,6 @@ function saveStore(store) {
 
 function ensureStoreEmailColumns_(sh) {
   const required = [
-    "STORE_EMAILS",
     "BILLING_EMAILS",
     "PM_REPORT_EMAILS",
     "QUOTE_EMAILS",
