@@ -401,7 +401,7 @@ function insertPMLogoInContainer_(container, marker) {
 
   const el = found.getElement();
   const par = el.getParent().asParagraph();
-  par.setText("");
+  par.setText(" ");
   par.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
 
   const logoId = String(CFG.COMPANY_LOGO_FILE_ID || "").trim();
