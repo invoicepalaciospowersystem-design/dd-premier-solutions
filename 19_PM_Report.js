@@ -192,7 +192,7 @@ function fillPMTemplate_(docId, p, lang) {
   const body = doc.getBody();
 
   replacePMTitles_(body, lang);
-  insertPMLogoAtMarker_(body, "[[LOGO_COMPANY]]");
+  insertPMLogoAtMarker_(doc, "[[LOGO_COMPANY]]");
 
   const serviceType = lang === "EN" ? "PREVENTIVE (PM)" : p.serviceType;
   const pmFrequency = formatPMFrequency_(p.pmFrequency, lang);
@@ -379,16 +379,33 @@ function replacePM_(body, marker, value) {
   );
 }
 
-function insertPMLogoAtMarker_(body, marker) {
-  const found = body.findText(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  if (!found) return;
+function insertPMLogoAtMarker_(doc, marker) {
+  const containers = [
+    doc.getHeader(),
+    doc.getBody(),
+    doc.getFooter()
+  ].filter(Boolean);
+
+  for (let i = 0; i < containers.length; i++) {
+    if (insertPMLogoInContainer_(containers[i], marker)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function insertPMLogoInContainer_(container, marker) {
+  const found = container.findText(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  if (!found) return false;
 
   const el = found.getElement();
   const par = el.getParent().asParagraph();
   par.setText("");
+  par.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
 
   const logoId = String(CFG.COMPANY_LOGO_FILE_ID || "").trim();
-  if (!logoId) return;
+  if (!logoId) return true;
 
   const blob = DriveApp.getFileById(logoId).getBlob();
   const img = par.appendInlineImage(blob);
@@ -403,6 +420,8 @@ function insertPMLogoAtMarker_(body, marker) {
   } else {
     img.setWidth(targetWidth);
   }
+
+  return true;
 }
 
 function insertPMFilesAtMarker_(body, marker, urls, title) {
