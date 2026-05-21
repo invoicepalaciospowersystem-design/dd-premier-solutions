@@ -63,6 +63,15 @@
       margin-top:10px;
     }
 
+    .report-btn {
+      background:#0f766e;
+      margin-top:10px;
+    }
+
+    .report-btn.missing {
+      background:#9ca3af;
+    }
+
     .quote-approved-btn {
       background:#16a34a;
       margin-top:10px;
@@ -280,6 +289,7 @@ function renderStats(data) {
   const emergency = data.filter(o => String(o.ORDER_PRIORITY || "").toLowerCase().includes("emergency")).length;
   const invoiced = data.filter(o => String(o.HAS_INVOICE_PDF || "").toUpperCase() === "YES").length;
   const quotes = data.filter(o => o.QUOTE_EN_URL || o.QUOTE_ES_URL).length;
+  const pmReports = data.filter(o => String(o.HAS_PM_REPORT_PDF || "").toUpperCase() === "YES").length;
 
   document.getElementById("stats").innerHTML = `
     <div class="stat"><b>Total Orders:</b> ${total}</div>
@@ -287,6 +297,7 @@ function renderStats(data) {
     <div class="stat"><b>Buying Parts:</b> ${parts}</div>
     <div class="stat"><b>Invoiced:</b> ${invoiced}</div>
     <div class="stat"><b>Quotes:</b> ${quotes}</div>
+    <div class="stat"><b>PM Reports:</b> ${pmReports}</div>
     <div class="stat"><b>Emergency:</b> ${emergency}</div>
   `;
 }
@@ -328,6 +339,8 @@ function card(o) {
 
     ${pdfButton}
 
+    ${renderPMReportButtons(o)}
+
     ${renderQuoteButtons(o)}
 
 <div style="margin-top:10px;">
@@ -336,6 +349,27 @@ function card(o) {
   </button>
 </div>
   </div>`;
+}
+
+function renderPMReportButtons(o) {
+  const reportEs = o.PM_REPORT_ES_URL || "";
+  const reportEn = o.PM_REPORT_EN_URL || "";
+  const folderUrl = o.PM_REPORT_FOLDER_URL || "";
+  const isPM = String(o.WO_TYPE || "").toUpperCase().includes("PM");
+
+  if (!reportEs && !reportEn && !folderUrl) {
+    return isPM
+      ? `<button class="report-btn missing" disabled>No PM Report Yet</button>`
+      : "";
+  }
+
+  return `
+    <div style="margin-top:10px;">
+      ${reportEn ? `<button class="report-btn" onclick="openPMReportPdf('${jsEsc(reportEn)}')">View PM Report EN</button>` : ""}
+      ${reportEs ? `<button class="report-btn" onclick="openPMReportPdf('${jsEsc(reportEs)}')">View PM Report ES</button>` : ""}
+      ${folderUrl ? `<button class="report-btn" onclick="openPMReportPdf('${jsEsc(folderUrl)}')">Open PM Folder</button>` : ""}
+    </div>
+  `;
 }
 
 function renderQuoteButtons(o) {
@@ -387,6 +421,15 @@ function approveQuoteFromCustomer(row) {
 function openQuotePdf(url) {
   if (!url) {
     alert("No quote PDF is available.");
+    return;
+  }
+
+  window.open(url, "_blank");
+}
+
+function openPMReportPdf(url) {
+  if (!url) {
+    alert("No PM report PDF is available for this order yet.");
     return;
   }
 
