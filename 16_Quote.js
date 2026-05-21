@@ -145,20 +145,30 @@ function createQuote(data) {
   const pdfEs = generateQuotePdfFromTemplate_(data, "ES", targetFolder);
   const pdfEn = generateQuotePdfFromTemplate_(data, "EN", targetFolder);
 
-  sh.appendRow([
-    new Date(),
-    data.companyId || CFG.DEFAULT_COMPANY_ID || "",
-    data.rowNumber || "",
-    data.quote_number || "",
-    data.wo_number || "",
-    data.nombre_cliente || "",
-    "CREATED",
-    pdfEn || "",
-    pdfEs || "",
-    "",
-    "",
-    JSON.stringify(data)
-  ]);
+  const quoteHeaders = sh.getRange(1, 1, 1, sh.getLastColumn())
+    .getValues()[0]
+    .map(function(h) {
+      return String(h).trim();
+    });
+
+  const quoteRow = {
+    CREATED_AT: new Date(),
+    COMPANY_ID: data.companyId || CFG.DEFAULT_COMPANY_ID || "",
+    ROW_NUMBER: data.rowNumber || "",
+    QUOTE_NUMBER: data.quote_number || "",
+    WO_NUMBER: data.wo_number || "",
+    CLIENT: data.nombre_cliente || "",
+    STATUS: "CREATED",
+    PDF_EN_URL: pdfEn || "",
+    PDF_ES_URL: pdfEs || "",
+    APPROVED_BY: "",
+    APPROVED_AT: "",
+    DATA_JSON: JSON.stringify(data)
+  };
+
+  sh.appendRow(quoteHeaders.map(function(h) {
+    return quoteRow[h] !== undefined ? quoteRow[h] : "";
+  }));
 
   updateWorkOrderQuoteLinks_(data.rowNumber, pdfEn, pdfEs);
 
@@ -193,21 +203,24 @@ function setupQuotesModule() {
     "DATA_JSON"
   ];
 
-  const current = sh.getLastRow() > 0
-    ? sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), headers.length)).getValues()[0]
-    : [];
-
-  const same = headers.every(function(h, i) {
-    return String(current[i] || "").trim().toUpperCase() === h;
-  });
-
-  if (!same) {
-    sh.clear();
+  if (sh.getLastRow() < 1 || sh.getLastColumn() < 1) {
     sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+  } else {
+    const current = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+    const normalizedCurrent = current.map(function(h) {
+      return String(h || "").trim().toUpperCase();
+    });
+
+    headers.forEach(function(h) {
+      if (normalizedCurrent.indexOf(h) === -1) {
+        sh.getRange(1, sh.getLastColumn() + 1).setValue(h);
+        normalizedCurrent.push(h);
+      }
+    });
   }
 
   sh.setFrozenRows(1);
-  sh.autoResizeColumns(1, headers.length);
+  sh.autoResizeColumns(1, sh.getLastColumn());
 }
 
 function normalizeQuoteAddressForTemplate_(data) {

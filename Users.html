@@ -42,7 +42,7 @@
 
   <input id="email" placeholder="Email">
   <input id="name" placeholder="Nombre">
-  <input id="password" placeholder="Password">
+  <input id="password" placeholder="New password (leave blank to keep)">
 
   <select id="role">
     <option>OWNER</option>
@@ -193,7 +193,7 @@ function edit(row) {
 
   document.getElementById("email").value = u.EMAIL || "";
   document.getElementById("name").value = u.NAME || "";
-  document.getElementById("password").value = u.PASSWORD || "";
+  document.getElementById("password").value = "";
   document.getElementById("role").value = u.ROLE || "TECH";
   document.getElementById("company").value = u.COMPANY_ID || "";
   document.getElementById("rate").value = u.HOURLY_RATE || "";

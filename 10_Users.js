@@ -11,7 +11,11 @@ function getUsers(companyId, role) {
 
   return data.slice(1).map((row, i) => {
     const obj = {};
-    headers.forEach((h, c) => obj[h] = row[c]);
+    headers.forEach((h, c) => {
+      if (String(h).trim().toUpperCase() !== "PASSWORD") {
+        obj[h] = row[c];
+      }
+    });
     obj.ROW_NUMBER = i + 2;
     return obj;
   }).filter(u => {
@@ -23,11 +27,21 @@ function getUsers(companyId, role) {
 function saveUser(rowNumber, data) {
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.SHEET_USERS);
   const headers = sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0].map(h => String(h).trim());
+  const isExisting = rowNumber && Number(rowNumber) > 1;
+  const existingRow = isExisting
+    ? sh.getRange(Number(rowNumber), 1, 1, headers.length).getValues()[0]
+    : null;
 
-  const values = headers.map(h => data[h] || "");
+  const values = headers.map((h, i) => {
+    if (String(h).trim().toUpperCase() === "PASSWORD" && isExisting && !data[h]) {
+      return existingRow[i] || "";
+    }
 
-  if (rowNumber && rowNumber > 1) {
-    sh.getRange(rowNumber,1,1,headers.length).setValues([values]);
+    return data[h] || "";
+  });
+
+  if (isExisting) {
+    sh.getRange(Number(rowNumber),1,1,headers.length).setValues([values]);
   } else {
     sh.appendRow(values);
   }

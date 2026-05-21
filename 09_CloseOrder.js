@@ -454,12 +454,19 @@ function logOldSync_(invoiceRow, result) {
 }
 
 function generateInvoiceNumber_(companyId) {
-  const props = PropertiesService.getScriptProperties();
-  const key = "LAST_INVOICE_NUMBER_" + String(companyId || "DEFAULT").toUpperCase();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
 
-  let last = Number(props.getProperty(key) || 10000);
-  last++;
-  props.setProperty(key, String(last));
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const key = "LAST_INVOICE_NUMBER_" + String(companyId || "DEFAULT").toUpperCase();
 
-  return String(last);
+    let last = Number(props.getProperty(key) || 10000);
+    last++;
+    props.setProperty(key, String(last));
+
+    return String(last);
+  } finally {
+    lock.releaseLock();
+  }
 }
