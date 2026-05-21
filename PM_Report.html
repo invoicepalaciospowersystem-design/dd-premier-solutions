@@ -109,11 +109,20 @@ function loadPMOrder() {
         return;
       }
 
+      const reportLinks =
+        (o.pmReportEsUrl || o.pmReportEnUrl || o.pmReportFolderUrl)
+          ? "<br><br><b>Reporte PM existente:</b><br>" +
+            (o.pmReportEsUrl ? "<a href='" + o.pmReportEsUrl + "' target='_blank'>PDF Español</a><br>" : "") +
+            (o.pmReportEnUrl ? "<a href='" + o.pmReportEnUrl + "' target='_blank'>PDF English</a><br>" : "") +
+            (o.pmReportFolderUrl ? "<a href='" + o.pmReportFolderUrl + "' target='_blank'>Carpeta</a>" : "")
+          : "";
+
       document.getElementById("orderInfo").innerHTML =
         "<b>" + (o.woNumber || WO) + "</b><br>" +
         "Store: " + (o.nsn || "") + "<br>" +
         "Address: " + (o.storeAddress || "") + "<br>" +
-        "Status: " + (o.status || "");
+        "Status: " + (o.status || "") +
+        reportLinks;
 
       document.getElementById("woNumber").value = o.woNumber || WO;
       document.getElementById("storeNumber").value = o.nsn || "";
@@ -131,7 +140,7 @@ function loadPMOrder() {
       document.getElementById("orderInfo").innerHTML =
         "ERROR getPMOrderData: " + (err.message || err);
     })
-    .getPMOrderData(ROW);
+    .getPMOrderData(ROW, WO);
 }
 
 function loadPMTexts() {
@@ -317,13 +326,17 @@ async function savePMReport() {
 
     const pdf = await runServer("generatePMReportPDF", payload);
 
-    alert("Reportes PM generados correctamente en Español e Inglés.");
+    alert(
+      "Reportes PM generados correctamente en Español e Inglés." +
+      (pdf.savedToWorkOrder ? "\nLinks guardados en la orden." : "\nPDF creado, pero no se pudieron guardar los links en la orden.")
+    );
 
     document.getElementById("orderInfo").innerHTML =
   "Reporte PM generado:<br>" +
   "<a href='" + pdf.pdfEsUrl + "' target='_blank'>Abrir PDF Español</a><br>" +
   "<a href='" + pdf.pdfEnUrl + "' target='_blank'>Abrir PDF English</a><br><br>" +
-  "<a href='" + pdf.folderUrl + "' target='_blank'>Abrir carpeta</a>";
+  "<a href='" + pdf.folderUrl + "' target='_blank'>Abrir carpeta</a><br><br>" +
+  (pdf.savedToWorkOrder ? "Links guardados en la orden." : "PDF creado, pero los links no se guardaron en la orden.");
 
   } catch (err) {
     alert("ERROR guardando PM: " + (err.message || err));

@@ -2,10 +2,7 @@
 // FILE: 19_PM_Report.gs
 // =====================================================
 
-function getPMOrderData(row) {
-  row = Number(row);
-  if (!row || row < 2) throw new Error("Fila inválida.");
-
+function getPMOrderData(row, woNumber) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const shWO = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
   if (!shWO) throw new Error("No existe la hoja: " + CFG.SHEET_WORK_ORDERS);
@@ -14,7 +11,10 @@ function getPMOrderData(row) {
   if (woValues.length < 2) throw new Error("No hay órdenes.");
 
   const woHeaders = woValues[0].map(h => String(h).trim());
-  const dataRow = woValues[row - 1];
+  const rowNumber = resolvePMOrderDataRow_(woValues, woHeaders, row, woNumber);
+  if (!rowNumber) throw new Error("No se encontró la orden PM: " + (woNumber || row || ""));
+
+  const dataRow = woValues[rowNumber - 1];
 
   const obj = {};
   woHeaders.forEach(function(h, i) {
@@ -42,9 +42,10 @@ function getPMOrderData(row) {
     "";
 
   return {
-    row,
+    row: rowNumber,
     woNumber: obj.WO_NUMBER || "",
     woType: obj.WO_TYPE || "",
+    pmFrequency: normalizePMReportFrequency_(obj.PM_TYPE || obj.PM_FREQUENCY || obj.TIPO_MANTENIMIENTO || ""),
     companyId,
     nsn,
     storeAddress: address,
@@ -52,8 +53,41 @@ function getPMOrderData(row) {
     technician: obj.TECHNICIAN || "",
     equipment: obj.REPORTED_EQUIPMENT || obj.REPORTED_EQUIPMENT_EN || obj["REPORTED EQUIPMENT"] || "",
     problem: obj.REPORTED_PROBLEM_ES || obj.REPORTED_PROBLEM_EN || obj.REPORTED_PROBLEM_ORIGINAL || obj["REPORTED PROBLEM"] || "",
-    status: obj.STATUS || ""
+    status: obj.STATUS || "",
+    pmReportEsUrl: obj.PM_REPORT_ES_URL || "",
+    pmReportEnUrl: obj.PM_REPORT_EN_URL || "",
+    pmReportFolderUrl: obj.PM_REPORT_FOLDER_URL || "",
+    pmReportStatus: obj.PM_REPORT_STATUS || ""
   };
+}
+
+function resolvePMOrderDataRow_(values, headers, row, woNumber) {
+  const rowNumber = Number(row || 0);
+  const targetWO = String(woNumber || "").trim();
+
+  if (rowNumber >= 2 && rowNumber <= values.length) {
+    if (!targetWO) return rowNumber;
+
+    const idxWOForRow = headers.indexOf("WO_NUMBER");
+    const rowWO = idxWOForRow >= 0
+      ? String(values[rowNumber - 1][idxWOForRow] || "").trim()
+      : "";
+
+    if (rowWO === targetWO) return rowNumber;
+  }
+
+  if (!targetWO) return 0;
+
+  const idxWO = headers.indexOf("WO_NUMBER");
+  if (idxWO === -1) return 0;
+
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][idxWO] || "").trim() === targetWO) {
+      return i + 1;
+    }
+  }
+
+  return 0;
 }
 
 function getPMTexts() {
@@ -137,13 +171,18 @@ function generatePMReportPDF(payload) {
   DriveApp.getFileById(docFileEs.getId()).setTrashed(true);
   DriveApp.getFileById(docFileEn.getId()).setTrashed(true);
 
-  return {
+  const result = {
     pdfEsId: pdfEs.id,
     pdfEsUrl: pdfEs.url,
     pdfEnId: pdfEn.id,
     pdfEnUrl: pdfEn.url,
-    folderUrl: mainFolder.getUrl()
+    folderUrl: mainFolder.getUrl(),
+    savedToWorkOrder: false
   };
+
+  result.savedToWorkOrder = updatePMReportLinks_(payload, result);
+
+  return result;
 }
 
 function fillPMTemplate_(docId, p, lang) {
@@ -176,7 +215,7 @@ function fillPMTemplate_(docId, p, lang) {
   const rtus = p.rtus || [];
 
   for (let i = 5; i > equipmentQty; i--) {
-    removeRTUSection_(body, i);
+    removeRTUSection_(body, i, lang);
   }
 
   for (let i = 1; i <= equipmentQty; i++) {
@@ -393,9 +432,142 @@ function insertPMFilesAtMarker_(body, marker, urls, title) {
   if (col === 1) row.appendTableCell(" ");
 }
 
-function removeRTUSection_(body, rtuNum) {
-  const startText = "🔹 RTU " + rtuNum;
-  const nextText = rtuNum < 5 ? "🔹 RTU " + (rtuNum + 1) : "📝 RECOMENDACIONES AREA ROOF";
+function updatePMReportLinks_(payload, report) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sh = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
+    if (!sh) throw new Error("No existe la hoja: " + CFG.SHEET_WORK_ORDERS);
+
+    let headers = sh.getRange(1, 1, 1, sh.getLastColumn())
+      .getValues()[0]
+      .map(function(h) {
+        return String(h).trim();
+      });
+
+    [
+      "PM_REPORT_ES_URL",
+      "PM_REPORT_EN_URL",
+      "PM_REPORT_FOLDER_URL",
+      "PM_REPORT_DATE",
+      "PM_REPORT_STATUS"
+    ].forEach(function(h) {
+      ensurePMReportColumn_(sh, headers, h);
+      headers = sh.getRange(1, 1, 1, sh.getLastColumn())
+        .getValues()[0]
+        .map(function(x) {
+          return String(x).trim();
+        });
+    });
+
+    const rowNumber = resolvePMReportRow_(sh, headers, payload.row, payload.woNumber);
+    if (!rowNumber) {
+      throw new Error("No se pudo encontrar la orden PM para guardar links: " + (payload.woNumber || ""));
+    }
+
+    setPMReportCell_(sh, rowNumber, headers, "PM_REPORT_ES_URL", report.pdfEsUrl || "");
+    setPMReportCell_(sh, rowNumber, headers, "PM_REPORT_EN_URL", report.pdfEnUrl || "");
+    setPMReportCell_(sh, rowNumber, headers, "PM_REPORT_FOLDER_URL", report.folderUrl || "");
+    setPMReportCell_(sh, rowNumber, headers, "PM_REPORT_DATE", new Date());
+    setPMReportCell_(sh, rowNumber, headers, "PM_REPORT_STATUS", "GENERATED");
+
+    try {
+      const companyId = getPMReportCell_(sh, rowNumber, headers, "COMPANY_ID") || CFG.DEFAULT_COMPANY_ID;
+      addLog_(companyId, payload.woNumber || "", "PM REPORT GENERATED", "", "GENERATED", payload.technician || "PM Report", report.folderUrl || "");
+    } catch (logErr) {
+      Logger.log("PM report log error: " + logErr);
+    }
+
+    return true;
+  } catch (err) {
+    Logger.log("ERROR updatePMReportLinks_: " + err);
+    return false;
+  }
+}
+
+function ensurePMReportColumn_(sheet, headers, columnName) {
+  const target = String(columnName || "").trim();
+  const exists = headers.some(function(h) {
+    return String(h || "").trim().toUpperCase() === target.toUpperCase();
+  });
+
+  if (!exists) {
+    sheet.getRange(1, sheet.getLastColumn() + 1).setValue(target);
+  }
+}
+
+function resolvePMReportRow_(sheet, headers, rowNumber, woNumber) {
+  const row = Number(rowNumber || 0);
+  const targetWO = String(woNumber || "").trim();
+  const lastRow = sheet.getLastRow();
+
+  if (row >= 2 && row <= lastRow) {
+    if (!targetWO) return row;
+
+    const rowWO = String(getPMReportCell_(sheet, row, headers, "WO_NUMBER") || "").trim();
+    if (rowWO === targetWO) return row;
+  }
+
+  if (!targetWO) return 0;
+
+  const idxWO = headers.map(function(h) {
+    return String(h || "").trim().toUpperCase();
+  }).indexOf("WO_NUMBER");
+
+  if (idxWO === -1 || lastRow < 2) return 0;
+
+  const values = sheet.getRange(2, idxWO + 1, lastRow - 1, 1).getValues();
+  for (let i = 0; i < values.length; i++) {
+    if (String(values[i][0] || "").trim() === targetWO) {
+      return i + 2;
+    }
+  }
+
+  return 0;
+}
+
+function setPMReportCell_(sheet, rowNumber, headers, headerName, value) {
+  const idx = headers.map(function(h) {
+    return String(h || "").trim().toUpperCase();
+  }).indexOf(String(headerName || "").trim().toUpperCase());
+
+  if (idx === -1) throw new Error("No existe la columna " + headerName);
+  sheet.getRange(Number(rowNumber), idx + 1).setValue(value);
+}
+
+function getPMReportCell_(sheet, rowNumber, headers, headerName) {
+  const idx = headers.map(function(h) {
+    return String(h || "").trim().toUpperCase();
+  }).indexOf(String(headerName || "").trim().toUpperCase());
+
+  if (idx === -1) return "";
+  return sheet.getRange(Number(rowNumber), idx + 1).getValue();
+}
+
+function normalizePMReportFrequency_(value) {
+  const v = String(value || "").trim().toUpperCase();
+
+  if (v === "MONTHLY" || v === "MENSUAL") return "MENSUAL";
+  if (v === "QUARTERLY" || v === "TRIMESTRAL") return "TRIMESTRAL";
+  if (v === "ANNUAL" || v === "ANUAL") return "ANNUAL";
+
+  return v || "MENSUAL";
+}
+
+function removeRTUSection_(body, rtuNum, lang) {
+  const isEn = String(lang || "ES").toUpperCase() === "EN";
+  const startTokens = [
+    "{{TITLE_RTU" + rtuNum + "}}",
+    "RTU " + rtuNum
+  ];
+  const nextTokens = rtuNum < 5
+    ? [
+        "{{TITLE_RTU" + (rtuNum + 1) + "}}",
+        "RTU " + (rtuNum + 1)
+      ]
+    : [
+        "{{TITLE_ROOF_RECOMMENDATIONS}}",
+        isEn ? "ROOF RECOMMENDATIONS" : "RECOMENDACIONES AREA ROOF"
+      ];
 
   let startIndex = -1;
   let endIndex = -1;
@@ -404,12 +576,12 @@ function removeRTUSection_(body, rtuNum) {
     const child = body.getChild(i);
     const txt = child.getText ? child.getText() : "";
 
-    if (startIndex === -1 && txt.indexOf(startText) !== -1) {
+    if (startIndex === -1 && textContainsAnyPM_(txt, startTokens)) {
       startIndex = i;
       continue;
     }
 
-    if (startIndex !== -1 && txt.indexOf(nextText) !== -1) {
+    if (startIndex !== -1 && textContainsAnyPM_(txt, nextTokens)) {
       endIndex = i;
       break;
     }
@@ -420,6 +592,14 @@ function removeRTUSection_(body, rtuNum) {
   for (let i = endIndex - 1; i >= startIndex; i--) {
     body.removeChild(body.getChild(i));
   }
+}
+
+function textContainsAnyPM_(text, tokens) {
+  const value = String(text || "").toUpperCase();
+
+  return tokens.some(function(token) {
+    return value.indexOf(String(token || "").toUpperCase()) !== -1;
+  });
 }
 
 function extractDriveIdPM_(urlOrId) {
