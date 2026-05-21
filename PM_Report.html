@@ -12,6 +12,7 @@
     button{padding:12px 16px;border:none;border-radius:10px;color:white;font-weight:bold;cursor:pointer;margin-top:10px;}
     .purple{background:#7c3aed;}
     .gray{background:#6b7280;}
+    .return-btn{display:inline-block;background:#7c3aed;color:white;padding:12px 16px;border-radius:10px;font-weight:bold;text-decoration:none;margin-top:10px;}
     h2,h3{margin-top:0;}
   </style>
 </head>
@@ -341,7 +342,7 @@ async function savePMReport() {
 }
 
 function goBack() {
-  returnToPreviousScreen("");
+  openReturnUrl(getPMReturnUrl());
 }
 
 function returnToPreviousScreen(message) {
@@ -357,14 +358,13 @@ function returnToPreviousScreen(message) {
   }
 
   showPMReturnLink(targetUrl);
-  navigateTop(targetUrl);
 }
 
 function getPMReturnUrl() {
   return RETURN_TO || BASE_URL + "?view=tech&tech=" + encodeURIComponent(TECH_NAME);
 }
 
-function navigateTop(url) {
+function openReturnUrl(url) {
   try {
     window.open(url, "_top");
     return;
@@ -381,8 +381,9 @@ function navigateTop(url) {
 
 function showPMReturnLink(url) {
   document.getElementById("orderInfo").innerHTML =
-    "Regresando a la pantalla anterior...<br><br>" +
-    "<a href='" + escapeAttr(url) + "' target='_top'>Volver al portal</a>";
+    "<b>Reporte PM generado correctamente.</b><br>" +
+    "Presiona el boton para volver al portal tecnico.<br><br>" +
+    "<a class='return-btn' href='" + escapeAttr(url) + "' target='_top'>Volver al portal tecnico</a>";
 }
 
 function escapeAttr(value) {

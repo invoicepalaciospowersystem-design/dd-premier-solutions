@@ -13,6 +13,7 @@
     .save { background:#16a34a; }
     .row { font-size:14px; margin:5px 0; }
     .pm-note { background:#ede9fe; color:#4c1d95; padding:12px; border-radius:10px; margin:10px 0; font-weight:bold; }
+    .return-btn { display:inline-block; width:100%; box-sizing:border-box; background:#111827; color:white; padding:11px; border-radius:9px; font-weight:bold; text-align:center; text-decoration:none; margin:6px 0; }
   </style>
 </head>
 
@@ -326,7 +327,7 @@ function saveClose() {
       );
 
       const closeTech = TECH_NAME || (ORDER && ORDER.TECHNICIAN) || "";
-      return navigateTop(getCloseOrderReturnUrl(closeTech));
+      showCloseReturnLink(getCloseOrderReturnUrl(closeTech));
     })
     .withFailureHandler(function(err) {
       document.getElementById("saveBtn").disabled = false;
@@ -342,27 +343,11 @@ function getCloseOrderReturnUrl(tech) {
   return RETURN_TO || BASE_URL + "?view=tech&tech=" + encodeURIComponent(tech || "");
 }
 
-function navigateTop(url) {
-  showCloseReturnLink(url);
-
-  try {
-    window.open(url, "_top");
-    return;
-  } catch (err) {
-    console.log("Top navigation blocked:", err);
-  }
-
-  try {
-    window.location.href = url;
-  } catch (err2) {
-    console.log("Frame navigation blocked:", err2);
-  }
-}
-
 function showCloseReturnLink(url) {
   document.getElementById("orderInfo").innerHTML =
-    "Invoice creado. Regresando a la pantalla anterior...<br><br>" +
-    "<a href='" + escapeAttr(url) + "' target='_top'>Volver</a>";
+    "<b>Invoice creado correctamente.</b><br>" +
+    "Presiona el boton para volver a la pantalla anterior.<br><br>" +
+    "<a class='return-btn' href='" + escapeAttr(url) + "' target='_top'>Volver</a>";
 }
 
 function escapeAttr(value) {

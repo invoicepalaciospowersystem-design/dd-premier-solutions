@@ -20,6 +20,7 @@
     .add { background:#2563eb; color:white; }
     .remove { background:#dc2626; color:white; }
     .totals { max-width:360px; margin-left:auto; }
+    .return-btn { display:inline-block; background:#111827; color:white; padding:10px 14px; border-radius:8px; font-weight:bold; text-decoration:none; }
   </style>
 </head>
 
@@ -345,7 +346,7 @@ function saveQuote() {
 }
 
 function goBack() {
-  returnToPreviousScreen("");
+  openReturnUrl(getQuoteReturnUrl());
 }
 
 function returnToPreviousScreen(message) {
@@ -354,7 +355,7 @@ function returnToPreviousScreen(message) {
     localStorage.setItem("lastWO", WO_PARAM);
   }
 
-  navigateTop(getQuoteReturnUrl());
+  showQuoteReturnLink(getQuoteReturnUrl());
 }
 
 function getQuoteReturnUrl() {
@@ -369,7 +370,7 @@ function getQuoteReturnUrl() {
   return url;
 }
 
-function navigateTop(url) {
+function openReturnUrl(url) {
   showQuoteReturnLink(url);
 
   try {
@@ -397,8 +398,9 @@ function showQuoteReturnLink(url) {
   }
 
   box.innerHTML =
-    "Regresando a la pantalla anterior...<br><br>" +
-    "<a href='" + escapeAttr(url) + "' target='_top'>Volver</a>";
+    "<b>Quote creado correctamente.</b><br>" +
+    "Presiona el boton para volver a la pantalla anterior.<br><br>" +
+    "<a class='return-btn' href='" + escapeAttr(url) + "' target='_top'>Volver</a>";
 }
 
 function splitAddressClient(fullAddress) {
