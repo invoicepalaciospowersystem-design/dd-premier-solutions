@@ -170,7 +170,20 @@ function createQuote(data) {
     return quoteRow[h] !== undefined ? quoteRow[h] : "";
   }));
 
+  const quoteSheetRow = sh.getLastRow();
+
   updateWorkOrderQuoteLinks_(data.rowNumber, pdfEn, pdfEs);
+
+  let emailResult = null;
+  try {
+    emailResult = sendQuoteCreatedClientEmail_(data, quoteRow, quoteSheetRow);
+  } catch (emailErr) {
+    Logger.log("ERROR sendQuoteCreatedClientEmail_: " + emailErr);
+    emailResult = {
+      sent: false,
+      status: "ERROR: " + emailErr
+    };
+  }
 
   addNotification_(data.companyId, "ADMIN", data.wo_number, "QUOTE", "📄 Quote created for " + data.wo_number);
   addNotification_(data.companyId, "SYSTEM", data.wo_number, "QUOTE", "📄 Quote created for " + data.wo_number);
@@ -179,7 +192,8 @@ function createQuote(data) {
   return {
     success: true,
     pdfEnUrl: pdfEn,
-    pdfEsUrl: pdfEs
+    pdfEsUrl: pdfEs,
+    emailResult: emailResult
   };
 }
 

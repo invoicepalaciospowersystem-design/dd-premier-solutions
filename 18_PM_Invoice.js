@@ -181,6 +181,18 @@ function createPMInvoiceFromCloseOrder_(data) {
   });
 
   shInv.appendRow(rowValues);
+  const invoiceSheetRow = shInv.getLastRow();
+
+  let emailResult = null;
+  try {
+    emailResult = sendInvoiceCreatedClientEmail_(invoiceRow, rowNumber, invoiceSheetRow);
+  } catch (emailErr) {
+    Logger.log("ERROR sendInvoiceCreatedClientEmail_ PM: " + emailErr);
+    emailResult = {
+      sent: false,
+      status: "ERROR: " + emailErr
+    };
+  }
 
     try {
     savePMEconomy({
@@ -217,7 +229,8 @@ function createPMInvoiceFromCloseOrder_(data) {
     invoiceType: "PM",
     pmType: pmType,
     pdfEnUrl: pdfs.pdfEnUrl,
-    pdfEsUrl: pdfs.pdfEsUrl
+    pdfEsUrl: pdfs.pdfEsUrl,
+    emailResult: emailResult
   };
 }
 

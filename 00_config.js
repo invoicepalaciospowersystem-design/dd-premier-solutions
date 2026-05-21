@@ -15,6 +15,8 @@ const CFG = {
   PM_REPORTS_FOLDER_ID: "1eCiT7if6s_bqpQPTIi8HLy9_Hl5wfgUi",
 PM_REPORT_TEMPLATE_ID: "1wuLdLD_W4IAb4MoA8IHf0birHG6f1rJ0O7Umf5ahbMg",
   TEST_MODE: true,
+  AUTO_SEND_CLIENT_EMAILS: true,
+  CLIENT_EMAIL_TEST_TO: "invoice.palaciospowersystem@gmail.com",
   INVOICES_FOLDER_ID: "1nHOt6jpoGPmTcRAkndkaDtNjsIal7WDy",
   QUOTES_FOLDER_ID: "1OHZ9Mxffsi1_P2wenpIwgZ95o0wubWop",
   QUOTE_TEMPLATE_ES_DOC_ID: "1buu6D95PW-XjEtBtkI2T4RW8mWd7IfFi6eqTCZyVlqc",

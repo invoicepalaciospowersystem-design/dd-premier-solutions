@@ -92,6 +92,7 @@ function saveCloseOrder(data) {
       invoiceNumber: result.invoiceNumber || "",
       woNumber: woNumber,
       invoiceType: "PM",
+      emailResult: result.emailResult || null,
       message: "PM invoice created and returned from saveCloseOrder"
     };
   }
@@ -247,6 +248,18 @@ function saveCloseOrder(data) {
   });
 
   shInv.appendRow(rowValues);
+  const invoiceSheetRow = shInv.getLastRow();
+
+  let emailResult = null;
+  try {
+    emailResult = sendInvoiceCreatedClientEmail_(invoiceRow, rowNumber, invoiceSheetRow);
+  } catch (emailErr) {
+    Logger.log("ERROR sendInvoiceCreatedClientEmail_: " + emailErr);
+    emailResult = {
+      sent: false,
+      status: "ERROR: " + emailErr
+    };
+  }
 
   let oldSyncResult = null;
 
@@ -268,6 +281,7 @@ function saveCloseOrder(data) {
     invoiceNumber: invoiceNumber,
     woNumber: woNumber,
     invoiceType: "REPAIR",
+    emailResult: emailResult,
     oldSync: oldSyncResult
   };
 }

@@ -23,6 +23,13 @@ function getStoreByNSN_(nsn, companyId) {
   const idxZip = headers.indexOf("ZIP");
   const idxVendor = headers.indexOf("VendorID");
   const idxActive = headers.indexOf("ACTIVE");
+  const idxStoreEmails = headers.indexOf("STORE_EMAILS");
+  const idxSupervisorName = headers.indexOf("SUPERVISOR_NAME");
+  const idxSupervisorEmail = headers.indexOf("SUPERVISOR_EMAIL");
+  const idxBillingEmails = headers.indexOf("BILLING_EMAILS");
+  const idxPmReportEmails = headers.indexOf("PM_REPORT_EMAILS");
+  const idxQuoteEmails = headers.indexOf("QUOTE_EMAILS");
+  const idxInvoiceEmails = headers.indexOf("INVOICE_EMAILS");
 
   if (idxNSN === -1) return {};
 
@@ -56,6 +63,14 @@ function getStoreByNSN_(nsn, companyId) {
         state: normalized.STATE,
         zip: normalized.ZIP,
         vendorId: idxVendor >= 0 ? data[i][idxVendor] || "" : "",
+        storeEmails: idxStoreEmails >= 0 ? data[i][idxStoreEmails] || "" : "",
+        supervisorName: idxSupervisorName >= 0 ? data[i][idxSupervisorName] || "" : "",
+        supervisorEmail: idxSupervisorEmail >= 0 ? data[i][idxSupervisorEmail] || "" : "",
+        supervisorEmails: idxSupervisorEmail >= 0 ? data[i][idxSupervisorEmail] || "" : "",
+        billingEmails: idxBillingEmails >= 0 ? data[i][idxBillingEmails] || "" : "",
+        pmReportEmails: idxPmReportEmails >= 0 ? data[i][idxPmReportEmails] || "" : "",
+        quoteEmails: idxQuoteEmails >= 0 ? data[i][idxQuoteEmails] || "" : "",
+        invoiceEmails: idxInvoiceEmails >= 0 ? data[i][idxInvoiceEmails] || "" : "",
         fullAddress: normalized.FULL_ADDRESS
       };
     }
@@ -166,6 +181,8 @@ function getStores(companyId, role) {
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.SHEET_STORES);
   if (!sh) throw new Error("No existe la hoja STORES.");
 
+  ensureStoreEmailColumns_(sh);
+
   const data = sh.getDataRange().getValues();
   if (data.length < 2) return [];
 
@@ -204,6 +221,8 @@ function saveStore(store) {
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.SHEET_STORES);
   if (!sh) throw new Error("No existe la hoja STORES.");
 
+  ensureStoreEmailColumns_(sh);
+
   const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(function(h) {
     return String(h).trim();
   });
@@ -228,4 +247,27 @@ function saveStore(store) {
   }
 
   return true;
+}
+
+function ensureStoreEmailColumns_(sh) {
+  const required = [
+    "STORE_EMAILS",
+    "BILLING_EMAILS",
+    "PM_REPORT_EMAILS",
+    "QUOTE_EMAILS",
+    "INVOICE_EMAILS"
+  ];
+
+  let headers = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1))
+    .getValues()[0]
+    .map(function(h) {
+      return String(h || "").trim().toUpperCase();
+    });
+
+  required.forEach(function(h) {
+    if (headers.indexOf(h) === -1) {
+      sh.getRange(1, sh.getLastColumn() + 1).setValue(h);
+      headers.push(h);
+    }
+  });
 }

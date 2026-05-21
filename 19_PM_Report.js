@@ -184,6 +184,16 @@ function generatePMReportPDF(payload) {
     Object.assign({ folderUrl: folderUrl }, result)
   );
 
+  try {
+    result.emailResult = sendPMReportClientEmail_(payload, result);
+  } catch (emailErr) {
+    Logger.log("ERROR sendPMReportClientEmail_: " + emailErr);
+    result.emailResult = {
+      sent: false,
+      status: "ERROR: " + emailErr
+    };
+  }
+
   return result;
 }
 
