@@ -188,3 +188,87 @@ function getCompanyName(companyId) {
 
   return companyId;
 }
+
+function getCompanyBranding(companyId) {
+  companyId = String(companyId || "").trim().toUpperCase();
+
+  const base = Object.assign(
+    {},
+    (CFG.COMPANY_BRANDING && CFG.COMPANY_BRANDING.DEFAULT) || {}
+  );
+
+  const configured = companyId && CFG.COMPANY_BRANDING && CFG.COMPANY_BRANDING[companyId]
+    ? Object.assign({}, CFG.COMPANY_BRANDING[companyId])
+    : {};
+
+  const sheetBranding = getCompanyBrandingFromSheet_(companyId);
+  const branding = Object.assign(base, configured, sheetBranding);
+
+  branding.companyId = companyId || "";
+  branding.companyName = branding.companyName || getCompanyName(companyId) || base.companyName || CFG.APP_NAME;
+  branding.loginTitle = branding.loginTitle || branding.companyName;
+  branding.loginSubtitle = branding.loginSubtitle || "";
+  branding.ownerName = branding.ownerName || CFG.APP_NAME;
+  branding.primaryColor = branding.primaryColor || "#111827";
+  branding.accentColor = branding.accentColor || "#dc2626";
+  branding.backgroundImageUrl = branding.backgroundImageUrl || driveImageUrl_(branding.backgroundFileId, 1800);
+  branding.logoImageUrl = branding.logoImageUrl || driveImageUrl_(branding.logoFileId, 600);
+
+  return branding;
+}
+
+function getCompanyBrandingFromSheet_(companyId) {
+  if (!companyId) return {};
+
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.SHEET_COMPANIES);
+  if (!sh) return {};
+
+  const data = sh.getDataRange().getValues();
+  if (data.length < 2) return {};
+
+  const headers = data[0].map(function(h) {
+    return String(h).trim();
+  });
+
+  const idxId = headers.indexOf("COMPANY_ID");
+  if (idxId === -1) return {};
+
+  const map = {
+    COMPANY_NAME: "companyName",
+    LOGIN_TITLE: "loginTitle",
+    LOGIN_SUBTITLE: "loginSubtitle",
+    LOGIN_OWNER_NAME: "ownerName",
+    LOGIN_PRIMARY_COLOR: "primaryColor",
+    LOGIN_ACCENT_COLOR: "accentColor",
+    LOGIN_BACKGROUND_URL: "backgroundImageUrl",
+    LOGIN_BACKGROUND_FILE_ID: "backgroundFileId",
+    LOGIN_LOGO_URL: "logoImageUrl",
+    LOGIN_LOGO_FILE_ID: "logoFileId"
+  };
+
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][idxId] || "").trim().toUpperCase() !== companyId) continue;
+
+    const branding = {};
+    Object.keys(map).forEach(function(header) {
+      const idx = headers.indexOf(header);
+      if (idx >= 0 && data[i][idx] !== "") {
+        branding[map[header]] = String(data[i][idx] || "").trim();
+      }
+    });
+
+    return branding;
+  }
+
+  return {};
+}
+
+function driveImageUrl_(fileId, size) {
+  fileId = String(fileId || "").trim();
+  if (!fileId) return "";
+
+  return "https://drive.google.com/thumbnail?id=" +
+    encodeURIComponent(fileId) +
+    "&sz=w" +
+    encodeURIComponent(String(size || 1200));
+}

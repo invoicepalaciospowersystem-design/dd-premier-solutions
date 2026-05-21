@@ -126,6 +126,7 @@ function doGet(e) {
 
     const template = HtmlService.createTemplateFromFile("Main");
     template.baseUrl = CFG.WEB_APP_URL;
+    template.companyId = p.companyId || "";
 
     return template.evaluate()
       .setTitle(CFG.APP_NAME)

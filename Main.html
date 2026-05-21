@@ -5,41 +5,235 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
-    body { font-family: Arial, sans-serif; background:#f3f4f6; margin:0; padding:20px; color:#111827; }
-    .box { max-width:420px; margin:60px auto; background:white; padding:25px; border-radius:16px; box-shadow:0 4px 14px rgba(0,0,0,0.08); }
-    .panel { max-width:900px; margin:30px auto; background:white; padding:25px; border-radius:16px; box-shadow:0 4px 14px rgba(0,0,0,0.08); display:none; }
-    .global-header { display:none; max-width:900px; margin:0 auto 15px auto; background:white; padding:15px; border-radius:12px; box-shadow:0 3px 10px rgba(0,0,0,0.08); justify-content:space-between; align-items:center; flex-wrap:wrap; }
-    input, button { width:100%; box-sizing:border-box; padding:13px; margin:8px 0; border-radius:10px; border:1px solid #d1d5db; font-size:15px; }
-    button { background:#111827; color:white; border:none; font-weight:bold; cursor:pointer; }
-    .muted { color:#6b7280; font-size:14px; }
-    .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:15px; margin-top:20px; }
-    .module { background:#f9fafb; border:1px solid #e5e7eb; border-radius:14px; padding:18px; cursor:pointer; }
-    .module-title { font-size:18px; font-weight:bold; margin-bottom:6px; }
-    .module-desc { font-size:14px; color:#6b7280; }
-    #error { color:#dc2626; font-size:14px; margin-top:10px; font-weight:bold; }
-    .logout { background:#dc2626; max-width:180px; }
+    :root {
+      --brand-primary:#111827;
+      --brand-accent:#dc2626;
+      --login-bg-image:none;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background:#f3f4f6;
+      margin:0;
+      padding:20px;
+      color:#111827;
+      min-height:100vh;
+      box-sizing:border-box;
+    }
+
+    body.login-mode {
+      padding:0;
+      background:
+        radial-gradient(circle at 18% 20%, rgba(220,38,38,.18), transparent 28%),
+        linear-gradient(135deg, #111827 0%, #27272a 54%, #7f1d1d 100%);
+    }
+
+    body.login-mode.has-login-bg {
+      background-image:
+        linear-gradient(90deg, rgba(17,24,39,.88), rgba(17,24,39,.58), rgba(17,24,39,.18)),
+        var(--login-bg-image);
+      background-size:cover;
+      background-position:center;
+      background-attachment:fixed;
+    }
+
+    .login-shell {
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:42px;
+      padding:28px;
+      box-sizing:border-box;
+    }
+
+    .login-brand {
+      width:min(520px, 100%);
+      color:white;
+      text-shadow:0 2px 12px rgba(0,0,0,.28);
+    }
+
+    .login-kicker {
+      display:inline-block;
+      background:rgba(255,255,255,.14);
+      border:1px solid rgba(255,255,255,.24);
+      padding:7px 10px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:bold;
+      text-transform:uppercase;
+      letter-spacing:0;
+      margin-bottom:14px;
+    }
+
+    .login-brand h1 {
+      margin:0;
+      font-size:42px;
+      line-height:1.05;
+      letter-spacing:0;
+    }
+
+    .login-brand p {
+      font-size:18px;
+      line-height:1.45;
+      margin:14px 0 0;
+      color:rgba(255,255,255,.86);
+    }
+
+    .box {
+      max-width:420px;
+      width:100%;
+      background:rgba(255,255,255,.94);
+      padding:25px;
+      border-radius:16px;
+      box-shadow:0 24px 80px rgba(0,0,0,.28);
+      box-sizing:border-box;
+      backdrop-filter:blur(8px);
+    }
+
+    .box h2 {
+      margin:0 0 6px;
+      color:#111827;
+    }
+
+    .panel {
+      max-width:900px;
+      margin:30px auto;
+      background:white;
+      padding:25px;
+      border-radius:16px;
+      box-shadow:0 4px 14px rgba(0,0,0,0.08);
+      display:none;
+    }
+
+    .global-header {
+      display:none;
+      max-width:900px;
+      margin:0 auto 15px auto;
+      background:white;
+      padding:15px;
+      border-radius:12px;
+      box-shadow:0 3px 10px rgba(0,0,0,0.08);
+      justify-content:space-between;
+      align-items:center;
+      flex-wrap:wrap;
+      gap:12px;
+    }
+
+    input, button {
+      width:100%;
+      box-sizing:border-box;
+      padding:13px;
+      margin:8px 0;
+      border-radius:10px;
+      border:1px solid #d1d5db;
+      font-size:15px;
+    }
+
+    input:focus {
+      outline:2px solid color-mix(in srgb, var(--brand-primary), white 62%);
+      border-color:var(--brand-primary);
+    }
+
+    button {
+      background:var(--brand-primary);
+      color:white;
+      border:none;
+      font-weight:bold;
+      cursor:pointer;
+    }
+
+    button:hover {
+      filter:brightness(.95);
+    }
+
+    .muted {
+      color:#6b7280;
+      font-size:14px;
+    }
+
+    .grid {
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+      gap:15px;
+      margin-top:20px;
+    }
+
+    .module {
+      background:#f9fafb;
+      border:1px solid #e5e7eb;
+      border-left:5px solid var(--brand-primary);
+      border-radius:14px;
+      padding:18px;
+      cursor:pointer;
+    }
+
+    .module-title {
+      font-size:18px;
+      font-weight:bold;
+      margin-bottom:6px;
+    }
+
+    .module-desc {
+      font-size:14px;
+      color:#6b7280;
+      line-height:1.35;
+    }
+
+    #error {
+      color:#dc2626;
+      font-size:14px;
+      margin-top:10px;
+      font-weight:bold;
+    }
+
+    .logout {
+      background:#dc2626;
+      max-width:180px;
+    }
+
+    @media (max-width: 800px) {
+      .login-shell {
+        align-items:stretch;
+        flex-direction:column;
+        justify-content:center;
+        gap:22px;
+      }
+
+      .login-brand h1 {
+        font-size:32px;
+      }
+    }
   </style>
 </head>
 
-<body>
+<body class="login-mode">
+
+<div id="loginShell" class="login-shell">
+  <section class="login-brand">
+    <div class="login-kicker" id="loginKicker">Company Login</div>
+    <h1 id="heroTitle">D&D Premier Solutions Corp</h1>
+    <p id="heroSubtitle">Sistema de ordenes y operaciones</p>
+  </section>
+
+  <div id="loginBox" class="box">
+    <h2 id="loginTitle">D&D Premier Solutions Corp</h2>
+    <div class="muted" id="loginSubtitle">Login de acceso</div>
+
+    <input id="email" type="email" placeholder="Email" autocomplete="username">
+    <input id="password" type="password" placeholder="Password" autocomplete="current-password">
+
+    <button id="loginButton" onclick="login()">Entrar</button>
+    <div id="error"></div>
+  </div>
+</div>
 
 <div id="globalHeader" class="global-header">
   <div id="companyTitle" style="font-size:22px; font-weight:bold;">Company: Loading...</div>
   <div style="text-align:right;">
-    <div style="font-size:16px; font-weight:bold;">D&D Premier Solutions Corp</div>
-    <div style="font-size:13px; color:#6b7280;">Sistema de Órdenes</div>
+    <div id="ownerTitle" style="font-size:16px; font-weight:bold;">D&D Premier Solutions Corp</div>
+    <div id="systemSubtitle" style="font-size:13px; color:#6b7280;">Sistema de Ordenes</div>
   </div>
-</div>
-
-<div id="loginBox" class="box">
-  <h2>D&D Premier Solutions Corp</h2>
-  <div class="muted">Login de acceso</div>
-
-  <input id="email" type="email" placeholder="Email">
-  <input id="password" type="password" placeholder="Password">
-
-  <button onclick="login()">Entrar</button>
-  <div id="error"></div>
 </div>
 
 <div id="mainPanel" class="panel">
@@ -52,20 +246,30 @@
 </div>
 
 <script>
-const BASE_URL = "https://script.google.com/macros/s/AKfycbwAiZ0Dh5BQoX-QTmMbZcRDEr974-X_nNWcW5x2XeYurC_CeXLNSrl1k-f3p1DDKppOCw/exec";
+const BASE_URL = "<?= baseUrl ?>";
+const LOGIN_COMPANY_ID = String("<?= companyId ?>").trim().toUpperCase();
 
 let CURRENT_USER = null;
+let CURRENT_BRANDING = {
+  companyName: "D&D Premier Solutions Corp",
+  loginTitle: "D&D Premier Solutions Corp",
+  loginSubtitle: "Sistema de ordenes y operaciones",
+  ownerName: "D&D Premier Solutions Corp",
+  primaryColor: "#111827",
+  accentColor: "#dc2626",
+  backgroundImageUrl: ""
+};
 
 const MODULES = [
   {
-    title: "Órdenes",
-    desc: "Manejo de work orders, técnicos y estados.",
+    title: "Ordenes",
+    desc: "Manejo de work orders, tecnicos y estados.",
     roles: ["OWNER", "ADMIN", "ORDENES"],
     url: "?view=orders"
   },
   {
-    title: "Economía",
-    desc: "Facturación, costos, pagos y profit.",
+    title: "Economia",
+    desc: "Facturacion, costos, pagos y profit.",
     roles: ["OWNER", "ADMIN", "ECONOMIA"],
     url: "?view=economy"
   },
@@ -77,7 +281,7 @@ const MODULES = [
   },
   {
     title: "Empresas",
-    desc: "Administración multi-empresa.",
+    desc: "Administracion multi-empresa.",
     roles: ["OWNER"],
     url: "?view=companies"
   },
@@ -88,8 +292,8 @@ const MODULES = [
     url: "?view=users"
   },
   {
-    title: "Portal Técnico",
-    desc: "Vista de órdenes para técnicos.",
+    title: "Portal Tecnico",
+    desc: "Vista de ordenes para tecnicos.",
     roles: ["OWNER", "ADMIN", "TECH"],
     url: "?view=tech&tech="
   },
@@ -101,22 +305,71 @@ const MODULES = [
   }
 ];
 
+function loadLoginBranding() {
+  google.script.run
+    .withSuccessHandler(function(branding) {
+      applyBranding(branding || {});
+    })
+    .withFailureHandler(function() {
+      applyBranding(CURRENT_BRANDING);
+    })
+    .getCompanyBranding(LOGIN_COMPANY_ID);
+}
+
+function applyBranding(branding) {
+  CURRENT_BRANDING = Object.assign({}, CURRENT_BRANDING, branding || {});
+
+  document.documentElement.style.setProperty(
+    "--brand-primary",
+    safeCssColor(CURRENT_BRANDING.primaryColor, "#111827")
+  );
+  document.documentElement.style.setProperty(
+    "--brand-accent",
+    safeCssColor(CURRENT_BRANDING.accentColor, "#dc2626")
+  );
+
+  document.getElementById("heroTitle").innerText =
+    CURRENT_BRANDING.loginTitle || CURRENT_BRANDING.companyName || "D&D Premier Solutions Corp";
+  document.getElementById("heroSubtitle").innerText =
+    CURRENT_BRANDING.loginSubtitle || "Sistema de ordenes y operaciones";
+  document.getElementById("loginTitle").innerText =
+    CURRENT_BRANDING.loginTitle || CURRENT_BRANDING.companyName || "D&D Premier Solutions Corp";
+  document.getElementById("loginSubtitle").innerText =
+    CURRENT_BRANDING.loginSubtitle || "Login de acceso";
+  document.getElementById("ownerTitle").innerText =
+    CURRENT_BRANDING.ownerName || "D&D Premier Solutions Corp";
+
+  const bg = String(CURRENT_BRANDING.backgroundImageUrl || "").trim();
+  if (bg) {
+    document.body.classList.add("has-login-bg");
+    document.documentElement.style.setProperty("--login-bg-image", "url('" + cssUrl(bg) + "')");
+  } else {
+    document.body.classList.remove("has-login-bg");
+    document.documentElement.style.setProperty("--login-bg-image", "none");
+  }
+}
+
 function login() {
   const email = document.getElementById("email").value.trim();
   const password = document.getElementById("password").value.trim();
 
   document.getElementById("error").innerText = "";
+  document.getElementById("loginButton").disabled = true;
+  document.getElementById("loginButton").innerText = "Entrando...";
 
   google.script.run
     .withSuccessHandler(function(user) {
       CURRENT_USER = user || {};
       localStorage.setItem("pps_user", JSON.stringify(CURRENT_USER));
+      localStorage.setItem("pps_login_company", LOGIN_COMPANY_ID || "");
       showPanel();
     })
     .withFailureHandler(function(err) {
-      document.getElementById("error").innerText = err.message;
+      document.getElementById("error").innerText = err.message || err;
+      document.getElementById("loginButton").disabled = false;
+      document.getElementById("loginButton").innerText = "Entrar";
     })
-    .loginUser(email, password);
+    .loginUserForCompany(email, password, LOGIN_COMPANY_ID);
 }
 
 function normalizeUser(user) {
@@ -134,11 +387,12 @@ function normalizeUser(user) {
 function showPanel() {
   CURRENT_USER = normalizeUser(CURRENT_USER);
 
-  document.getElementById("loginBox").style.display = "none";
+  document.body.classList.remove("login-mode");
+  document.getElementById("loginShell").style.display = "none";
   document.getElementById("globalHeader").style.display = "flex";
   document.getElementById("mainPanel").style.display = "block";
 
-  updateHeaderCompany(CURRENT_USER.companyId);
+  updateHeaderCompany(getActiveCompanyId());
 
   document.getElementById("userInfo").innerText =
     CURRENT_USER.name + " | " + CURRENT_USER.role + " | Company: " + CURRENT_USER.companyId;
@@ -156,10 +410,10 @@ function renderModules() {
   if (!allowed.length) {
     document.getElementById("modules").innerHTML = `
       <div class="module">
-        <div class="module-title">No hay módulos disponibles</div>
+        <div class="module-title">No hay modulos disponibles</div>
         <div class="module-desc">
-          Rol detectado: <b>${role || "VACÍO"}</b><br>
-          Company: <b>${CURRENT_USER.companyId || "VACÍO"}</b><br>
+          Rol detectado: <b>${role || "VACIO"}</b><br>
+          Company: <b>${CURRENT_USER.companyId || "VACIO"}</b><br>
           Revisa la hoja USERS: ROLE debe ser OWNER, ADMIN, TECH, SUPERVISOR, ECONOMIA u ORDENES.
         </div>
       </div>
@@ -179,19 +433,31 @@ function renderModules() {
 }
 
 function openModule(url) {
+  const companyId = getActiveCompanyId();
+  let finalUrl;
+
   if (url === "?view=tech&tech=") {
-    window.top.location.href =
-      BASE_URL + url + encodeURIComponent(CURRENT_USER.name);
-    return;
+    finalUrl = BASE_URL + url + encodeURIComponent(CURRENT_USER.name);
+  } else if (url === "?view=customer&supervisor=") {
+    finalUrl = BASE_URL + url + encodeURIComponent(CURRENT_USER.name);
+  } else {
+    finalUrl = BASE_URL + url;
   }
 
-  if (url === "?view=customer&supervisor=") {
-    window.top.location.href =
-      BASE_URL + url + encodeURIComponent(CURRENT_USER.name);
-    return;
-  }
+  finalUrl = appendCompanyParam(finalUrl, companyId);
+  window.top.location.href = finalUrl;
+}
 
-  window.top.location.href = BASE_URL + url;
+function getActiveCompanyId() {
+  return LOGIN_COMPANY_ID || String(CURRENT_USER && CURRENT_USER.companyId || "").trim().toUpperCase();
+}
+
+function appendCompanyParam(url, companyId) {
+  companyId = String(companyId || "").trim().toUpperCase();
+  if (!companyId || /[?&]companyId=/.test(url)) return url;
+
+  return url + (url.indexOf("?") === -1 ? "?" : "&") +
+    "companyId=" + encodeURIComponent(companyId);
 }
 
 function updateHeaderCompany(companyId) {
@@ -203,34 +469,69 @@ function updateHeaderCompany(companyId) {
   }
 
   google.script.run
-    .withSuccessHandler(function(name) {
+    .withSuccessHandler(function(branding) {
+      branding = branding || {};
       document.getElementById("companyTitle").innerText =
-        "Company: " + (name || companyId);
+        "Company: " + (branding.companyName || companyId);
+      document.getElementById("ownerTitle").innerText =
+        branding.ownerName || CURRENT_BRANDING.ownerName || "D&D Premier Solutions Corp";
+      document.getElementById("systemSubtitle").innerText =
+        branding.loginSubtitle || "Sistema de Ordenes";
     })
     .withFailureHandler(function() {
       document.getElementById("companyTitle").innerText =
         "Company: " + companyId;
     })
-    .getCompanyName(companyId);
+    .getCompanyBranding(companyId);
 }
 
 function logout() {
   localStorage.removeItem("pps_user");
+  localStorage.removeItem("pps_login_company");
   CURRENT_USER = null;
 
+  document.body.classList.add("login-mode");
   document.getElementById("globalHeader").style.display = "none";
   document.getElementById("mainPanel").style.display = "none";
-  document.getElementById("loginBox").style.display = "block";
+  document.getElementById("loginShell").style.display = "flex";
   document.getElementById("password").value = "";
+  document.getElementById("loginButton").disabled = false;
+  document.getElementById("loginButton").innerText = "Entrar";
+}
+
+function canUseSavedUser(user) {
+  const normalized = normalizeUser(user);
+
+  if (!LOGIN_COMPANY_ID) return true;
+  if (normalized.role === "OWNER") return true;
+
+  return normalized.companyId === LOGIN_COMPANY_ID;
+}
+
+function safeCssColor(value, fallback) {
+  value = String(value || "").trim();
+  return /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(value) ? value : fallback;
+}
+
+function cssUrl(value) {
+  return String(value || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 }
 
 window.onload = function() {
+  loadLoginBranding();
+
   const saved = localStorage.getItem("pps_user");
 
   if (saved) {
     try {
-      CURRENT_USER = JSON.parse(saved);
-      showPanel();
+      const parsed = JSON.parse(saved);
+
+      if (canUseSavedUser(parsed)) {
+        CURRENT_USER = parsed;
+        showPanel();
+      } else {
+        localStorage.removeItem("pps_user");
+      }
     } catch (e) {
       localStorage.removeItem("pps_user");
     }

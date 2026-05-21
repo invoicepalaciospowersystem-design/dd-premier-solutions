@@ -53,3 +53,18 @@ function loginUser(email, password) {
 
   throw new Error("Email o password incorrecto.");
 }
+
+function loginUserForCompany(email, password, requestedCompanyId) {
+  const user = loginUser(email, password);
+  const requested = String(requestedCompanyId || "").trim().toUpperCase();
+
+  if (
+    requested &&
+    String(user.role || "").trim().toUpperCase() !== "OWNER" &&
+    String(user.companyId || "").trim().toUpperCase() !== requested
+  ) {
+    throw new Error("Este login pertenece a otra compania.");
+  }
+
+  return user;
+}

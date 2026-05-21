@@ -43,6 +43,33 @@ PM_REPORT_TEMPLATE_ID: "1wuLdLD_W4IAb4MoA8IHf0birHG6f1rJ0O7Umf5ahbMg",
   DEFAULT_COMPANY_ID: "PPS",
   CLIENT_DEFAULT: "McDonald's",
 
+  COMPANY_BRANDING: {
+    DEFAULT: {
+      companyName: "D&D Premier Solutions Corp",
+      loginTitle: "D&D Premier Solutions Corp",
+      loginSubtitle: "Sistema de ordenes y operaciones",
+      ownerName: "D&D Premier Solutions Corp",
+      primaryColor: "#111827",
+      accentColor: "#dc2626",
+      backgroundImageUrl: "",
+      backgroundFileId: "",
+      logoImageUrl: "",
+      logoFileId: ""
+    },
+    PPS: {
+      companyName: "Palacios Power Systems Corp",
+      loginTitle: "Palacios Power Systems Corp",
+      loginSubtitle: "Electrical - HVAC & Restaurant Equipment",
+      ownerName: "D&D Premier Solutions Corp",
+      primaryColor: "#b91c1c",
+      accentColor: "#111827",
+      backgroundImageUrl: "",
+      backgroundFileId: "",
+      logoImageUrl: "",
+      logoFileId: ""
+    }
+  },
+
   TECHS: {
     "David Dominguez": "ddpremiersolutions.corp@gmail.com",
     "Miguel Rodriguez": "minongo2005@gmail.com",
