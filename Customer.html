@@ -363,9 +363,9 @@ function render(data) {
 
 function renderStats(data) {
   const total = data.length;
-  const completed = data.filter(o => normalizeStatus(o.STATUS).includes("COMPLETED") || normalizeStatus(o.STATUS).includes("CLOSED")).length;
-  const parts = data.filter(o => normalizeStatus(o.STATUS).includes("PART")).length;
-  const emergency = data.filter(o => String(o.ORDER_PRIORITY || "").toLowerCase().includes("emergency")).length;
+  const completed = data.filter(o => isClosedStatus(o.STATUS)).length;
+  const parts = data.filter(o => isPartsStatus(o.STATUS)).length;
+  const emergency = data.filter(o => isEmergencyPriority(o.ORDER_PRIORITY)).length;
   const invoiced = data.filter(o => String(o.HAS_INVOICE_PDF || "").toUpperCase() === "YES").length;
   const quotes = data.filter(o => o.QUOTE_EN_URL || o.QUOTE_ES_URL).length;
   const pmReports = data.filter(o => String(o.HAS_PM_REPORT_PDF || "").toUpperCase() === "YES").length;
@@ -383,13 +383,19 @@ function renderStats(data) {
 
 function card(o) {
   const s = normalizeStatus(o.STATUS);
-  const p = String(o.ORDER_PRIORITY || "").toLowerCase();
+  const statusLabel = getOrderDisplayStatus(o);
+  const priorityLabel = getOrderDisplayPriority(o);
+  const typeLabel = getOrderDisplayType(o);
+  const pmTypeLabel = getOrderDisplayPMType(o);
+  const equipmentLabel = getOrderDisplayEquipment(o);
+  const problemText = getOrderDisplayProblem(o);
+  const p = String(priorityLabel || o.ORDER_PRIORITY || "").toLowerCase();
 
   let cls = "";
   if (p.includes("urgent")) cls = "urgent";
   if (p.includes("emergency")) cls = "emergency";
-  if (s.includes("PART")) cls = "parts";
-  if (s === "CLOSED" || s === "COMPLETED") cls = "closed";
+  if (isPartsStatus(s)) cls = "parts";
+  if (isClosedStatus(s)) cls = "closed";
 
   const pdfUrl = o.PDF_EN_URL || "";
   const pdfButton = pdfUrl
@@ -402,17 +408,19 @@ function card(o) {
       <div>
         <b>${esc(o.WO_NUMBER)}</b><br>
         NSN ${esc(o.NSN)}
-        <div class="status">${esc(o.STATUS || "NO STATUS")}</div>
+        <div class="status">${esc(statusLabel || "No Status")}</div>
       </div>
       <div class="age-badge">${getAge(o)}</div>
     </div>
 
     <div class="small"><b>Technician:</b> ${esc(o.TECHNICIAN || "Not assigned")}</div>
+    ${typeLabel ? `<div class="small"><b>Type:</b> ${esc(typeLabel)}</div>` : ""}
+    ${pmTypeLabel ? `<div class="small"><b>PM Type:</b> ${esc(pmTypeLabel)}</div>` : ""}
     <div class="small"><b>Address:</b> ${esc(o.STORE_ADDRESS || "")}</div>
-    <div class="small"><b>Equipment:</b> ${esc(o.REPORTED_EQUIPMENT || "")}</div>
-    <div class="small"><b>Priority:</b> ${esc(o.ORDER_PRIORITY || "")}</div>
+    <div class="small"><b>Equipment:</b> ${esc(equipmentLabel || "")}</div>
+    <div class="small"><b>Priority:</b> ${esc(priorityLabel || "")}</div>
 
-    <div class="problem">${esc(o.REPORTED_PROBLEM_EN || o.REPORTED_PROBLEM_ES || "")}</div>
+    <div class="problem">${esc(problemText || "")}</div>
 
     ${renderStatusProgress(o)}
 
@@ -563,6 +571,125 @@ function getProgressIndex(status) {
   if (status.includes("RECEIVED") || status.includes("RECIBIDO") || status.includes("RECIBIDA")) return 0;
 
   return 0;
+}
+
+function getOrderDisplayStatus(o) {
+  return o.SUPERVISOR_STATUS_EN || translateStatusToEnglish(o.STATUS);
+}
+
+function getOrderDisplayPriority(o) {
+  return o.SUPERVISOR_PRIORITY_EN || translatePriorityToEnglish(o.ORDER_PRIORITY);
+}
+
+function getOrderDisplayType(o) {
+  return o.SUPERVISOR_WO_TYPE_EN || translateWorkOrderTypeToEnglish(o.WO_TYPE);
+}
+
+function getOrderDisplayPMType(o) {
+  return o.SUPERVISOR_PM_TYPE_EN || translatePMTypeToEnglish(o.PM_TYPE);
+}
+
+function getOrderDisplayEquipment(o) {
+  return o.SUPERVISOR_EQUIPMENT_EN || o.REPORTED_EQUIPMENT_EN || o.REPORTED_EQUIPMENT || "";
+}
+
+function getOrderDisplayProblem(o) {
+  return o.SUPERVISOR_PROBLEM_EN ||
+    o.REPORTED_PROBLEM_EN ||
+    o.REPORTED_PROBLEM_ES ||
+    o.REPORTED_PROBLEM_ORIGINAL ||
+    "";
+}
+
+function translateStatusToEnglish(value) {
+  const raw = String(value || "").trim();
+  const status = normalizeStatus(raw);
+
+  if (!status) return "No Status";
+  if (status.includes("DELETED")) return "Deleted";
+  if (status.includes("INVOICED") || status.includes("FACTURADO")) return "Invoiced";
+  if (status.includes("CLOSED") || status.includes("CERRAD")) return "Closed";
+  if (status.includes("COMPLETED") || status.includes("COMPLETADO")) return "Completed";
+  if (status.includes("PARTS READY") || status.includes("PARTS RECEIVED") || status.includes("PIEZAS RECIBID")) return "Parts Ready";
+  if (status.includes("PARTS IN TRANSIT") || status.includes("PARTS TRANSIT")) return "Parts in Transit";
+  if (status.includes("REQUEST PART") || status.includes("PARTS REQUESTED") || status.includes("SOLICIT")) return "Parts Requested";
+  if (status.includes("BUYING") || status.includes("COMPRANDO")) return "Buying Parts";
+  if (status.includes("IN PROGRESS") || status.includes("ON SITE") || status.includes("TRABAJANDO") || status.includes("PROGRESO")) return "In Progress";
+  if (status.includes("SENT") || status.includes("ASSIGNED") || status.includes("TECH") || status.includes("ENVIADA") || status.includes("ASIGNADA")) return "Sent to Technician";
+  if (status.includes("ORDER RECEIVED") || status.includes("RECEIVED") || status.includes("RECIBID")) return "Order Received";
+
+  return titleCaseText(raw.replace(/_/g, " "));
+}
+
+function translatePriorityToEnglish(value) {
+  const priority = normalizeStatus(value);
+
+  if (priority.includes("EMERGENCY") || priority.includes("EMERGENCIA")) return "Emergency";
+  if (priority.includes("URGENT") || priority.includes("URGENTE")) return "Urgent";
+  if (priority.includes("NORMAL")) return "Normal";
+
+  return titleCaseText(String(value || ""));
+}
+
+function translateWorkOrderTypeToEnglish(value) {
+  const raw = String(value || "").trim();
+  const type = normalizeStatus(raw);
+
+  if (!type) return "";
+  if (type.includes("PM")) return "Preventive Maintenance";
+  if (type.includes("REPAIR")) return "Repair";
+  if (type.includes("INSTALL")) return "Installation";
+  if (type.includes("QUOTE")) return "Quote";
+  if (type.includes("EMERGENCY")) return "Emergency Service";
+
+  return titleCaseText(raw.replace(/_/g, " "));
+}
+
+function translatePMTypeToEnglish(value) {
+  const raw = String(value || "").trim();
+  const type = normalizeStatus(raw);
+
+  if (!type) return "";
+  if (type.includes("QUARTER")) return "Quarterly";
+  if (type.includes("MONTH")) return "Monthly";
+  if (type.includes("SEMI")) return "Semiannual";
+  if (type.includes("ANNUAL") || type.includes("YEAR")) return "Annual";
+
+  return titleCaseText(raw.replace(/_/g, " "));
+}
+
+function isClosedStatus(value) {
+  const status = normalizeStatus(value);
+  return status.includes("COMPLETED") ||
+    status.includes("CLOSED") ||
+    status.includes("INVOICED") ||
+    status.includes("COMPLETADO") ||
+    status.includes("CERRAD") ||
+    status.includes("FACTURADO");
+}
+
+function isPartsStatus(value) {
+  const status = normalizeStatus(value);
+  return status.includes("PART") ||
+    status.includes("PIEZA") ||
+    status.includes("COMPRANDO") ||
+    status.includes("SOLICIT");
+}
+
+function isEmergencyPriority(value) {
+  const priority = normalizeStatus(value);
+  return priority.includes("EMERGENCY") ||
+    priority.includes("EMERGENCIA") ||
+    priority.includes("URGENT") ||
+    priority.includes("URGENTE");
+}
+
+function titleCaseText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\b[a-z]/g, function(letter) {
+      return letter.toUpperCase();
+    });
 }
 
 function normalizeStatus(v) {

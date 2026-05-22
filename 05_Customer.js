@@ -69,6 +69,7 @@ function getCustomerOrdersBySupervisor(supervisorName, sessionToken, companyId) 
     obj.ROW_NUMBER = i + 1;
 
     enrichWorkOrderObject_(obj);
+    localizeSupervisorOrderForEnglish_(obj);
 
     obj.PDF_EN_URL = getInvoicePdfByWO(obj.WO_NUMBER);
     obj.HAS_INVOICE_PDF = obj.PDF_EN_URL ? "YES" : "NO";
@@ -84,6 +85,90 @@ function getCustomerOrdersBySupervisor(supervisorName, sessionToken, companyId) 
   }
 
   return result.reverse();
+}
+
+function localizeSupervisorOrderForEnglish_(obj) {
+  obj = obj || {};
+
+  obj.SUPERVISOR_STATUS_EN = translateWorkOrderStatusForSupervisor_(obj.STATUS);
+  obj.SUPERVISOR_PRIORITY_EN = normalizePriorityEn_(obj.ORDER_PRIORITY);
+  obj.SUPERVISOR_WO_TYPE_EN = translateWorkOrderTypeForSupervisor_(obj.WO_TYPE);
+  obj.SUPERVISOR_PM_TYPE_EN = translatePmTypeForSupervisor_(obj.PM_TYPE);
+  obj.SUPERVISOR_EQUIPMENT_EN =
+    obj.REPORTED_EQUIPMENT_EN ||
+    translateSupervisorTextToEnglish_(obj.REPORTED_EQUIPMENT || obj["REPORTED EQUIPMENT"] || "");
+  obj.SUPERVISOR_PROBLEM_EN =
+    obj.REPORTED_PROBLEM_EN ||
+    translateSupervisorTextToEnglish_(
+      obj.REPORTED_PROBLEM_ORIGINAL ||
+      obj.REPORTED_PROBLEM_ES ||
+      obj["REPORTED PROBLEM"] ||
+      ""
+    );
+
+  return obj;
+}
+
+function translateWorkOrderStatusForSupervisor_(value) {
+  const raw = String(value || "").trim();
+  const status = raw.replace(/_/g, " ").toUpperCase();
+
+  if (!status) return "No Status";
+  if (status.includes("DELETED")) return "Deleted";
+  if (status.includes("INVOICED") || status.includes("FACTURADO")) return "Invoiced";
+  if (status.includes("CLOSED") || status.includes("CERRAD")) return "Closed";
+  if (status.includes("COMPLETED") || status.includes("COMPLETADO")) return "Completed";
+  if (status.includes("PARTS READY") || status.includes("PARTS RECEIVED") || status.includes("PIEZAS RECIBID")) return "Parts Ready";
+  if (status.includes("PARTS IN TRANSIT") || status.includes("PARTS TRANSIT")) return "Parts in Transit";
+  if (status.includes("REQUEST PART") || status.includes("PARTS REQUESTED") || status.includes("SOLICIT")) return "Parts Requested";
+  if (status.includes("BUYING") || status.includes("COMPRANDO")) return "Buying Parts";
+  if (status.includes("IN PROGRESS") || status.includes("ON SITE") || status.includes("TRABAJANDO") || status.includes("PROGRESO")) return "In Progress";
+  if (status.includes("SENT") || status.includes("ASSIGNED") || status.includes("TECH") || status.includes("ENVIADA") || status.includes("ASIGNADA")) return "Sent to Technician";
+  if (status.includes("ORDER RECEIVED") || status.includes("RECEIVED") || status.includes("RECIBID")) return "Order Received";
+
+  return titleCaseSupervisorText_(raw.replace(/_/g, " "));
+}
+
+function translateWorkOrderTypeForSupervisor_(value) {
+  const raw = String(value || "").trim();
+  const type = raw.replace(/_/g, " ").toUpperCase();
+
+  if (!type) return "";
+  if (type.includes("PM")) return "Preventive Maintenance";
+  if (type.includes("REPAIR")) return "Repair";
+  if (type.includes("INSTALL")) return "Installation";
+  if (type.includes("QUOTE")) return "Quote";
+  if (type.includes("EMERGENCY")) return "Emergency Service";
+
+  return titleCaseSupervisorText_(raw.replace(/_/g, " "));
+}
+
+function translatePmTypeForSupervisor_(value) {
+  const raw = String(value || "").trim();
+  const type = raw.replace(/_/g, " ").toUpperCase();
+
+  if (!type) return "";
+  if (type.includes("QUARTER")) return "Quarterly";
+  if (type.includes("MONTH")) return "Monthly";
+  if (type.includes("SEMI")) return "Semiannual";
+  if (type.includes("ANNUAL") || type.includes("YEAR")) return "Annual";
+
+  return titleCaseSupervisorText_(raw.replace(/_/g, " "));
+}
+
+function translateSupervisorTextToEnglish_(value) {
+  value = String(value || "").trim();
+  if (!value) return "";
+
+  return safeTranslate_(value, "auto", "en");
+}
+
+function titleCaseSupervisorText_(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\b[a-z]/g, function(letter) {
+      return letter.toUpperCase();
+    });
 }
 
 function getSupervisorAllowedStores_(supervisorName, companyId) {
@@ -195,13 +280,13 @@ function getSupervisorCompany(supervisorName) {
 
 function sendSupervisorOrderMessage(rowNumber, supervisorName, message, sessionToken) {
   if (!rowNumber || isNaN(rowNumber)) {
-    throw new Error("Fila inválida.");
+    throw new Error("Invalid row.");
   }
 
   message = String(message || "").trim();
 
   if (!message) {
-    throw new Error("El mensaje no puede estar vacío.");
+    throw new Error("Message cannot be empty.");
   }
 
   const to = "invoice.palaciospowersystem@gmail.com";
@@ -231,11 +316,11 @@ function sendSupervisorOrderMessage(rowNumber, supervisorName, message, sessionT
 
   if (String(session.role || "").toUpperCase() === "SUPERVISOR" &&
       allowedStores.indexOf(normalizeNSN_(nsn)) === -1) {
-    throw new Error("No autorizado para enviar mensajes de esta orden.");
+    throw new Error("Not authorized to send messages for this order.");
   }
 
   if (!woNumber) {
-    throw new Error("No se encontró WO_NUMBER para esta orden.");
+    throw new Error("WO_NUMBER was not found for this order.");
   }
 
   MailApp.sendEmail({

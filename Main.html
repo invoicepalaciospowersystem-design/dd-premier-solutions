@@ -2579,11 +2579,10 @@ function getSupervisorDashboardFilteredOrders(filterKey) {
 
   return orders.filter(function(order) {
     const status = normalizeDashboardStatus(order.STATUS);
-    const priority = String(order.ORDER_PRIORITY || "").toLowerCase();
 
     if (filterKey === "open") return !isSupervisorOrderClosed(order);
     if (filterKey === "completed") return isSupervisorOrderClosed(order);
-    if (filterKey === "parts") return status.includes("PART");
+    if (filterKey === "parts") return isSupervisorPartsStatus(status);
     if (filterKey === "invoiced") {
       return String(order.HAS_INVOICE_PDF || "").toUpperCase() === "YES" || order.PDF_EN_URL || order.PDF_ES_URL;
     }
@@ -2592,7 +2591,7 @@ function getSupervisorDashboardFilteredOrders(filterKey) {
       return String(order.HAS_PM_REPORT_PDF || "").toUpperCase() === "YES" ||
         order.PM_REPORT_EN_URL || order.PM_REPORT_ES_URL;
     }
-    if (filterKey === "emergency") return priority.includes("emergency") || priority.includes("urgent");
+    if (filterKey === "emergency") return isSupervisorEmergencyPriority(order.ORDER_PRIORITY);
     return true;
   });
 }
@@ -2614,37 +2613,40 @@ function getSupervisorFilterLabel(filterKey) {
 }
 
 function renderSupervisorOrderPreviewCard(order) {
-  const status = normalizeDashboardStatus(order.STATUS);
-  const priority = String(order.ORDER_PRIORITY || "");
+  const status = getSupervisorDisplayStatus(order);
+  const priority = getSupervisorDisplayPriority(order);
+  const type = getSupervisorDisplayType(order);
+  const equipment = getSupervisorDisplayEquipment(order);
   const tone = getSupervisorOrderTone(order);
   const wo = order.WO_NUMBER || order.WO || "";
   const nsn = order.NSN || order["NSN #"] || "";
   const address = order.STORE_ADDRESS || order.ADDRESS || "";
-  const problem = order.REPORTED_PROBLEM_EN || order.REPORTED_PROBLEM_ES || "";
+  const problem = getSupervisorDisplayProblem(order);
 
   return `
     <div class="supervisor-order-card ${escapeHtmlMain(tone)}">
       <div class="supervisor-order-top">
         <div>
-          <div class="supervisor-order-title">${escapeHtmlMain(wo || "Sin WO")}</div>
+          <div class="supervisor-order-title">${escapeHtmlMain(wo || "No WO")}</div>
           <div class="supervisor-order-meta">NSN ${escapeHtmlMain(nsn)} | ${escapeHtmlMain(getDashboardOrderAgeDays(order) + "d")}</div>
         </div>
         <div class="supervisor-order-pill">${escapeHtmlMain(status || "NO STATUS")}</div>
       </div>
       <div class="supervisor-order-meta"><b>Technician:</b> ${escapeHtmlMain(order.TECHNICIAN || "Not assigned")}</div>
+      ${type ? `<div class="supervisor-order-meta"><b>Type:</b> ${escapeHtmlMain(type)}</div>` : ""}
+      ${equipment ? `<div class="supervisor-order-meta"><b>Equipment:</b> ${escapeHtmlMain(equipment)}</div>` : ""}
       <div class="supervisor-order-meta"><b>Priority:</b> ${escapeHtmlMain(priority || "")}</div>
       <div class="supervisor-order-meta"><b>Address:</b> ${escapeHtmlMain(address || "")}</div>
-      ${problem ? `<div class="supervisor-order-meta"><b>Issue:</b> ${escapeHtmlMain(problem).slice(0, 180)}</div>` : ""}
+      ${problem ? `<div class="supervisor-order-meta"><b>Issue:</b> ${escapeHtmlMain(String(problem).slice(0, 180))}</div>` : ""}
     </div>
   `;
 }
 
 function getSupervisorOrderTone(order) {
   const status = normalizeDashboardStatus(order.STATUS);
-  const priority = String(order.ORDER_PRIORITY || "").toLowerCase();
 
-  if (priority.includes("emergency") || priority.includes("urgent")) return "danger";
-  if (status.includes("PART")) return "warning";
+  if (isSupervisorEmergencyPriority(order.ORDER_PRIORITY)) return "danger";
+  if (isSupervisorPartsStatus(status)) return "warning";
   if (isSupervisorOrderClosed(order)) return "success";
   return "info";
 }
@@ -2672,11 +2674,7 @@ function getSupervisorDashboardTotals(data) {
 
   data.forEach(function(order) {
     const status = normalizeDashboardStatus(order.STATUS);
-    const priority = String(order.ORDER_PRIORITY || "").toLowerCase();
-    const isClosed = status.includes("COMPLETED") ||
-      status.includes("CLOSED") ||
-      status.includes("INVOICED") ||
-      status.includes("FACTURADO");
+    const isClosed = isSupervisorOrderClosed(order);
 
     if (isClosed) totals.completed++;
     else {
@@ -2684,7 +2682,7 @@ function getSupervisorDashboardTotals(data) {
       totals.oldestOpenDays = Math.max(totals.oldestOpenDays, getDashboardOrderAgeDays(order));
     }
 
-    if (status.includes("PART")) totals.parts++;
+    if (isSupervisorPartsStatus(status)) totals.parts++;
     if (String(order.HAS_INVOICE_PDF || "").toUpperCase() === "YES" || order.PDF_EN_URL || order.PDF_ES_URL) {
       totals.invoiced++;
     }
@@ -2693,10 +2691,102 @@ function getSupervisorDashboardTotals(data) {
         order.PM_REPORT_EN_URL || order.PM_REPORT_ES_URL) {
       totals.pmReports++;
     }
-    if (priority.includes("emergency") || priority.includes("urgent")) totals.emergency++;
+    if (isSupervisorEmergencyPriority(order.ORDER_PRIORITY)) totals.emergency++;
   });
 
   return totals;
+}
+
+function getSupervisorDisplayStatus(order) {
+  return order.SUPERVISOR_STATUS_EN || translateDashboardStatusToEnglish(order.STATUS);
+}
+
+function getSupervisorDisplayPriority(order) {
+  return order.SUPERVISOR_PRIORITY_EN || translateDashboardPriorityToEnglish(order.ORDER_PRIORITY);
+}
+
+function getSupervisorDisplayType(order) {
+  return order.SUPERVISOR_WO_TYPE_EN || translateDashboardTypeToEnglish(order.WO_TYPE);
+}
+
+function getSupervisorDisplayEquipment(order) {
+  return order.SUPERVISOR_EQUIPMENT_EN || order.REPORTED_EQUIPMENT_EN || order.REPORTED_EQUIPMENT || "";
+}
+
+function getSupervisorDisplayProblem(order) {
+  return order.SUPERVISOR_PROBLEM_EN ||
+    order.REPORTED_PROBLEM_EN ||
+    order.REPORTED_PROBLEM_ES ||
+    order.REPORTED_PROBLEM_ORIGINAL ||
+    "";
+}
+
+function translateDashboardStatusToEnglish(value) {
+  const raw = String(value || "").trim();
+  const status = normalizeDashboardStatus(raw);
+
+  if (!status) return "No Status";
+  if (status.includes("DELETED")) return "Deleted";
+  if (status.includes("INVOICED") || status.includes("FACTURADO")) return "Invoiced";
+  if (status.includes("CLOSED") || status.includes("CERRAD")) return "Closed";
+  if (status.includes("COMPLETED") || status.includes("COMPLETADO")) return "Completed";
+  if (status.includes("PARTS READY") || status.includes("PARTS RECEIVED") || status.includes("PIEZAS RECIBID")) return "Parts Ready";
+  if (status.includes("PARTS IN TRANSIT") || status.includes("PARTS TRANSIT")) return "Parts in Transit";
+  if (status.includes("REQUEST PART") || status.includes("PARTS REQUESTED") || status.includes("SOLICIT")) return "Parts Requested";
+  if (status.includes("BUYING") || status.includes("COMPRANDO")) return "Buying Parts";
+  if (status.includes("IN PROGRESS") || status.includes("ON SITE") || status.includes("TRABAJANDO") || status.includes("PROGRESO")) return "In Progress";
+  if (status.includes("SENT") || status.includes("ASSIGNED") || status.includes("TECH") || status.includes("ENVIADA") || status.includes("ASIGNADA")) return "Sent to Technician";
+  if (status.includes("ORDER RECEIVED") || status.includes("RECEIVED") || status.includes("RECIBID")) return "Order Received";
+
+  return titleCaseDashboardText(raw.replace(/_/g, " "));
+}
+
+function translateDashboardPriorityToEnglish(value) {
+  const priority = normalizeDashboardStatus(value);
+
+  if (priority.includes("EMERGENCY") || priority.includes("EMERGENCIA")) return "Emergency";
+  if (priority.includes("URGENT") || priority.includes("URGENTE")) return "Urgent";
+  if (priority.includes("NORMAL")) return "Normal";
+
+  return titleCaseDashboardText(value);
+}
+
+function translateDashboardTypeToEnglish(value) {
+  const raw = String(value || "").trim();
+  const type = normalizeDashboardStatus(raw);
+
+  if (!type) return "";
+  if (type.includes("PM")) return "Preventive Maintenance";
+  if (type.includes("REPAIR")) return "Repair";
+  if (type.includes("INSTALL")) return "Installation";
+  if (type.includes("QUOTE")) return "Quote";
+  if (type.includes("EMERGENCY")) return "Emergency Service";
+
+  return titleCaseDashboardText(raw.replace(/_/g, " "));
+}
+
+function isSupervisorPartsStatus(value) {
+  const status = normalizeDashboardStatus(value);
+  return status.includes("PART") ||
+    status.includes("PIEZA") ||
+    status.includes("COMPRANDO") ||
+    status.includes("SOLICIT");
+}
+
+function isSupervisorEmergencyPriority(value) {
+  const priority = normalizeDashboardStatus(value);
+  return priority.includes("EMERGENCY") ||
+    priority.includes("EMERGENCIA") ||
+    priority.includes("URGENT") ||
+    priority.includes("URGENTE");
+}
+
+function titleCaseDashboardText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\b[a-z]/g, function(letter) {
+      return letter.toUpperCase();
+    });
 }
 
 function normalizeDashboardStatus(value) {
