@@ -1514,7 +1514,7 @@
 
 <div id="globalHeader" class="global-header">
   <div class="global-company-block">
-    <div class="global-label">Compa&ntilde;ia activa</div>
+    <div id="globalCompanyLabel" class="global-label">Compa&ntilde;ia activa</div>
     <div id="companyTitle" class="global-company-name">Company: Loading...</div>
   </div>
   <div class="global-system-block">
@@ -1527,10 +1527,10 @@
   <div class="panel-hero">
     <div class="panel-title-row">
       <div>
-        <h1>Panel Principal</h1>
+        <h1 id="panelTitle">Panel Principal</h1>
         <div class="muted" id="userInfo"></div>
       </div>
-      <button class="logout" onclick="logout()">Salir</button>
+      <button id="logoutButton" class="logout" onclick="logout()">Salir</button>
     </div>
 
     <div id="ownerCompanyControl" class="owner-company-control">
@@ -1637,12 +1637,12 @@
   <div id="supervisorDashboard" class="supervisor-dashboard">
     <div class="dash-head">
       <div>
-        <h2>Resumen Supervisor</h2>
+        <h2>Supervisor Summary</h2>
         <div class="muted" id="supervisorDashboardScope">Loading...</div>
       </div>
       <div class="dash-actions">
-        <button class="dash-refresh" onclick="loadSupervisorDashboard()">Actualizar</button>
-        <button class="dash-refresh" onclick="openModule('?view=customer&supervisor=')">Abrir Portal</button>
+        <button class="dash-refresh" onclick="loadSupervisorDashboard()">Refresh</button>
+        <button class="dash-refresh" onclick="openModule('?view=customer&supervisor=')">Open Portal</button>
       </div>
     </div>
 
@@ -1769,9 +1769,9 @@ const MODULES = [
     url: "?view=tech&tech="
   },
   {
-    title: "Portal Supervisor",
+    title: "Supervisor Portal",
     icon: "PS",
-    desc: "Vista de estados para supervisores.",
+    desc: "Order status view for supervisors.",
     roles: ["SUPERVISOR"],
     url: "?view=customer&supervisor="
   }
@@ -1930,11 +1930,41 @@ function showPanel() {
   document.getElementById("userInfo").innerText =
     CURRENT_USER.name + " | " + CURRENT_USER.role + " | Company: " + (getActiveCompanyId() || "ALL");
 
+  updateRoleShellLabels();
   renderModules();
   updateTechAccountBanner();
   loadAdminDashboard();
   loadSupervisorDashboard();
   loadOwnerCompanySelector();
+}
+
+function updateRoleShellLabels() {
+  const role = String(CURRENT_USER && CURRENT_USER.role || "").trim().toUpperCase();
+  const isSupervisor = role === "SUPERVISOR";
+  const label = document.getElementById("globalCompanyLabel");
+  const title = document.getElementById("panelTitle");
+  const logoutButton = document.getElementById("logoutButton");
+  const moduleHeading = document.getElementById("moduleHeading");
+  const subtitle = document.getElementById("systemSubtitle");
+
+  if (label) label.innerText = isSupervisor ? "Active Company" : "Compania activa";
+  if (title) title.innerText = isSupervisor ? "Main Dashboard" : "Panel Principal";
+  if (logoutButton) logoutButton.innerText = isSupervisor ? "Log out" : "Salir";
+  if (moduleHeading) moduleHeading.innerText = isSupervisor ? "Modules" : "Modulos";
+  if (subtitle && isSupervisor && /Sistema de Ordenes/i.test(subtitle.innerText || "")) {
+    subtitle.innerText = "Order System";
+  }
+}
+
+function getRoleAwareSystemSubtitle(value) {
+  const role = String(CURRENT_USER && CURRENT_USER.role || "").trim().toUpperCase();
+  const text = String(value || "Sistema de Ordenes");
+
+  if (role === "SUPERVISOR" && /Sistema de Ordenes|Vista ejecutiva central/i.test(text)) {
+    return "Order System";
+  }
+
+  return text;
 }
 
 function renderModules() {
@@ -2380,7 +2410,7 @@ function loadSupervisorDashboard() {
   }
 
   box.style.display = "block";
-  document.getElementById("supervisorDashboardScope").innerText = "Cargando ordenes asignadas...";
+  document.getElementById("supervisorDashboardScope").innerText = "Loading assigned orders...";
   document.getElementById("supervisorMetrics").innerHTML = renderMetricSkeletons();
   document.getElementById("supervisorMetricResults").style.display = "none";
 
@@ -2392,7 +2422,7 @@ function loadSupervisorDashboard() {
     .withFailureHandler(function(err) {
       SUPERVISOR_DASHBOARD_ORDERS = [];
       document.getElementById("supervisorDashboardScope").innerText =
-        "Error cargando metricas: " + (err && err.message ? err.message : err);
+        "Error loading metrics: " + (err && err.message ? err.message : err);
       document.getElementById("supervisorMetrics").innerHTML = "";
       document.getElementById("supervisorMetricResults").style.display = "none";
     })
@@ -2409,70 +2439,70 @@ function renderSupervisorDashboard(data) {
   const updated = new Date().toLocaleString();
 
   document.getElementById("supervisorDashboardScope").innerText =
-    "Company: " + company + " | " + totals.total + " ordenes asignadas | Actualizado " + updated;
+    "Company: " + company + " | " + totals.total + " assigned orders | Updated " + updated;
 
   const cards = [
     {
       key: "all",
       label: "Total Orders",
       value: totals.total,
-      note: "Todas las asignadas",
+      note: "All assigned orders",
       tone: totals.emergency ? "danger" : "info"
     },
     {
       key: "open",
       label: "Open Orders",
       value: totals.open,
-      note: totals.total + " ordenes totales",
+      note: totals.total + " total orders",
       tone: totals.emergency ? "danger" : "info"
     },
     {
       key: "completed",
       label: "Completed / Closed",
       value: totals.completed,
-      note: "Terminadas o cerradas",
+      note: "Completed or closed",
       tone: "success"
     },
     {
       key: "parts",
       label: "Buying Parts",
       value: totals.parts,
-      note: "Esperando piezas",
+      note: "Waiting on parts",
       tone: totals.parts ? "warning" : "success"
     },
     {
       key: "invoiced",
       label: "Invoiced",
       value: totals.invoiced,
-      note: "Con invoice PDF",
+      note: "With invoice PDF",
       tone: "info"
     },
     {
       key: "quotes",
       label: "Quotes",
       value: totals.quotes,
-      note: "Quotes disponibles",
+      note: "Available quotes",
       tone: totals.quotes ? "warning" : "info"
     },
     {
       key: "pmReports",
       label: "PM Reports",
       value: totals.pmReports,
-      note: "Reportes PM generados",
+      note: "Generated PM reports",
       tone: "info"
     },
     {
       key: "emergency",
       label: "Emergency",
       value: totals.emergency,
-      note: "Prioridad emergencia",
+      note: "Emergency priority",
       tone: totals.emergency ? "danger" : "success"
     },
     {
       key: "oldest",
       label: "Oldest Open",
       value: totals.oldestOpenDays + "d",
-      note: "Orden abierta mas vieja",
+      note: "Oldest open order",
       tone: totals.oldestOpenDays > 7 ? "danger" : (totals.oldestOpenDays > 3 ? "warning" : "success")
     }
   ];
@@ -2490,7 +2520,7 @@ function renderSupervisorMetricButton(card) {
       onclick="filterSupervisorDashboard('${escapeHtmlMain(card.key || "all")}')">
       <div class="metric-label">${escapeHtmlMain(card.label)}</div>
       <div class="metric-value">${escapeHtmlMain(card.value)}</div>
-      <div class="metric-note">${escapeHtmlMain(card.note)} | Ver tarjetas</div>
+      <div class="metric-note">${escapeHtmlMain(card.note)} | View cards</div>
     </button>
   `;
 }
@@ -2514,7 +2544,7 @@ function renderSupervisorMetricResults(filterKey) {
       <div class="supervisor-results-head">
         <div>
           <h3>${escapeHtmlMain(label)}</h3>
-          <div class="muted">No hay ordenes para esta metrica.</div>
+          <div class="muted">No orders for this metric.</div>
         </div>
       </div>
     `;
@@ -2525,14 +2555,14 @@ function renderSupervisorMetricResults(filterKey) {
     <div class="supervisor-results-head">
       <div>
         <h3>${escapeHtmlMain(label)}</h3>
-        <div class="muted">${filtered.length} ordenes encontradas</div>
+        <div class="muted">${filtered.length} orders found</div>
       </div>
-      <button class="dash-refresh" onclick="openModule('?view=customer&supervisor=')">Abrir Portal Completo</button>
+      <button class="dash-refresh" onclick="openModule('?view=customer&supervisor=')">Open Full Portal</button>
     </div>
     <div class="supervisor-card-grid">
       ${filtered.slice(0, 12).map(renderSupervisorOrderPreviewCard).join("")}
     </div>
-    ${filtered.length > 12 ? "<div class='muted' style='margin-top:10px;'>Mostrando 12 de " + filtered.length + ". Abre el portal completo para ver todas.</div>" : ""}
+    ${filtered.length > 12 ? "<div class='muted' style='margin-top:10px;'>Showing 12 of " + filtered.length + ". Open the full portal to view all.</div>" : ""}
   `;
 }
 
@@ -2569,15 +2599,15 @@ function getSupervisorDashboardFilteredOrders(filterKey) {
 
 function getSupervisorFilterLabel(filterKey) {
   const labels = {
-    all: "Todas las ordenes",
-    open: "Ordenes abiertas",
+    all: "All orders",
+    open: "Open orders",
     completed: "Completed / Closed",
     parts: "Buying Parts",
-    invoiced: "Ordenes con invoice PDF",
-    quotes: "Ordenes con quotes",
-    pmReports: "Ordenes con PM reports",
+    invoiced: "Orders with invoice PDF",
+    quotes: "Orders with quotes",
+    pmReports: "Orders with PM reports",
     emergency: "Emergency / Urgent",
-    oldest: "Ordenes abiertas mas viejas"
+    oldest: "Oldest open orders"
   };
 
   return labels[filterKey] || labels.all;
@@ -2907,7 +2937,8 @@ function updateHeaderCompany(companyId) {
     document.getElementById("companyTitle").innerText = "Company: Todas las empresas";
     document.getElementById("ownerTitle").innerText =
       CURRENT_BRANDING.ownerName || "D&D Premier Solutions Corp";
-    document.getElementById("systemSubtitle").innerText = "Vista ejecutiva central";
+    document.getElementById("systemSubtitle").innerText =
+      getRoleAwareSystemSubtitle("Vista ejecutiva central");
     applyWatermark("");
     return;
   }
@@ -2920,7 +2951,7 @@ function updateHeaderCompany(companyId) {
       document.getElementById("ownerTitle").innerText =
         branding.ownerName || CURRENT_BRANDING.ownerName || "D&D Premier Solutions Corp";
       document.getElementById("systemSubtitle").innerText =
-        branding.loginSubtitle || "Sistema de Ordenes";
+        getRoleAwareSystemSubtitle(branding.loginSubtitle || "Sistema de Ordenes");
       applyWatermark(shouldShowMainWatermark(companyId) ? (branding.logoImageUrl || CURRENT_BRANDING.logoImageUrl) : "");
     })
     .withFailureHandler(function() {

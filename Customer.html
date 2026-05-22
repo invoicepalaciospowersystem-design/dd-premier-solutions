@@ -292,7 +292,7 @@ function requireLogin() {
 }
 
 if (!requireLogin()) {
-  throw new Error("No autorizado");
+  throw new Error("Not authorized");
 }
 
 function getCurrentUser() {
