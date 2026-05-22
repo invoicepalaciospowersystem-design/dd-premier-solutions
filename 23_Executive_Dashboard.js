@@ -209,7 +209,6 @@ function buildAdminPeriodScope_(periodMode, periodYear, periodMonth) {
 }
 
 function collectAdminEconomyFinancials_(ss, dashboard, companyId, periodScope) {
-  const processedKeys = {};
   const sh = ss.getSheetByName(CFG.SHEET_ECONOMY);
 
   if (sh && sh.getLastRow() >= 2) {
@@ -234,15 +233,8 @@ function collectAdminEconomyFinancials_(ss, dashboard, companyId, periodScope) {
     rows.forEach(function(row) {
       const entry = buildAdminEconomyEntryFromEconomyRow_(row, headers);
       addAdminEconomyEntryToDashboard_(dashboard, entry);
-
-      if (adminEconomyEntryHasFinancials_(entry)) {
-        const key = getAdminEconomyEntryKey_(entry);
-        if (key) processedKeys[key] = true;
-      }
     });
   }
-
-  collectAdminInvoiceFinancialsFallback_(ss, dashboard, companyId, periodScope, processedKeys);
 
   dashboard.totals.grossProfit =
     dashboard.totals.totalBilled -
@@ -257,7 +249,7 @@ function buildAdminEconomyEntryFromEconomyRow_(row, headers) {
   const tax = parseMoneyFlexible_(getExecutiveValue_(row, headers, ["TAX", "TAX_AMOUNT"]));
   const hours = parseMoneyFlexible_(getExecutiveValue_(row, headers, ["HORAS", "LABOR_HOURS", "HOURS"]));
   const laborBilled = getAdminLaborBilled_(row, headers, hours);
-  const partsCost = getMaterialCostValue_(row, headers);
+  const partsCost = getAdminEconomyCost_(row, headers);
   const partsBilled = getAdminPartsBilled_(row, headers, amount, tax, laborBilled);
   const techLaborCost = parseMoneyFlexible_(getExecutiveValue_(row, headers, ["TECH_LABOR_COST", "TECH_LABOR_PAY"]));
   const invSource = String(getExecutiveValue_(row, headers, ["INV_SOURCE"]) || "").trim().toUpperCase();
@@ -282,66 +274,14 @@ function buildAdminEconomyEntryFromEconomyRow_(row, headers) {
   };
 }
 
-function collectAdminInvoiceFinancialsFallback_(ss, dashboard, companyId, periodScope, processedKeys) {
-  const sh = ss.getSheetByName("INVOICES");
-  if (!sh || sh.getLastRow() < 2) return;
-
-  const data = sh.getDataRange().getValues();
-  const headers = data[0].map(function(h) { return String(h || "").trim(); });
-  const woCompanyMap = buildAdminWorkOrderCompanyMap_(ss);
-  const rateMap = buildAdminHourlyRateMap_(ss, companyId);
-
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    if (isSoftDeletedRow_(row, headers)) continue;
-    if (isAdminPMInvoiceRow_(row, headers)) continue;
-    if (!adminInvoiceRowMatchesScope_(row, headers, periodScope)) continue;
-
-    const woNumber = String(getExecutiveValue_(row, headers, ["WO_NUMBER"]) || "").trim();
-    const rowCompany = String(
-      getExecutiveValue_(row, headers, ["COMPANY_ID"]) ||
-      woCompanyMap[woNumber] ||
-      CFG.DEFAULT_COMPANY_ID
-    ).trim().toUpperCase();
-
-    if (rowCompany !== companyId) continue;
-
-    const entry = buildAdminEconomyEntryFromInvoiceRow_(row, headers, rateMap);
-    const key = getAdminEconomyEntryKey_(entry);
-    if (key && processedKeys && processedKeys[key]) continue;
-
-    addAdminEconomyEntryToDashboard_(dashboard, entry);
-  }
-}
-
-function buildAdminEconomyEntryFromInvoiceRow_(row, headers, rateMap) {
-  const amount = getInvoiceTotalValue_(row, headers);
-  const tax = getTaxAmountValue_(row, headers);
-  const hours = getHoursValue_(row, headers);
-  const laborBilled = getAdminInvoiceLaborBilled_(row, headers, hours);
-  const partsBilled = getAdminInvoicePartsBilled_(row, headers, amount, tax, laborBilled);
-  const partsCost = getMaterialCostValue_(row, headers);
-  const techLaborCost = getAdminInvoiceTechLaborCost_(row, headers, hours, rateMap);
-  const invSource = String(getExecutiveValue_(row, headers, ["INV_SOURCE", "INVERSION_SOURCE"]) || "").trim().toUpperCase();
-  const split = getAdminInvestorSplit_(invSource, partsCost);
-
-  return {
-    source: "INVOICES",
-    woNumber: String(getExecutiveValue_(row, headers, ["WO_NUMBER"]) || "").trim(),
-    invoiceNumber: getInvoiceNumberValue_(row, headers),
-    status: "INVOICED",
-    amount: amount,
-    tax: tax,
-    laborHours: hours,
-    laborBilled: laborBilled,
-    partsBilled: partsBilled,
-    partsCost: partsCost,
-    techLaborCost: techLaborCost,
-    invSource: invSource,
-    davidPartsCost: split.david,
-    yoelPartsCost: split.yoel,
-    unassignedPartsCost: split.unassigned
-  };
+function getAdminEconomyCost_(row, headers) {
+  return parseMoneyFlexible_(getExecutiveValue_(row, headers, [
+    "COST",
+    "MATERIAL_COST",
+    "INVERSION",
+    "PARTS",
+    "COMPRA"
+  ]));
 }
 
 function addAdminEconomyEntryToDashboard_(dashboard, entry) {
@@ -389,140 +329,6 @@ function addAdminEconomyEntryToDashboard_(dashboard, entry) {
       unassignedPartsCost: Number(entry.unassignedPartsCost || 0)
     });
   }
-}
-
-function adminEconomyEntryHasFinancials_(entry) {
-  entry = entry || {};
-  return !!(
-    Number(entry.amount || 0) ||
-    Number(entry.tax || 0) ||
-    Number(entry.laborHours || 0) ||
-    Number(entry.laborBilled || 0) ||
-    Number(entry.partsBilled || 0) ||
-    Number(entry.partsCost || 0) ||
-    Number(entry.techLaborCost || 0)
-  );
-}
-
-function getAdminEconomyEntryKey_(entry) {
-  entry = entry || {};
-  const invoiceNumber = String(entry.invoiceNumber || "").trim().toUpperCase();
-  const woNumber = String(entry.woNumber || "").trim().toUpperCase();
-  if (invoiceNumber) return "INV:" + invoiceNumber;
-  if (woNumber) return "WO:" + woNumber;
-  return "";
-}
-
-function buildAdminWorkOrderCompanyMap_(ss) {
-  const map = {};
-  const sh = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
-  if (!sh || sh.getLastRow() < 2) return map;
-
-  const data = sh.getDataRange().getValues();
-  const headers = data[0].map(function(h) { return String(h || "").trim(); });
-
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    const woNumber = String(getExecutiveValue_(row, headers, ["WO_NUMBER"]) || "").trim();
-    if (!woNumber) continue;
-
-    map[woNumber] = String(getExecutiveValue_(row, headers, ["COMPANY_ID"]) || CFG.DEFAULT_COMPANY_ID)
-      .trim()
-      .toUpperCase();
-  }
-
-  return map;
-}
-
-function buildAdminHourlyRateMap_(ss, companyId) {
-  const map = {};
-  const sh = ss.getSheetByName(CFG.SHEET_USERS);
-  if (!sh || sh.getLastRow() < 2) return map;
-
-  const data = sh.getDataRange().getValues();
-  const headers = data[0].map(function(h) { return String(h || "").trim(); });
-
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    if (isSoftDeletedRow_(row, headers)) continue;
-
-    const rowCompany = String(getExecutiveValue_(row, headers, ["COMPANY_ID"]) || CFG.DEFAULT_COMPANY_ID).trim().toUpperCase();
-    if (rowCompany !== companyId) continue;
-
-    const name = String(getExecutiveValue_(row, headers, ["NAME"]) || "").trim().toLowerCase();
-    const rate = parseMoneyFlexible_(getExecutiveValue_(row, headers, ["HOURLY_RATE", "RATE"]));
-    if (name) map[name] = rate;
-  }
-
-  return map;
-}
-
-function isAdminPMInvoiceRow_(row, headers) {
-  const invoiceType = String(getExecutiveValue_(row, headers, ["INVOICE_TYPE"]) || "").trim().toUpperCase();
-  const woType = String(getExecutiveValue_(row, headers, ["WO_TYPE", "WO_TYPO"]) || "").trim().toUpperCase();
-  const pmType = String(getExecutiveValue_(row, headers, ["PM_TYPE"]) || "").trim();
-
-  return invoiceType === "PM" || woType === "PM_FORM" || !!pmType;
-}
-
-function adminInvoiceRowMatchesScope_(row, headers, periodScope) {
-  periodScope = periodScope || { mode: "monthly" };
-  if (periodScope.mode === "all") return true;
-
-  const invoiceDate = parseExecutiveDate_(
-    getExecutiveValue_(row, headers, ["DATE_INVOICE", "Timestamp", "INVOICE_DATE", "DATE_COMPLETED", "DATE_PAID"])
-  );
-
-  return adminDateMatchesScope_(invoiceDate, periodScope);
-}
-
-function getAdminInvoiceLaborBilled_(row, headers, hours) {
-  const explicit = getLaborAmountValue_(row, headers);
-  if (explicit) return explicit;
-
-  return calculateAdminLaborCharge_(hours);
-}
-
-function getAdminInvoicePartsBilled_(row, headers, amount, tax, laborBilled) {
-  const explicit = parseMoneyFlexible_(getExecutiveValue_(row, headers, [
-    "PARTS_AMOUNT",
-    "PARTS_CHARGE",
-    "TOTAL_COBRO_PARTS",
-    "COBRO_PARTS",
-    "PARTS",
-    "MATERIAL_COST",
-    "INVERSION"
-  ]));
-
-  if (explicit) return explicit;
-  if (!amount) return 0;
-
-  return Math.max(0, amount - Number(tax || 0) - Number(laborBilled || 0));
-}
-
-function getAdminInvoiceTechLaborCost_(row, headers, hours, rateMap) {
-  const explicit = parseMoneyFlexible_(getExecutiveValue_(row, headers, ["TECH_LABOR_COST", "TECH_LABOR_PAY"]));
-  if (explicit) return explicit;
-
-  const techniciansText = String(getExecutiveValue_(row, headers, [
-    "TECHNICIANS",
-    "TECHNICIAN NAME",
-    "TECHNICIAN",
-    "TECH"
-  ]) || "").trim();
-
-  const technicians = techniciansText
-    .split(",")
-    .map(function(name) { return String(name || "").trim(); })
-    .filter(Boolean);
-
-  if (!technicians.length) return 0;
-
-  const hoursPerTech = Number(hours || 0) / technicians.length;
-  return technicians.reduce(function(total, name) {
-    const rate = Number((rateMap || {})[name.toLowerCase()] || 0);
-    return total + (hoursPerTech * rate);
-  }, 0);
 }
 
 function adminEconomyRowMatchesScope_(row, headers, periodScope) {
