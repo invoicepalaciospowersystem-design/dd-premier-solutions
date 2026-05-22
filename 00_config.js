@@ -54,7 +54,7 @@ PM_REPORT_TEMPLATE_ID: "1wuLdLD_W4IAb4MoA8IHf0birHG6f1rJ0O7Umf5ahbMg",
       backgroundImageUrl: "",
       backgroundFileId: "",
       logoImageUrl: "",
-      logoFileId: ""
+      logoFileId: "1nE27lzdKy_EPYbAf2CX0eiQIRU5tsSMN"
     },
     PPS: {
       companyName: "Palacios Power Systems Corp",

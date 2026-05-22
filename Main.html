@@ -391,6 +391,146 @@
       box-sizing:border-box;
     }
 
+    .dd-showcase {
+      display:none;
+      width:min(680px, 96%);
+      margin:22px auto 0;
+      color:#ffffff;
+      text-align:center;
+      position:relative;
+      z-index:2;
+    }
+
+    .dd-slogan {
+      margin:0 auto 24px;
+      max-width:660px;
+      font-size:clamp(20px, 2.1vw, 27px);
+      line-height:1.28;
+      font-weight:bold;
+      text-shadow:0 2px 16px rgba(0,0,0,.58);
+      overflow-wrap:anywhere;
+    }
+
+    .dd-feature-grid {
+      display:grid;
+      grid-template-columns:repeat(4, minmax(108px, 1fr));
+      gap:8px;
+    }
+
+    .dd-feature {
+      min-width:0;
+      min-height:140px;
+      padding:14px 10px;
+      border:1px solid rgba(255,255,255,.12);
+      border-bottom:2px solid rgba(220,38,38,.72);
+      border-radius:8px;
+      background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(8,10,12,.52));
+      box-shadow:0 18px 35px rgba(0,0,0,.28);
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
+      box-sizing:border-box;
+    }
+
+    .dd-feature-icon {
+      width:58px;
+      height:58px;
+      border-radius:50%;
+      color:#ffffff;
+      background:linear-gradient(180deg, #d90000, #7f0f0f);
+      border:1px solid rgba(255,255,255,.22);
+      box-shadow:0 0 26px rgba(220,38,38,.28);
+      display:grid;
+      place-items:center;
+    }
+
+    .dd-feature-icon svg {
+      width:34px;
+      height:34px;
+    }
+
+    .dd-feature span {
+      color:#ffffff;
+      font-size:12px;
+      line-height:1.25;
+      font-weight:bold;
+      text-transform:uppercase;
+      overflow-wrap:anywhere;
+    }
+
+    body.login-dd {
+      background:
+        radial-gradient(circle at 16% 10%, rgba(220,38,38,.24), transparent 30%),
+        radial-gradient(circle at 92% 74%, rgba(220,38,38,.20), transparent 34%),
+        linear-gradient(135deg, #030405 0%, #07090d 50%, #020202 100%);
+    }
+
+    body.login-dd::before {
+      background:
+        linear-gradient(135deg, rgba(220,38,38,.18), transparent 28%, transparent 72%, rgba(220,38,38,.16)),
+        repeating-linear-gradient(135deg, rgba(220,38,38,.18) 0 1px, transparent 1px 76px);
+      opacity:.48;
+    }
+
+    body.login-dd .login-shell {
+      background:linear-gradient(120deg, #090b0f 0%, #0d1015 50%, #060709 100%);
+      border-color:rgba(203,213,225,.22);
+    }
+
+    body.login-dd .login-brand {
+      align-items:center;
+      text-align:center;
+      color:#ffffff;
+      background:
+        radial-gradient(circle at 48% 18%, rgba(220,38,38,.33), transparent 34%),
+        linear-gradient(135deg, rgba(30,8,8,.88), rgba(6,8,11,.98) 58%, rgba(4,5,7,.98));
+    }
+
+    body.login-dd .login-brand::before {
+      top:0;
+      right:0;
+      width:100%;
+      height:100%;
+      border-radius:0;
+      background:
+        linear-gradient(135deg, transparent 0 64%, rgba(220,38,38,.22) 64% 66%, transparent 66%),
+        radial-gradient(circle at 46% 30%, rgba(220,38,38,.28), transparent 36%);
+      box-shadow:none;
+      z-index:0;
+    }
+
+    body.login-dd .login-brand::after {
+      left:0;
+      right:0;
+      height:220px;
+      background:
+        linear-gradient(to top, rgba(0,0,0,.86), rgba(0,0,0,0)),
+        repeating-linear-gradient(90deg,
+          rgba(255,255,255,.24) 0 13px,
+          rgba(255,255,255,.06) 13px 22px,
+          transparent 22px 36px);
+      opacity:.50;
+    }
+
+    body.login-dd .brand-logo {
+      width:min(720px, 94%);
+      max-height:330px;
+      margin:0 auto;
+      filter:drop-shadow(0 28px 34px rgba(0,0,0,.50));
+    }
+
+    body.login-dd .dd-showcase {
+      display:block;
+    }
+
+    body.login-dd .box {
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.045), rgba(255,255,255,.012)),
+        #090b0f;
+    }
+
     .panel {
       max-width:900px;
       margin:30px auto;
@@ -516,8 +656,8 @@
       .login-shell {
         align-items:stretch;
         grid-template-columns:1fr;
-        width:calc(100vw - 28px);
-        max-width:calc(100vw - 28px);
+        width:calc(100vw - 42px);
+        max-width:calc(100vw - 42px);
         min-height:auto;
         border-radius:16px;
       }
@@ -532,15 +672,55 @@
         align-items:center;
       }
 
+      body.login-dd .login-brand {
+        padding-bottom:32px;
+      }
+
       .brand-logo {
         width:min(330px, 88%);
         max-height:330px;
+      }
+
+      body.login-dd .brand-logo {
+        width:min(300px, 84vw);
+        max-width:100%;
+        max-height:210px;
       }
 
       .login-brand::before {
         right:-50%;
         width:80%;
         opacity:.55;
+      }
+
+      body.login-dd .login-brand::before {
+        right:0;
+        width:100%;
+        opacity:1;
+      }
+
+      .dd-showcase {
+        width:100%;
+        margin-top:14px;
+      }
+
+      .dd-slogan {
+        max-width:280px;
+        margin-bottom:16px;
+        font-size:18px;
+      }
+
+      .dd-feature-grid {
+        width:100%;
+        max-width:260px;
+        margin:0 auto;
+        box-sizing:border-box;
+        grid-template-columns:1fr;
+      }
+
+      .dd-feature {
+        padding:12px 6px;
+        min-height:116px;
       }
 
       .box {
@@ -560,7 +740,7 @@
   </style>
 </head>
 
-<body class="login-mode">
+<body class="login-mode login-dd">
 
 <div id="loginShell" class="login-shell">
   <section id="loginBrand" class="login-brand">
@@ -570,6 +750,48 @@
       <h1 id="heroTitle">D&D Premier Solutions Corp</h1>
       <p id="heroSubtitle">Sistema de ordenes y operaciones</p>
       <div class="brand-line"></div>
+    </div>
+
+    <div class="dd-showcase" aria-hidden="true">
+      <p class="dd-slogan">Programaci&oacute;n de infraestructura econ&oacute;mica y de &oacute;rdenes de trabajo para multicompa&ntilde;&iacute;as</p>
+      <div class="dd-feature-grid">
+        <div class="dd-feature">
+          <div class="dd-feature-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 19V9m5 10V5m5 14v-7m5 7V3" fill="none" stroke="currentColor" stroke-width="1.8"></path>
+              <path d="m4 13 5-5 5 4 6-7" fill="none" stroke="currentColor" stroke-width="1.8"></path>
+            </svg>
+          </div>
+          <span>Infraestructura econ&oacute;mica</span>
+        </div>
+        <div class="dd-feature">
+          <div class="dd-feature-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="4" y="5" width="16" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"></rect>
+              <path d="m10 9-3 2.5 3 2.5m4-5 3 2.5-3 2.5M8 20h8" fill="none" stroke="currentColor" stroke-width="1.8"></path>
+            </svg>
+          </div>
+          <span>Programaci&oacute;n personalizada</span>
+        </div>
+        <div class="dd-feature">
+          <div class="dd-feature-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M8 5h8l1 3h2v12H5V8h2z" fill="none" stroke="currentColor" stroke-width="1.8"></path>
+              <path d="m8 12 2 2 4-4m-6 7h8" fill="none" stroke="currentColor" stroke-width="1.8"></path>
+            </svg>
+          </div>
+          <span>&Oacute;rdenes de trabajo</span>
+        </div>
+        <div class="dd-feature">
+          <div class="dd-feature-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 20V9l5-3 5 3v11M14 20V7l6 3v10" fill="none" stroke="currentColor" stroke-width="1.8"></path>
+              <path d="M7 12h2m-2 4h2m8-3h1m-1 4h1" fill="none" stroke="currentColor" stroke-width="1.8"></path>
+            </svg>
+          </div>
+          <span>Multicompa&ntilde;&iacute;as y escalable</span>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -648,6 +870,8 @@ let CURRENT_BRANDING = {
   logoImageUrl: ""
 };
 
+setLoginTheme(LOGIN_COMPANY_ID);
+
 const MODULES = [
   {
     title: "Ordenes",
@@ -718,6 +942,7 @@ function loadLoginBranding() {
 
 function applyBranding(branding) {
   CURRENT_BRANDING = Object.assign({}, CURRENT_BRANDING, branding || {});
+  setLoginTheme(CURRENT_BRANDING.companyId || LOGIN_COMPANY_ID);
 
   document.documentElement.style.setProperty(
     "--brand-primary",
@@ -751,6 +976,12 @@ function applyBranding(branding) {
     document.body.classList.remove("has-login-bg");
     document.documentElement.style.setProperty("--login-bg-image", "none");
   }
+}
+
+function setLoginTheme(companyId) {
+  companyId = String(companyId || "").trim().toUpperCase();
+  document.body.classList.toggle("login-pps", companyId === "PPS");
+  document.body.classList.toggle("login-dd", companyId !== "PPS");
 }
 
 function applyLogo(url) {
