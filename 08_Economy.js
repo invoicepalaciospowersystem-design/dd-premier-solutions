@@ -179,9 +179,14 @@ function updateEconomyRow(rowNumber, updates, sessionToken) {
   const profitCol = headers.indexOf("PROFIT") + 1;
 
   if (amountCol > 0 && costCol > 0 && profitCol > 0) {
-    const amount = Number(sh.getRange(rowNumber, amountCol).getValue() || 0);
-    const cost = Number(sh.getRange(rowNumber, costCol).getValue() || 0);
-    sh.getRange(rowNumber, profitCol).setValue(amount - cost);
+    const amount = parseMoneyFlexible_(sh.getRange(rowNumber, amountCol).getValue());
+    const tax = getEconomyRowNumberByHeader_(sh, rowNumber, headers, ["TAX", "TAX_AMOUNT"]);
+    const rawCost = parseMoneyFlexible_(sh.getRange(rowNumber, costCol).getValue());
+    const techLabor = getEconomyRowNumberByHeader_(sh, rowNumber, headers, ["TECH_LABOR_COST", "TECH_LABOR_PAY"]);
+    const invSource = getEconomyRowValueByHeader_(sh, rowNumber, headers, ["INV_SOURCE"]);
+    const realCost = calculateEconomyRealPartsCost_(invSource, rawCost);
+
+    sh.getRange(rowNumber, profitCol).setValue(amount - tax - realCost - techLabor);
   }
 
   const statusCol = headers.indexOf("STATUS") + 1;
@@ -201,6 +206,33 @@ function updateEconomyRow(rowNumber, updates, sessionToken) {
   }
 
   return true;
+}
+
+function getEconomyRowValueByHeader_(sh, rowNumber, headers, possibleNames) {
+  const normalized = headers.map(function(h) {
+    return String(h || "").trim().toUpperCase();
+  });
+
+  for (let i = 0; i < possibleNames.length; i++) {
+    const idx = normalized.indexOf(String(possibleNames[i] || "").trim().toUpperCase());
+    if (idx >= 0) return sh.getRange(rowNumber, idx + 1).getValue();
+  }
+
+  return "";
+}
+
+function getEconomyRowNumberByHeader_(sh, rowNumber, headers, possibleNames) {
+  return parseMoneyFlexible_(getEconomyRowValueByHeader_(sh, rowNumber, headers, possibleNames));
+}
+
+function calculateEconomyRealPartsCost_(source, cost) {
+  source = String(source || "").trim().toUpperCase();
+  cost = Number(cost || 0);
+
+  if (source === "MISCELANEAS") return 0;
+  if (source === "DAVID" || source === "YOEL") return cost * 0.50;
+
+  return cost;
 }
 
 function syncInvoicesToEconomy(companyId, sessionToken) {
@@ -394,7 +426,10 @@ if (invType === "PM") continue;
     setEcoValue_(shEco, targetRow, ecoHeaders, ["AMOUNT", "INVOICE_TOTAL"], total);
     setEcoValue_(shEco, targetRow, ecoHeaders, ["TAX", "TAX_AMOUNT"], tax);
     setEcoValue_(shEco, targetRow, ecoHeaders, ["COST", "MATERIAL_COST"], materialCost);
-    setEcoValue_(shEco, targetRow, ecoHeaders, ["PROFIT"], total - materialCost);
+
+    const existingInvSource = getCellByHeader_(shEco, targetRow, ecoHeaders, "INV_SOURCE");
+    const realMaterialCost = calculateEconomyRealPartsCost_(existingInvSource, materialCost);
+    setEcoValue_(shEco, targetRow, ecoHeaders, ["PROFIT"], total - tax - realMaterialCost - laborTotal);
 
     setEcoValue_(shEco, targetRow, ecoHeaders, ["INVOICE_NUMBER"], invoiceNumber);
     setEcoValue_(shEco, targetRow, ecoHeaders, ["DATE_INVOICE"], invoiceDate);

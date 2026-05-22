@@ -250,11 +250,12 @@ function buildAdminEconomyEntryFromEconomyRow_(row, headers) {
   const tax = parseMoneyFlexible_(getExecutiveValue_(row, headers, ["TAX", "TAX_AMOUNT"]));
   const hours = parseMoneyFlexible_(getExecutiveValue_(row, headers, ["HORAS", "LABOR_HOURS", "HOURS"]));
   const laborBilled = getAdminLaborBilled_(row, headers, hours);
-  const partsCost = getAdminEconomyCost_(row, headers);
-  const partsBilled = getAdminPartsBilled_(row, headers, amount, tax, laborBilled);
   const techLaborCost = parseMoneyFlexible_(getExecutiveValue_(row, headers, ["TECH_LABOR_COST", "TECH_LABOR_PAY"]));
   const invSource = String(getExecutiveValue_(row, headers, ["INV_SOURCE"]) || "").trim().toUpperCase();
-  const split = getAdminInvestorSplit_(invSource, partsCost);
+  const rawPartsCost = getAdminEconomyCost_(row, headers);
+  const partsCost = getAdminRealPartsCost_(invSource, rawPartsCost);
+  const partsBilled = getAdminPartsBilled_(row, headers, amount, tax, laborBilled);
+  const split = getAdminInvestorSplit_(invSource, rawPartsCost);
 
   return {
     source: "ECONOMY",
@@ -266,6 +267,7 @@ function buildAdminEconomyEntryFromEconomyRow_(row, headers) {
     laborHours: hours,
     laborBilled: laborBilled,
     partsBilled: partsBilled,
+    rawPartsCost: rawPartsCost,
     partsCost: partsCost,
     techLaborCost: techLaborCost,
     invSource: invSource,
@@ -273,6 +275,16 @@ function buildAdminEconomyEntryFromEconomyRow_(row, headers) {
     yoelPartsCost: split.yoel,
     unassignedPartsCost: split.unassigned
   };
+}
+
+function getAdminRealPartsCost_(source, cost) {
+  source = String(source || "").trim().toUpperCase();
+  cost = Number(cost || 0);
+
+  if (source === "MISCELANEAS") return 0;
+  if (source === "DAVID" || source === "YOEL") return cost * 0.50;
+
+  return cost;
 }
 
 function getAdminEconomyCost_(row, headers) {
@@ -401,6 +413,7 @@ function addAdminEconomyEntryToDashboard_(dashboard, entry) {
       laborHours: Number(entry.laborHours || 0),
       laborBilled: Number(entry.laborBilled || 0),
       partsBilled: Number(entry.partsBilled || 0),
+      rawPartsCost: Number(entry.rawPartsCost || 0),
       partsCost: Number(entry.partsCost || 0),
       techLaborCost: Number(entry.techLaborCost || 0),
       grossProfit:

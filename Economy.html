@@ -564,9 +564,9 @@ function getEconomyMetricCards(m) {
     { key:"tax", label:"Tax", value:formatMoney(m.tax), note:"Tax collected", tone:"neutral" },
     { key:"billedParts", label:"Billed Parts", value:formatMoney(m.billedParts), note:"Estimated parts charge", tone:"info" },
     { key:"laborBilled", label:"Billed Labor", value:formatMoney(m.laborBilled), note:m.hours.toFixed(2) + " hours", tone:"info" },
-    { key:"cost", label:"Real Parts Cost", value:formatMoney(m.cost), note:"Registered material cost", tone:m.cost ? "warning" : "success" },
+    { key:"cost", label:"Real Parts Cost", value:formatMoney(m.cost), note:"Calculated from COST + INV_SOURCE", tone:m.cost ? "warning" : "success" },
     { key:"techPay", label:"Tech Pay", value:formatMoney(m.techPay), note:"Labor paid to techs", tone:"warning" },
-    { key:"profit", label:"Profit", value:formatMoney(m.profit), note:"Saved profit field", tone:m.profit >= 0 ? "success" : "danger" },
+    { key:"profit", label:"Profit", value:formatMoney(m.profit), note:"Billed - tax - real cost - tech pay", tone:m.profit >= 0 ? "success" : "danger" },
     { key:"david", label:"David Parts", value:formatMoney(m.david), note:"Investor parts split", tone:"info" },
     { key:"yoel", label:"Yoel Parts", value:formatMoney(m.yoel), note:"Investor parts split", tone:"info" }
   ];
@@ -594,13 +594,14 @@ function calculateEconomyMetrics(rows) {
     const status = String(o.STATUS || "PENDING").toUpperCase();
     const amount = parseEconomyNumber(o.AMOUNT);
     const tax = parseEconomyNumber(o.TAX);
-    const cost = parseEconomyNumber(o.COST);
-    const profit = parseEconomyNumber(o.PROFIT);
+    const rawCost = parseEconomyNumber(o.COST);
+    const realCost = calculateRealPartsCost(o.INV_SOURCE, rawCost);
     const techPay = parseEconomyNumber(o.TECH_LABOR_COST || o.TECH_LABOR_PAY);
     const hours = parseEconomyNumber(o.HORAS || o.LABOR_HOURS);
     const laborBilled = calculateEconomyLaborCharge(hours);
     const billedParts = Math.max(0, amount - tax - laborBilled);
-    const split = getInvestmentSplitValues(o.INV_SOURCE, cost);
+    const profit = amount - tax - realCost - techPay;
+    const split = getInvestmentSplitValues(o.INV_SOURCE, rawCost);
 
     if (!status || status === "PENDING") totals.pending++;
     if (status === "INVOICED") totals.invoiced++;
@@ -608,7 +609,7 @@ function calculateEconomyMetrics(rows) {
 
     totals.amount += amount;
     totals.tax += tax;
-    totals.cost += cost;
+    totals.cost += realCost;
     totals.profit += profit;
     totals.techPay += techPay;
     totals.hours += hours;
@@ -630,13 +631,14 @@ function applyEconomyMetricFilter(rows) {
     const status = String(o.STATUS || "PENDING").toUpperCase();
     const amount = parseEconomyNumber(o.AMOUNT);
     const tax = parseEconomyNumber(o.TAX);
-    const cost = parseEconomyNumber(o.COST);
-    const profit = parseEconomyNumber(o.PROFIT);
+    const rawCost = parseEconomyNumber(o.COST);
+    const realCost = calculateRealPartsCost(o.INV_SOURCE, rawCost);
     const techPay = parseEconomyNumber(o.TECH_LABOR_COST || o.TECH_LABOR_PAY);
     const hours = parseEconomyNumber(o.HORAS || o.LABOR_HOURS);
     const laborBilled = calculateEconomyLaborCharge(hours);
     const billedParts = Math.max(0, amount - tax - laborBilled);
-    const split = getInvestmentSplitValues(o.INV_SOURCE, cost);
+    const profit = amount - tax - realCost - techPay;
+    const split = getInvestmentSplitValues(o.INV_SOURCE, rawCost);
 
     if (key === "pending") return !status || status === "PENDING";
     if (key === "invoiced") return status === "INVOICED";
@@ -645,7 +647,7 @@ function applyEconomyMetricFilter(rows) {
     if (key === "tax") return tax > 0;
     if (key === "billedParts") return billedParts > 0;
     if (key === "laborBilled") return laborBilled > 0;
-    if (key === "cost") return cost > 0;
+    if (key === "cost") return realCost > 0;
     if (key === "techPay") return techPay > 0;
     if (key === "profit") return profit !== 0;
     if (key === "hours") return hours > 0;
@@ -661,6 +663,16 @@ function parseEconomyNumber(value) {
     .replace(/[^\d.-]/g, "");
   const n = Number(cleaned);
   return isNaN(n) ? 0 : n;
+}
+
+function calculateRealPartsCost(source, cost) {
+  source = String(source || "").trim().toUpperCase();
+  cost = Number(cost || 0);
+
+  if (source === "MISCELANEAS") return 0;
+  if (source === "DAVID" || source === "YOEL") return cost * 0.50;
+
+  return cost;
 }
 
 function calculateEconomyLaborCharge(hours) {
@@ -868,7 +880,13 @@ function card(o) {
   if (status === "INVOICED") cls = "invoiced";
   if (status === "PAID") cls = "paid";
 
-  const split = getInvestmentSplitValues(o.INV_SOURCE, o.COST);
+  const amount = parseEconomyNumber(o.AMOUNT);
+  const tax = parseEconomyNumber(o.TAX);
+  const rawCost = parseEconomyNumber(o.COST);
+  const realCost = calculateRealPartsCost(o.INV_SOURCE, rawCost);
+  const techPay = parseEconomyNumber(o.TECH_LABOR_COST || o.TECH_LABOR_PAY);
+  const calculatedProfit = amount - tax - realCost - techPay;
+  const split = getInvestmentSplitValues(o.INV_SOURCE, rawCost);
 
   return `
     <div class="card ${cls}">
@@ -939,10 +957,13 @@ function card(o) {
               <span id="inv_yoel_${row}">${formatMoney(split.yoel)}</span>
             </div>
           </div>
+          <div style="margin-top:8px; color:#4b5563;">
+            Real parts cost: <b id="real_cost_${row}">${formatMoney(realCost)}</b>
+          </div>
         </div>
       `}
 
-      <div class="row"><b>Profit:</b> ${formatMoney(o.PROFIT)}</div>
+      <div class="row"><b>Profit:</b> ${formatMoney(calculatedProfit)}</div>
 
       <div class="row">
         <label>Status</label><br>
@@ -1082,12 +1103,15 @@ function updateInvView(row) {
   const cost = document.getElementById("cost_" + row).value;
 
   const split = getInvestmentSplitValues(source, cost);
+  const realCost = calculateRealPartsCost(source, cost);
 
   const davidBox = document.getElementById("inv_david_" + row);
   const yoelBox = document.getElementById("inv_yoel_" + row);
+  const realCostBox = document.getElementById("real_cost_" + row);
 
   if (davidBox) davidBox.innerText = formatMoney(split.david);
   if (yoelBox) yoelBox.innerText = formatMoney(split.yoel);
+  if (realCostBox) realCostBox.innerText = formatMoney(realCost);
 }
 
 function loadPeriod() {
