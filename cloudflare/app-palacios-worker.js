@@ -41,29 +41,17 @@ function renderAppShell(iframeUrl) {
     }
 
     iframe {
+      position: fixed;
+      inset: 0;
       width: 100%;
       height: 100%;
       border: 0;
       display: block;
       background: #07090d;
     }
-
-    .loading {
-      position: fixed;
-      inset: 0;
-      display: grid;
-      place-items: center;
-      color: #f9fafb;
-      font: 600 15px Arial, sans-serif;
-      background:
-        radial-gradient(circle at 20% 20%, rgba(220, 38, 38, .22), transparent 32%),
-        #07090d;
-      z-index: 0;
-    }
   </style>
 </head>
 <body>
-  <div class="loading">Cargando Palacios Power Systems...</div>
   <iframe
     title="Palacios Power Systems"
     src="${escapeHtml(iframeUrl)}"
