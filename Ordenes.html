@@ -159,24 +159,66 @@ const TOP_NAV = {
   }
 };
 
+const BASE_URL = "<?= baseUrl ?>";
+const URL_COMPANY_ID = String("<?= companyId ?>").trim().toUpperCase();
+
+function clearStoredSession() {
+  localStorage.removeItem("pps_user");
+}
+
+function redirectToLogin(message) {
+  clearStoredSession();
+  if (message) alert(message);
+  TOP_NAV.href = BASE_URL;
+}
+
+function getErrorMessage(err) {
+  return String((err && err.message) || err || "Error desconocido");
+}
+
+function isSessionExpiredError(err) {
+  const message = getErrorMessage(err).toLowerCase();
+  return message.includes("sesion expirada") || message.includes("sesión expirada") || message.includes("session expired");
+}
+
+function handleSessionFailure(err) {
+  if (!isSessionExpiredError(err)) return false;
+  redirectToLogin("Tu sesión expiró. Inicia sesión nuevamente.");
+  return true;
+}
+
+function renderServerError(err, elementId, prefix) {
+  if (handleSessionFailure(err)) return;
+  document.getElementById(elementId).innerHTML = prefix + getErrorMessage(err);
+}
+
+function alertServerError(err) {
+  if (handleSessionFailure(err)) return;
+  alert(getErrorMessage(err));
+}
+
 function requireLogin() {
   const user = localStorage.getItem("pps_user");
 
   if (!user) {
-    TOP_NAV.href = "<?= baseUrl ?>";
+    TOP_NAV.href = BASE_URL;
     return false;
   }
 
   try {
     const parsed = JSON.parse(user);
     if ((!parsed.role && !parsed.ROLE) || (!parsed.sessionToken && !parsed.SESSION_TOKEN)) {
-      localStorage.removeItem("pps_user");
-      TOP_NAV.href = "<?= baseUrl ?>";
+      redirectToLogin();
+      return false;
+    }
+
+    const expiresAt = Number(parsed.sessionExpiresAt || parsed.SESSION_EXPIRES_AT || 0);
+    if (expiresAt && expiresAt <= Date.now()) {
+      redirectToLogin("Tu sesión expiró. Inicia sesión nuevamente.");
       return false;
     }
   } catch (e) {
-    localStorage.removeItem("pps_user");
-    TOP_NAV.href = "<?= baseUrl ?>";
+    redirectToLogin();
     return false;
   }
 
@@ -188,10 +230,7 @@ if (!requireLogin()) {
 }
 
 let data = [];
-const URL_COMPANY_ID = String("<?= companyId ?>").trim().toUpperCase();
 let ACTIVE_COMPANY_ID = URL_COMPANY_ID;
-
-const BASE_URL = "<?= baseUrl ?>";
 
 function getCurrentUser() {
   try {
@@ -315,8 +354,7 @@ function load() {
       loadNotifications();
     })
     .withFailureHandler(function(err) {
-      document.getElementById("cards").innerHTML =
-        "ERROR loading dashboard: " + err.message;
+      renderServerError(err, "cards", "ERROR loading dashboard: ");
     })
     .getDashboardData(ACTIVE_COMPANY_ID, user.role || user.ROLE, getSessionToken());
 }
@@ -333,7 +371,7 @@ function loadCompanySelector(keepCurrentCards) {
       renderCompanySelector(companies || [], keepCurrentCards);
     })
     .withFailureHandler(function(err) {
-      document.getElementById("cards").innerHTML = "ERROR companies: " + err.message;
+      renderServerError(err, "cards", "ERROR companies: ");
     })
     .getCompaniesForUser(user.companyId, user.role || user.ROLE, getSessionToken());
 }
@@ -410,8 +448,7 @@ function loadNotifications() {
           : "No notifications.";
     })
     .withFailureHandler(function(err) {
-      document.getElementById("notificationsBox").innerHTML =
-        "ERROR loading notifications: " + err.message;
+      renderServerError(err, "notificationsBox", "ERROR loading notifications: ");
     })
     .getNotifications(ACTIVE_COMPANY_ID, getCurrentRole(), getSessionToken());
 }
@@ -427,7 +464,7 @@ function toggleNotifications() {
     google.script.run
       .withSuccessHandler(loadNotifications)
       .withFailureHandler(function(err) {
-        alert(err.message);
+        alertServerError(err);
       })
       .markNotificationsRead(ACTIVE_COMPANY_ID, getSessionToken());
 
@@ -617,12 +654,12 @@ function assignAndSend(row) {
           load();
         })
         .withFailureHandler(function(err) {
-          alert(err.message);
+          alertServerError(err);
         })
         .sendWorkOrderFromDashboard(row, getSessionToken());
     })
     .withFailureHandler(function(err) {
-      alert(err.message);
+      alertServerError(err);
     })
     .updateWorkOrderFromDashboard(row, { TECHNICIAN: techText }, getSessionToken());
 }
@@ -636,7 +673,7 @@ function sendWO(row) {
       load();
     })
     .withFailureHandler(function(err) {
-      alert(err.message);
+      alertServerError(err);
     })
     .sendWorkOrderFromDashboard(row, getSessionToken());
 }
@@ -647,7 +684,7 @@ function setStatus(row, st) {
       load();
     })
     .withFailureHandler(function(err) {
-      alert(err.message);
+      alertServerError(err);
     })
     .updateWorkOrderFromDashboard(row, { STATUS: st }, getSessionToken());
 }
@@ -658,7 +695,7 @@ function saveNotes(row) {
   google.script.run
     .withSuccessHandler(load)
     .withFailureHandler(function(err) {
-      alert(err.message);
+      alertServerError(err);
     })
     .updateWorkOrderFromDashboard(row, { NOTES: notes }, getSessionToken());
 }
@@ -673,7 +710,7 @@ function deleteWO(row, woNumber) {
       load();
     })
     .withFailureHandler(function(err) {
-      alert(err.message);
+      alertServerError(err);
     })
     .deleteWorkOrder(row, getSessionToken());
 }
