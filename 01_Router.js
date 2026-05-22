@@ -201,15 +201,11 @@ function isOwnerPortalRequest_(params) {
 }
 
 function getWebAppBaseUrl_(companyId, ownerPortal) {
-  if (ownerPortal && CFG.OWNER_WEB_APP_URL) {
-    return CFG.OWNER_WEB_APP_URL;
+  if (ownerPortal) {
+    return CFG.OWNER_WEB_APP_URL || CFG.WEB_APP_URL;
   }
 
   companyId = String(companyId || "").trim().toUpperCase();
-
-  if (!companyId && CFG.OWNER_WEB_APP_URL) {
-    return CFG.OWNER_WEB_APP_URL;
-  }
 
   if (companyId && CFG.PUBLIC_WEB_APP_URLS && CFG.PUBLIC_WEB_APP_URLS[companyId]) {
     return CFG.PUBLIC_WEB_APP_URLS[companyId];
