@@ -976,6 +976,112 @@
     .metric.success { border-left:5px solid #16a34a; }
     .metric.info { border-left:5px solid #2563eb; }
 
+    .metric-button {
+      width:100%;
+      margin:0;
+      color:#111827;
+      text-align:left;
+      font-weight:normal;
+      cursor:pointer;
+      transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+    }
+
+    .metric-button:hover {
+      filter:none;
+      transform:translateY(-2px);
+      border-color:#cbd5e1;
+      box-shadow:0 10px 22px rgba(15,23,42,.12);
+    }
+
+    .metric-button.active {
+      outline:3px solid rgba(37,99,235,.16);
+      border-color:#2563eb;
+    }
+
+    .metric-button:focus-visible {
+      outline:3px solid rgba(37,99,235,.28);
+      outline-offset:2px;
+    }
+
+    .supervisor-results {
+      display:none;
+      margin-top:14px;
+      background:#ffffff;
+      border:1px solid #e5e7eb;
+      border-radius:8px;
+      padding:14px;
+      box-shadow:0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .supervisor-results-head {
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-bottom:12px;
+    }
+
+    .supervisor-results-head h3 {
+      margin:0;
+      font-size:16px;
+    }
+
+    .supervisor-card-grid {
+      display:grid;
+      grid-template-columns:repeat(auto-fill, minmax(270px, 1fr));
+      gap:12px;
+    }
+
+    .supervisor-order-card {
+      min-width:0;
+      background:#f8fafc;
+      border:1px solid #e5e7eb;
+      border-left:5px solid #2563eb;
+      border-radius:8px;
+      padding:12px;
+      box-sizing:border-box;
+    }
+
+    .supervisor-order-card.danger { border-left-color:#dc2626; }
+    .supervisor-order-card.warning { border-left-color:#d97706; }
+    .supervisor-order-card.success { border-left-color:#16a34a; }
+
+    .supervisor-order-top {
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:flex-start;
+      margin-bottom:8px;
+    }
+
+    .supervisor-order-title {
+      font-weight:bold;
+      color:#111827;
+      overflow-wrap:anywhere;
+    }
+
+    .supervisor-order-pill {
+      flex:0 0 auto;
+      max-width:120px;
+      padding:5px 8px;
+      border-radius:999px;
+      background:#e5e7eb;
+      color:#111827;
+      font-size:11px;
+      font-weight:bold;
+      text-align:center;
+      overflow-wrap:anywhere;
+    }
+
+    .supervisor-order-meta {
+      margin-top:6px;
+      color:#4b5563;
+      font-size:12px;
+      line-height:1.35;
+      overflow-wrap:anywhere;
+    }
+
     .dash-layout {
       display:grid;
       grid-template-columns:1.6fr .9fr;
@@ -1473,6 +1579,7 @@
     </div>
 
     <div id="supervisorMetrics" class="metric-grid"></div>
+    <div id="supervisorMetricResults" class="supervisor-results"></div>
   </div>
 
   <h2 class="module-heading">Modulos</h2>
@@ -1530,6 +1637,8 @@ let CURRENT_BRANDING = {
 };
 let OWNER_COMPANIES = [];
 let SELECTED_OWNER_COMPANY_ID = "";
+let SUPERVISOR_DASHBOARD_ORDERS = [];
+let SUPERVISOR_DASHBOARD_FILTER = "open";
 
 setLoginTheme(LOGIN_COMPANY_ID);
 
@@ -2001,21 +2110,26 @@ function loadSupervisorDashboard() {
 
   if (role !== "SUPERVISOR") {
     box.style.display = "none";
+    SUPERVISOR_DASHBOARD_ORDERS = [];
     return;
   }
 
   box.style.display = "block";
   document.getElementById("supervisorDashboardScope").innerText = "Cargando ordenes asignadas...";
   document.getElementById("supervisorMetrics").innerHTML = renderMetricSkeletons();
+  document.getElementById("supervisorMetricResults").style.display = "none";
 
   google.script.run
     .withSuccessHandler(function(data) {
-      renderSupervisorDashboard(Array.isArray(data) ? data : []);
+      SUPERVISOR_DASHBOARD_ORDERS = Array.isArray(data) ? data : [];
+      renderSupervisorDashboard(SUPERVISOR_DASHBOARD_ORDERS);
     })
     .withFailureHandler(function(err) {
+      SUPERVISOR_DASHBOARD_ORDERS = [];
       document.getElementById("supervisorDashboardScope").innerText =
         "Error cargando metricas: " + (err && err.message ? err.message : err);
       document.getElementById("supervisorMetrics").innerHTML = "";
+      document.getElementById("supervisorMetricResults").style.display = "none";
     })
     .getCustomerOrdersBySupervisor(
       CURRENT_USER.name || CURRENT_USER.NAME || "",
@@ -2034,48 +2148,63 @@ function renderSupervisorDashboard(data) {
 
   const cards = [
     {
+      key: "all",
       label: "Total Orders",
       value: totals.total,
-      note: totals.open + " abiertas",
+      note: "Todas las asignadas",
       tone: totals.emergency ? "danger" : "info"
     },
     {
+      key: "open",
+      label: "Open Orders",
+      value: totals.open,
+      note: totals.total + " ordenes totales",
+      tone: totals.emergency ? "danger" : "info"
+    },
+    {
+      key: "completed",
       label: "Completed / Closed",
       value: totals.completed,
       note: "Terminadas o cerradas",
       tone: "success"
     },
     {
+      key: "parts",
       label: "Buying Parts",
       value: totals.parts,
       note: "Esperando piezas",
       tone: totals.parts ? "warning" : "success"
     },
     {
+      key: "invoiced",
       label: "Invoiced",
       value: totals.invoiced,
       note: "Con invoice PDF",
       tone: "info"
     },
     {
+      key: "quotes",
       label: "Quotes",
       value: totals.quotes,
       note: "Quotes disponibles",
       tone: totals.quotes ? "warning" : "info"
     },
     {
+      key: "pmReports",
       label: "PM Reports",
       value: totals.pmReports,
       note: "Reportes PM generados",
       tone: "info"
     },
     {
+      key: "emergency",
       label: "Emergency",
       value: totals.emergency,
       note: "Prioridad emergencia",
       tone: totals.emergency ? "danger" : "success"
     },
     {
+      key: "oldest",
       label: "Oldest Open",
       value: totals.oldestOpenDays + "d",
       note: "Orden abierta mas vieja",
@@ -2084,7 +2213,153 @@ function renderSupervisorDashboard(data) {
   ];
 
   document.getElementById("supervisorMetrics").innerHTML =
-    cards.map(renderMetricCard).join("");
+    cards.map(renderSupervisorMetricButton).join("");
+
+  renderSupervisorMetricResults(SUPERVISOR_DASHBOARD_FILTER);
+}
+
+function renderSupervisorMetricButton(card) {
+  const active = card.key === SUPERVISOR_DASHBOARD_FILTER ? " active" : "";
+  return `
+    <button type="button" class="metric metric-button ${escapeHtmlMain(card.tone || "")}${active}"
+      onclick="filterSupervisorDashboard('${escapeHtmlMain(card.key || "all")}')">
+      <div class="metric-label">${escapeHtmlMain(card.label)}</div>
+      <div class="metric-value">${escapeHtmlMain(card.value)}</div>
+      <div class="metric-note">${escapeHtmlMain(card.note)} | Ver tarjetas</div>
+    </button>
+  `;
+}
+
+function filterSupervisorDashboard(filterKey) {
+  SUPERVISOR_DASHBOARD_FILTER = String(filterKey || "all");
+  renderSupervisorDashboard(SUPERVISOR_DASHBOARD_ORDERS);
+}
+
+function renderSupervisorMetricResults(filterKey) {
+  const box = document.getElementById("supervisorMetricResults");
+  if (!box) return;
+
+  const filtered = getSupervisorDashboardFilteredOrders(filterKey);
+  const label = getSupervisorFilterLabel(filterKey);
+
+  box.style.display = "block";
+
+  if (!filtered.length) {
+    box.innerHTML = `
+      <div class="supervisor-results-head">
+        <div>
+          <h3>${escapeHtmlMain(label)}</h3>
+          <div class="muted">No hay ordenes para esta metrica.</div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  box.innerHTML = `
+    <div class="supervisor-results-head">
+      <div>
+        <h3>${escapeHtmlMain(label)}</h3>
+        <div class="muted">${filtered.length} ordenes encontradas</div>
+      </div>
+      <button class="dash-refresh" onclick="openModule('?view=customer&supervisor=')">Abrir Portal Completo</button>
+    </div>
+    <div class="supervisor-card-grid">
+      ${filtered.slice(0, 12).map(renderSupervisorOrderPreviewCard).join("")}
+    </div>
+    ${filtered.length > 12 ? "<div class='muted' style='margin-top:10px;'>Mostrando 12 de " + filtered.length + ". Abre el portal completo para ver todas.</div>" : ""}
+  `;
+}
+
+function getSupervisorDashboardFilteredOrders(filterKey) {
+  const orders = SUPERVISOR_DASHBOARD_ORDERS.slice();
+
+  if (filterKey === "all") return orders;
+  if (filterKey === "oldest") {
+    return orders
+      .filter(function(order) { return !isSupervisorOrderClosed(order); })
+      .sort(function(a, b) { return getDashboardOrderAgeDays(b) - getDashboardOrderAgeDays(a); })
+      .slice(0, 12);
+  }
+
+  return orders.filter(function(order) {
+    const status = normalizeDashboardStatus(order.STATUS);
+    const priority = String(order.ORDER_PRIORITY || "").toLowerCase();
+
+    if (filterKey === "open") return !isSupervisorOrderClosed(order);
+    if (filterKey === "completed") return isSupervisorOrderClosed(order);
+    if (filterKey === "parts") return status.includes("PART");
+    if (filterKey === "invoiced") {
+      return String(order.HAS_INVOICE_PDF || "").toUpperCase() === "YES" || order.PDF_EN_URL || order.PDF_ES_URL;
+    }
+    if (filterKey === "quotes") return order.QUOTE_EN_URL || order.QUOTE_ES_URL;
+    if (filterKey === "pmReports") {
+      return String(order.HAS_PM_REPORT_PDF || "").toUpperCase() === "YES" ||
+        order.PM_REPORT_EN_URL || order.PM_REPORT_ES_URL;
+    }
+    if (filterKey === "emergency") return priority.includes("emergency") || priority.includes("urgent");
+    return true;
+  });
+}
+
+function getSupervisorFilterLabel(filterKey) {
+  const labels = {
+    all: "Todas las ordenes",
+    open: "Ordenes abiertas",
+    completed: "Completed / Closed",
+    parts: "Buying Parts",
+    invoiced: "Ordenes con invoice PDF",
+    quotes: "Ordenes con quotes",
+    pmReports: "Ordenes con PM reports",
+    emergency: "Emergency / Urgent",
+    oldest: "Ordenes abiertas mas viejas"
+  };
+
+  return labels[filterKey] || labels.all;
+}
+
+function renderSupervisorOrderPreviewCard(order) {
+  const status = normalizeDashboardStatus(order.STATUS);
+  const priority = String(order.ORDER_PRIORITY || "");
+  const tone = getSupervisorOrderTone(order);
+  const wo = order.WO_NUMBER || order.WO || "";
+  const nsn = order.NSN || order["NSN #"] || "";
+  const address = order.STORE_ADDRESS || order.ADDRESS || "";
+  const problem = order.REPORTED_PROBLEM_EN || order.REPORTED_PROBLEM_ES || "";
+
+  return `
+    <div class="supervisor-order-card ${escapeHtmlMain(tone)}">
+      <div class="supervisor-order-top">
+        <div>
+          <div class="supervisor-order-title">${escapeHtmlMain(wo || "Sin WO")}</div>
+          <div class="supervisor-order-meta">NSN ${escapeHtmlMain(nsn)} | ${escapeHtmlMain(getDashboardOrderAgeDays(order) + "d")}</div>
+        </div>
+        <div class="supervisor-order-pill">${escapeHtmlMain(status || "NO STATUS")}</div>
+      </div>
+      <div class="supervisor-order-meta"><b>Technician:</b> ${escapeHtmlMain(order.TECHNICIAN || "Not assigned")}</div>
+      <div class="supervisor-order-meta"><b>Priority:</b> ${escapeHtmlMain(priority || "")}</div>
+      <div class="supervisor-order-meta"><b>Address:</b> ${escapeHtmlMain(address || "")}</div>
+      ${problem ? `<div class="supervisor-order-meta"><b>Issue:</b> ${escapeHtmlMain(problem).slice(0, 180)}</div>` : ""}
+    </div>
+  `;
+}
+
+function getSupervisorOrderTone(order) {
+  const status = normalizeDashboardStatus(order.STATUS);
+  const priority = String(order.ORDER_PRIORITY || "").toLowerCase();
+
+  if (priority.includes("emergency") || priority.includes("urgent")) return "danger";
+  if (status.includes("PART")) return "warning";
+  if (isSupervisorOrderClosed(order)) return "success";
+  return "info";
+}
+
+function isSupervisorOrderClosed(order) {
+  const status = normalizeDashboardStatus(order.STATUS);
+  return status.includes("COMPLETED") ||
+    status.includes("CLOSED") ||
+    status.includes("INVOICED") ||
+    status.includes("FACTURADO");
 }
 
 function getSupervisorDashboardTotals(data) {
