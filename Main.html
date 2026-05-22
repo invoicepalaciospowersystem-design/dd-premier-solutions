@@ -1014,7 +1014,7 @@ function login() {
 
   google.script.run
     .withSuccessHandler(function(user) {
-      CURRENT_USER = user || {};
+      CURRENT_USER = normalizeUser(user || {});
       localStorage.setItem("pps_user", JSON.stringify(CURRENT_USER));
       localStorage.setItem("pps_login_company", LOGIN_COMPANY_ID || "");
       showPanel();
@@ -1042,7 +1042,9 @@ function normalizeUser(user) {
     email: user.email || user.EMAIL || "",
     name: user.name || user.NAME || "",
     role: String(user.role || user.ROLE || "").trim().toUpperCase(),
-    companyId: String(user.companyId || user.COMPANY_ID || "").trim().toUpperCase()
+    companyId: String(user.companyId || user.COMPANY_ID || "").trim().toUpperCase(),
+    sessionToken: user.sessionToken || user.SESSION_TOKEN || "",
+    sessionExpiresAt: Number(user.sessionExpiresAt || user.SESSION_EXPIRES_AT || 0)
   };
 }
 
@@ -1148,6 +1150,11 @@ function updateHeaderCompany(companyId) {
 }
 
 function logout() {
+  const token = CURRENT_USER && CURRENT_USER.sessionToken;
+  if (token) {
+    google.script.run.destroySession(token);
+  }
+
   localStorage.removeItem("pps_user");
   localStorage.removeItem("pps_login_company");
   CURRENT_USER = null;
@@ -1164,6 +1171,8 @@ function logout() {
 function canUseSavedUser(user) {
   const normalized = normalizeUser(user);
 
+  if (!normalized.sessionToken) return false;
+  if (normalized.sessionExpiresAt && normalized.sessionExpiresAt < Date.now()) return false;
   if (!LOGIN_COMPANY_ID) return true;
   if (normalized.role === "OWNER") return true;
 

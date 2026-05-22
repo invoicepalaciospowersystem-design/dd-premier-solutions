@@ -67,9 +67,10 @@ function saveWorkOrderRow_(o) {
   sh.appendRow(rowValues);
 }
 
-function getDashboardData(companyId, role) {
+function getDashboardData(companyId, role, sessionToken) {
   companyId = String(companyId || "").trim().toUpperCase();
   role = String(role || "").trim().toUpperCase();
+  requireSession_(sessionToken, ["OWNER", "ADMIN", "ORDENES", "ECONOMIA"], companyId);
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
@@ -119,7 +120,7 @@ function getDashboardData(companyId, role) {
   return data.reverse();
 }
 
-function updateWorkOrderFromDashboard(rowNumber, updates) {
+function updateWorkOrderFromDashboard(rowNumber, updates, sessionToken) {
   if (!rowNumber || isNaN(rowNumber)) {
     throw new Error("Fila inválida recibida: " + rowNumber);
   }
@@ -140,6 +141,7 @@ function updateWorkOrderFromDashboard(rowNumber, updates) {
   const companyId = getCellByHeader_(sh, rowNumber, headers, "COMPANY_ID") || CFG.DEFAULT_COMPANY_ID;
   const woNumber = getCellByHeader_(sh, rowNumber, headers, "WO_NUMBER");
   const oldStatus = getCellByHeader_(sh, rowNumber, headers, "STATUS");
+  requireSession_(sessionToken, ["OWNER", "ADMIN", "ORDENES"], companyId);
 
   Object.keys(updates).forEach(function(key) {
     setCellByHeader_(sh, rowNumber, headers, key, updates[key]);
@@ -183,16 +185,35 @@ function updateWorkOrderFromDashboard(rowNumber, updates) {
   return true;
 }
 
-function sendWorkOrderFromDashboard(rowNumber) {
+function sendWorkOrderFromDashboard(rowNumber, sessionToken) {
   if (!rowNumber || isNaN(rowNumber)) {
     throw new Error("No llegó número de fila desde el dashboard. Valor recibido: " + rowNumber);
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+  const companyId = getCellByHeader_(sh, Number(rowNumber), headers, "COMPANY_ID") || CFG.DEFAULT_COMPANY_ID;
+  requireSession_(sessionToken, ["OWNER", "ADMIN", "ORDENES"], companyId);
 
   dispatchRowToTech_(sh, Number(rowNumber));
 
+  return true;
+}
+
+function deleteWorkOrder(rowNumber, sessionToken) {
+  rowNumber = Number(rowNumber);
+  if (!rowNumber || rowNumber < 2) throw new Error("Fila invalida.");
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
+  if (!sh) throw new Error("No existe la hoja: " + CFG.SHEET_WORK_ORDERS);
+
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+  const companyId = getCellByHeader_(sh, rowNumber, headers, "COMPANY_ID") || CFG.DEFAULT_COMPANY_ID;
+  requireSession_(sessionToken, ["OWNER", "ADMIN", "ORDENES"], companyId);
+
+  sh.deleteRow(rowNumber);
   return true;
 }
 
@@ -215,12 +236,11 @@ function dispatchRowToTech_(sh, row) {
   const techEmail = getTechEmails_(technician);
 
   const publicBaseUrl = getWebAppBaseUrl_(companyId);
-  const companyParam = companyId ? "&companyId=" + encodeURIComponent(companyId) : "";
-  const startJobLink = publicBaseUrl + "?action=START&wo=" + encodeURIComponent(obj.WO_NUMBER) + companyParam;
-  const waitingPartsLink = publicBaseUrl + "?action=WAITING&wo=" + encodeURIComponent(obj.WO_NUMBER) + companyParam;
-  const completedLink = publicBaseUrl + "?action=COMPLETED&wo=" + encodeURIComponent(obj.WO_NUMBER) + companyParam;
+  const startJobLink = buildWorkOrderActionLink_(publicBaseUrl, companyId, obj.WO_NUMBER, "START");
+  const waitingPartsLink = buildWorkOrderActionLink_(publicBaseUrl, companyId, obj.WO_NUMBER, "WAITING");
+  const completedLink = buildWorkOrderActionLink_(publicBaseUrl, companyId, obj.WO_NUMBER, "COMPLETED");
 
-  if (CFG.TEST_MODE) {
+  if (isTechEmailTestMode_()) {
     Logger.log("TEST MODE: Email NO enviado. Técnicos: " + technician + " / " + techEmail);
   } else {
     MailApp.sendEmail({
@@ -285,6 +305,111 @@ function dispatchRowToTech_(sh, row) {
     Session.getActiveUser().getEmail() || "Dashboard",
     technician + " / " + techEmail
   );
+}
+
+function isTechEmailTestMode_() {
+  if (CFG.TECH_EMAIL_TEST_MODE !== undefined) {
+    return CFG.TECH_EMAIL_TEST_MODE === true;
+  }
+
+  return CFG.TEST_MODE === true;
+}
+
+function handleWorkOrderAction_(e) {
+  const params = e && e.parameter ? e.parameter : {};
+  const action = String(params.action || "").trim().toUpperCase();
+  const woNumber = String(params.wo || "").trim();
+  const companyId = String(params.companyId || CFG.DEFAULT_COMPANY_ID).trim().toUpperCase();
+  const actionToken = String(params.token || "").trim();
+
+  const statusMap = {
+    START: "IN PROGRESS",
+    WAITING: "PARTS IN TRANSIT",
+    COMPLETED: "COMPLETED"
+  };
+
+  if (!woNumber || !statusMap[action]) {
+    return HtmlService.createHtmlOutput("<h2>Accion invalida.</h2>");
+  }
+
+  if (!verifyWorkOrderActionToken_(companyId, woNumber, action, actionToken)) {
+    return HtmlService.createHtmlOutput("<h2>Link expirado o no autorizado.</h2>");
+  }
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
+  if (!sh) return HtmlService.createHtmlOutput("<h2>No existe WORK_ORDERS.</h2>");
+
+  const data = sh.getDataRange().getValues();
+  if (data.length < 2) return HtmlService.createHtmlOutput("<h2>No hay ordenes.</h2>");
+
+  const headers = data[0].map(String);
+  const idxWO = headers.indexOf("WO_NUMBER");
+  const idxCompany = headers.indexOf("COMPANY_ID");
+
+  for (let i = 1; i < data.length; i++) {
+    const rowWO = String(data[i][idxWO] || "").trim();
+    const rowCompany = idxCompany >= 0
+      ? String(data[i][idxCompany] || "").trim().toUpperCase()
+      : companyId;
+
+    if (rowWO === woNumber && rowCompany === companyId) {
+      updateTechOrderStatus(i + 1, statusMap[action]);
+      return HtmlService.createHtmlOutput(
+        "<h2>Orden actualizada</h2>" +
+        "<p>WO " + woNumber + " ahora esta en " + statusMap[action] + ".</p>"
+      );
+    }
+  }
+
+  return HtmlService.createHtmlOutput("<h2>No se encontro la orden " + woNumber + ".</h2>");
+}
+
+function buildWorkOrderActionLink_(publicBaseUrl, companyId, woNumber, action) {
+  const token = getWorkOrderActionToken_(companyId, woNumber, action);
+
+  return publicBaseUrl +
+    "?action=" + encodeURIComponent(action) +
+    "&wo=" + encodeURIComponent(woNumber) +
+    "&companyId=" + encodeURIComponent(companyId || CFG.DEFAULT_COMPANY_ID) +
+    "&token=" + encodeURIComponent(token);
+}
+
+function verifyWorkOrderActionToken_(companyId, woNumber, action, token) {
+  return constantTimeEquals_(
+    String(token || ""),
+    getWorkOrderActionToken_(companyId, woNumber, action)
+  );
+}
+
+function getWorkOrderActionToken_(companyId, woNumber, action) {
+  const secret = getWorkOrderActionSecret_();
+  const payload = [
+    String(companyId || CFG.DEFAULT_COMPANY_ID).trim().toUpperCase(),
+    String(woNumber || "").trim(),
+    String(action || "").trim().toUpperCase()
+  ].join("|");
+
+  const digest = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    secret + "|" + payload,
+    Utilities.Charset.UTF_8
+  );
+
+  return Utilities.base64EncodeWebSafe(digest).replace(/=+$/g, "");
+}
+
+function getWorkOrderActionSecret_() {
+  const props = PropertiesService.getScriptProperties();
+  const key = "WO_ACTION_SECRET";
+  let secret = props.getProperty(key);
+
+  if (!secret) {
+    secret = Utilities.getUuid() + Utilities.getUuid();
+    props.setProperty(key, secret);
+  }
+
+  return secret;
 }
 
 function buildTechAssignedSmsMessage_(order, publicBaseUrl) {

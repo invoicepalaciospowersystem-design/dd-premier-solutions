@@ -173,6 +173,7 @@
 <div id="cards" class="grid">Loading...</div>
 
 <script>
+const BASE_URL = "<?= baseUrl ?>";
 let ECONOMY = [];
 let ACTIVE_COMPANY_ID = "";
 let CURRENT_PERIOD_LABEL = "";
@@ -184,6 +185,25 @@ function getCurrentUser() {
   } catch (e) {
     return {};
   }
+}
+
+function getSessionToken() {
+  const user = getCurrentUser();
+  return user.sessionToken || user.SESSION_TOKEN || "";
+}
+
+function requireEconomyLogin() {
+  const user = getCurrentUser();
+  const role = String(user.role || user.ROLE || "").toUpperCase();
+  const token = getSessionToken();
+
+  if (!token || ["OWNER", "ADMIN", "ECONOMIA"].indexOf(role) === -1) {
+    localStorage.removeItem("pps_user");
+    window.top.location.href = BASE_URL;
+    return false;
+  }
+
+  return true;
 }
 
 function setMode(mode) {
@@ -325,7 +345,7 @@ function load() {
       .withFailureHandler(function(err) {
         document.getElementById("cards").innerHTML = "ERROR PM_ECONOMY: " + err.message;
       })
-      .getPMEconomyData();
+      .getPMEconomyData(ACTIVE_COMPANY_ID, user.role, getSessionToken());
 
     return;
   }
@@ -339,7 +359,7 @@ function load() {
     .withFailureHandler(function(err) {
       document.getElementById("cards").innerHTML = "ERROR: " + err.message;
     })
-    .getEconomyData(ACTIVE_COMPANY_ID, user.role);
+    .getEconomyData(ACTIVE_COMPANY_ID, user.role, getSessionToken());
 }
 
 function render() {
@@ -699,9 +719,9 @@ function save(row, btn) {
     });
 
   if (isPM) {
-    runner.updatePMEconomyRow(row, updates);
+    runner.updatePMEconomyRow(row, updates, getSessionToken());
   } else {
-    runner.updateEconomyRow(row, updates);
+    runner.updateEconomyRow(row, updates, getSessionToken());
   }
 }
 
@@ -731,7 +751,7 @@ function loadCompanySelector() {
     .withFailureHandler(function(err) {
       document.getElementById("cards").innerHTML = "ERROR companies: " + err.message;
     })
-    .getCompaniesForUser(user.companyId, user.role);
+    .getCompaniesForUser(user.companyId, user.role, getSessionToken());
 }
 
 function activateCompany() {
@@ -761,7 +781,7 @@ function syncInvoices() {
     .withFailureHandler(function(err) {
       alert(err.message);
     })
-    .syncInvoicesToEconomy(ACTIVE_COMPANY_ID);
+    .syncInvoicesToEconomy(ACTIVE_COMPANY_ID, getSessionToken());
 }
 
 function updateInvView(row) {
@@ -922,9 +942,11 @@ function renderOldDDSummary(rows) {
   `;
 }
 
-initSummaryDate();
-loadPeriod();
-load();
+if (requireEconomyLogin()) {
+  initSummaryDate();
+  loadPeriod();
+  load();
+}
 </script>
 
 </body>

@@ -109,8 +109,9 @@ if (
   return false;
 }
 
-function getEconomyData(companyId, role) {
+function getEconomyData(companyId, role, sessionToken) {
   companyId = String(companyId || "").trim().toUpperCase();
+  requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"], companyId);
 
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.SHEET_ECONOMY);
   if (!sh) throw new Error("No existe la hoja ECONOMY.");
@@ -154,7 +155,7 @@ function getEconomyData(companyId, role) {
   }).reverse();
 }
 
-function updateEconomyRow(rowNumber, updates) {
+function updateEconomyRow(rowNumber, updates, sessionToken) {
   rowNumber = Number(rowNumber);
   if (!rowNumber || rowNumber < 2) throw new Error("Fila inválida.");
 
@@ -162,6 +163,8 @@ function updateEconomyRow(rowNumber, updates) {
   if (!sh) throw new Error("No existe la hoja ECONOMY.");
 
   const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+  const companyId = getCellByHeader_(sh, rowNumber, headers, "COMPANY_ID") || CFG.DEFAULT_COMPANY_ID;
+  requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"], companyId);
 
   Object.keys(updates).forEach(function(key) {
     const col = headers.indexOf(key) + 1;
@@ -197,8 +200,11 @@ function updateEconomyRow(rowNumber, updates) {
   return true;
 }
 
-function syncInvoicesToEconomy(companyId) {
+function syncInvoicesToEconomy(companyId, sessionToken) {
   companyId = String(companyId || "").trim().toUpperCase();
+  if (sessionToken) {
+    requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"], companyId);
+  }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const shInv = ss.getSheetByName("INVOICES");

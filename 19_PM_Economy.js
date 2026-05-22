@@ -217,7 +217,9 @@ function savePMEconomy(pmData) {
 // OBTENER DATA PM ECONOMY
 // =====================================================
 
-function getPMEconomyData() {
+function getPMEconomyData(companyId, role, sessionToken) {
+  companyId = String(companyId || PM_ECO_CFG.COMPANY_ID || CFG.DEFAULT_COMPANY_ID).trim().toUpperCase();
+  requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"], companyId);
 
   const sh = SpreadsheetApp
     .getActiveSpreadsheet()
@@ -258,6 +260,8 @@ function getPMEconomyData() {
 
     return obj;
 
+  }).filter(function(o) {
+    return String(o.COMPANY_ID || "").trim().toUpperCase() === companyId;
   }).reverse();
 }
 
@@ -265,7 +269,7 @@ function getPMEconomyData() {
 // UPDATE PM ECONOMY
 // =====================================================
 
-function updatePMEconomyRow(rowNumber, updates) {
+function updatePMEconomyRow(rowNumber, updates, sessionToken) {
 
   rowNumber = Number(rowNumber);
 
@@ -284,6 +288,10 @@ function updatePMEconomyRow(rowNumber, updates) {
   const headers = sh.getRange(1,1,1,sh.getLastColumn())
     .getValues()[0]
     .map(String);
+  const companyId = getCellByHeader_(sh, rowNumber, headers, "COMPANY_ID") ||
+    PM_ECO_CFG.COMPANY_ID ||
+    CFG.DEFAULT_COMPANY_ID;
+  requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"], companyId);
 
   Object.keys(updates).forEach(function(key) {
 

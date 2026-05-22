@@ -69,6 +69,11 @@ function requireLogin() {
   try {
     const user = JSON.parse(raw);
     const role = String(user.role || user.ROLE || "").toUpperCase();
+    const token = user.sessionToken || user.SESSION_TOKEN || "";
+    if (!token) {
+      window.top.location.href = BASE_URL;
+      return false;
+    }
     if (role !== "OWNER" && role !== "ADMIN") {
       window.top.location.href = BASE_URL;
       return false;
@@ -87,6 +92,11 @@ if (!requireLogin()) throw new Error("No autorizado");
 function getUser() {
   try { return JSON.parse(localStorage.getItem("pps_user") || "{}"); }
   catch(e) { return {}; }
+}
+
+function getSessionToken() {
+  const user = getUser();
+  return user.sessionToken || user.SESSION_TOKEN || "";
 }
 
 function getCompanyId() {
@@ -113,7 +123,7 @@ function loadCompanyOptions() {
 
       if (getCompanyId()) select.value = getCompanyId();
     })
-    .getCompaniesForUser(user.companyId, role);
+    .getCompaniesForUser(user.companyId, role, getSessionToken());
 }
 
 function changeCompany() {
@@ -139,7 +149,7 @@ function load() {
     .withFailureHandler(function(err) {
       document.getElementById("summary").innerHTML = "ERROR: " + (err.message || err);
     })
-    .getTechPortalAdminData(companyId, user.role || user.ROLE);
+    .getTechPortalAdminData(companyId, user.role || user.ROLE, getSessionToken());
 }
 
 function render() {

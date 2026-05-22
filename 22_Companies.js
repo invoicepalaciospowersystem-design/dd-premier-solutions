@@ -29,8 +29,8 @@ const COMPANY_ADMIN_COLUMNS = [
   "ACTIVE"
 ];
 
-function getCompaniesAdmin(role) {
-  requireCompaniesOwner_(role);
+function getCompaniesAdmin(sessionToken) {
+  requireCompaniesOwner_(sessionToken);
 
   const sh = getCompaniesSheet_();
   const headers = ensureCompanyAdminColumns_(sh);
@@ -48,8 +48,8 @@ function getCompaniesAdmin(role) {
   });
 }
 
-function saveCompanyAdmin(rowNumber, data, role) {
-  requireCompaniesOwner_(role);
+function saveCompanyAdmin(rowNumber, data, sessionToken) {
+  requireCompaniesOwner_(sessionToken);
 
   data = data || {};
 
@@ -84,8 +84,8 @@ function saveCompanyAdmin(rowNumber, data, role) {
   return true;
 }
 
-function toggleCompanyActiveAdmin(rowNumber, role) {
-  requireCompaniesOwner_(role);
+function toggleCompanyActiveAdmin(rowNumber, sessionToken) {
+  requireCompaniesOwner_(sessionToken);
 
   rowNumber = Number(rowNumber || 0);
   if (!rowNumber || rowNumber < 2) throw new Error("Fila invalida.");
@@ -154,9 +154,6 @@ function assertCompanyIdIsUnique_(sh, headers, companyId, currentRowNumber) {
   }
 }
 
-function requireCompaniesOwner_(role) {
-  role = String(role || "").trim().toUpperCase();
-  if (role !== "OWNER") {
-    throw new Error("Solo OWNER puede administrar empresas.");
-  }
+function requireCompaniesOwner_(sessionToken) {
+  return requireSession_(sessionToken, ["OWNER"]);
 }

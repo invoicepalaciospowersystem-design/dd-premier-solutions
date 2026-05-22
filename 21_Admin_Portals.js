@@ -2,9 +2,11 @@
 // FILE: 21_Admin_Portals.gs
 // =====================================================
 
-function getTechPortalAdminData(companyId, role) {
+function getTechPortalAdminData(companyId, role, sessionToken) {
   companyId = normalizeAdminCompanyId_(companyId);
   role = String(role || "").trim().toUpperCase();
+  const session = requireSession_(sessionToken, ["OWNER", "ADMIN"], companyId);
+  role = session.role;
 
   if (!isAdminPortalRole_(role)) {
     throw new Error("No autorizado.");
@@ -27,9 +29,11 @@ function getTechPortalAdminData(companyId, role) {
   };
 }
 
-function getSupervisorPortalAdminData(companyId, role) {
+function getSupervisorPortalAdminData(companyId, role, sessionToken) {
   companyId = normalizeAdminCompanyId_(companyId);
   role = String(role || "").trim().toUpperCase();
+  const session = requireSession_(sessionToken, ["OWNER", "ADMIN"], companyId);
+  role = session.role;
 
   if (!isAdminPortalRole_(role)) {
     throw new Error("No autorizado.");
@@ -100,10 +104,11 @@ function getSupervisorPortalAdminData(companyId, role) {
   };
 }
 
-function saveSupervisorStoreAssignment(data) {
+function saveSupervisorStoreAssignment(data, sessionToken) {
   data = data || {};
 
   const companyId = normalizeAdminCompanyId_(data.companyId);
+  requireSession_(sessionToken, ["OWNER", "ADMIN"], companyId);
   const rowNumbers = (data.rowNumbers || []).map(Number).filter(function(n) {
     return n && n > 1;
   });

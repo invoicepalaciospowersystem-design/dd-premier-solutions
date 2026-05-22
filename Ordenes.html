@@ -137,7 +137,7 @@ function requireLogin() {
 
   try {
     const parsed = JSON.parse(user);
-    if (!parsed.role && !parsed.ROLE) {
+    if ((!parsed.role && !parsed.ROLE) || (!parsed.sessionToken && !parsed.SESSION_TOKEN)) {
       localStorage.removeItem("pps_user");
       window.top.location.href = "<?= baseUrl ?>";
       return false;
@@ -158,7 +158,7 @@ if (!requireLogin()) {
 let data = [];
 let ACTIVE_COMPANY_ID = "<?= companyId ?>";
 
-const BASE_URL = "https://script.google.com/macros/s/AKfycbwAiZ0Dh5BQoX-QTmMbZcRDEr974-X_nNWcW5x2XeYurC_CeXLNSrl1k-f3p1DDKppOCw/exec";
+const BASE_URL = "<?= baseUrl ?>";
 
 function getCurrentUser() {
   try {
@@ -166,6 +166,11 @@ function getCurrentUser() {
   } catch (e) {
     return {};
   }
+}
+
+function getSessionToken() {
+  const user = getCurrentUser();
+  return user.sessionToken || user.SESSION_TOKEN || "";
 }
 
 function getCurrentCompanyId() {
@@ -278,7 +283,7 @@ function load() {
       document.getElementById("cards").innerHTML =
         "ERROR loading dashboard: " + err.message;
     })
-    .getDashboardData(ACTIVE_COMPANY_ID, user.role || user.ROLE);
+    .getDashboardData(ACTIVE_COMPANY_ID, user.role || user.ROLE, getSessionToken());
 }
 
 function loadCompanySelector() {
@@ -293,7 +298,7 @@ function loadCompanySelector() {
     .withFailureHandler(function(err) {
       document.getElementById("cards").innerHTML = "ERROR companies: " + err.message;
     })
-    .getCompaniesForUser(user.companyId, user.role || user.ROLE);
+    .getCompaniesForUser(user.companyId, user.role || user.ROLE, getSessionToken());
 }
 
 function renderCompanySelector(companies) {
@@ -571,12 +576,12 @@ function assignAndSend(row) {
         .withFailureHandler(function(err) {
           alert(err.message);
         })
-        .sendWorkOrderFromDashboard(row);
+        .sendWorkOrderFromDashboard(row, getSessionToken());
     })
     .withFailureHandler(function(err) {
       alert(err.message);
     })
-    .updateWorkOrderFromDashboard(row, { TECHNICIAN: techText });
+    .updateWorkOrderFromDashboard(row, { TECHNICIAN: techText }, getSessionToken());
 }
 
 function sendWO(row) {
@@ -590,7 +595,7 @@ function sendWO(row) {
     .withFailureHandler(function(err) {
       alert(err.message);
     })
-    .sendWorkOrderFromDashboard(row);
+    .sendWorkOrderFromDashboard(row, getSessionToken());
 }
 
 function setStatus(row, st) {
@@ -601,7 +606,7 @@ function setStatus(row, st) {
     .withFailureHandler(function(err) {
       alert(err.message);
     })
-    .updateWorkOrderFromDashboard(row, { STATUS: st });
+    .updateWorkOrderFromDashboard(row, { STATUS: st }, getSessionToken());
 }
 
 function saveNotes(row) {
@@ -612,7 +617,7 @@ function saveNotes(row) {
     .withFailureHandler(function(err) {
       alert(err.message);
     })
-    .updateWorkOrderFromDashboard(row, { NOTES: notes });
+    .updateWorkOrderFromDashboard(row, { NOTES: notes }, getSessionToken());
 }
 
 function deleteWO(row, woNumber) {
@@ -627,7 +632,7 @@ function deleteWO(row, woNumber) {
     .withFailureHandler(function(err) {
       alert(err.message);
     })
-    .deleteWorkOrder(row);
+    .deleteWorkOrder(row, getSessionToken());
 }
 
 function scrollToLastWO() {

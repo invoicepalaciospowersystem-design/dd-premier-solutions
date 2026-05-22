@@ -180,8 +180,9 @@ function enrichWorkOrderObject_(obj) {
   return obj;
 }
 
-function getStores(companyId, role) {
+function getStores(companyId, role, sessionToken) {
   companyId = String(companyId || "").trim().toUpperCase();
+  requireSession_(sessionToken, ["OWNER", "ADMIN"], companyId);
 
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.SHEET_STORES);
   if (!sh) throw new Error("No existe la hoja STORES.");
@@ -222,7 +223,11 @@ function getStores(companyId, role) {
   });
 }
 
-function saveStore(store) {
+function saveStore(store, sessionToken) {
+  store = store || {};
+  const targetCompany = String(store.COMPANY_ID || "").trim().toUpperCase();
+  requireSession_(sessionToken, ["OWNER", "ADMIN"], targetCompany);
+
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.SHEET_STORES);
   if (!sh) throw new Error("No existe la hoja STORES.");
 

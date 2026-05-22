@@ -94,6 +94,190 @@ function getCompaniesForUser(companyId, role) {
   });
 }
 
+// Secure admin-user functions. These later declarations intentionally replace
+// the legacy browser-role versions above while preserving the rest of this file.
+function getUsers(companyId, role, sessionToken) {
+  const session = requireSession_(sessionToken, ["OWNER", "ADMIN"], companyId);
+  companyId = String(companyId || session.companyId || "").trim().toUpperCase();
+
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.SHEET_USERS);
+  if (!sh) throw new Error("No existe la hoja USERS.");
+
+  ensureUserSecurityColumns_(sh);
+
+  const data = sh.getDataRange().getValues();
+  if (data.length < 2) return [];
+
+  const headers = data[0].map(h => String(h).trim());
+
+  return data.slice(1).map((row, i) => {
+    const obj = {};
+    headers.forEach((h, c) => {
+      if (!isSensitiveUserHeader_(h)) {
+        obj[h] = row[c];
+      }
+    });
+    obj.ROW_NUMBER = i + 2;
+    return obj;
+  }).filter(u => {
+    if (session.role === "OWNER") return true;
+    return String(u.COMPANY_ID || "").toUpperCase() === String(session.companyId || companyId).toUpperCase();
+  });
+}
+
+function saveUser(rowNumber, data, sessionToken) {
+  data = data || {};
+
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.SHEET_USERS);
+  if (!sh) throw new Error("No existe la hoja USERS.");
+
+  const headers = ensureUserSecurityColumns_(sh);
+  const normalizedHeaders = headers.map(function(h) {
+    return String(h).trim().toUpperCase();
+  });
+
+  const isExisting = rowNumber && Number(rowNumber) > 1;
+  const existingRow = isExisting
+    ? sh.getRange(Number(rowNumber), 1, 1, headers.length).getValues()[0]
+    : null;
+
+  const idxCompany = normalizedHeaders.indexOf("COMPANY_ID");
+  const idxRole = normalizedHeaders.indexOf("ROLE");
+  const idxPassword = normalizedHeaders.indexOf("PASSWORD");
+  const idxPasswordHash = normalizedHeaders.indexOf("PASSWORD_HASH");
+
+  const targetCompany = String(
+    data.COMPANY_ID ||
+    (existingRow && idxCompany >= 0 ? existingRow[idxCompany] : "") ||
+    ""
+  ).trim().toUpperCase();
+
+  const targetRole = String(
+    data.ROLE ||
+    (existingRow && idxRole >= 0 ? existingRow[idxRole] : "") ||
+    ""
+  ).trim().toUpperCase();
+
+  const session = requireSession_(sessionToken, ["OWNER", "ADMIN"], targetCompany);
+
+  if (session.role !== "OWNER" && targetRole === "OWNER") {
+    throw new Error("Solo OWNER puede crear o modificar usuarios OWNER.");
+  }
+
+  if (session.role !== "OWNER" && targetCompany !== session.companyId) {
+    throw new Error("No autorizado para esta compania.");
+  }
+
+  const newPassword = String(data.PASSWORD || "").trim();
+
+  if (!isExisting && !newPassword) {
+    throw new Error("Password requerido para usuario nuevo.");
+  }
+
+  const existingHash = existingRow && idxPasswordHash >= 0 ? String(existingRow[idxPasswordHash] || "").trim() : "";
+  const existingPlainPassword = existingRow && idxPassword >= 0 ? String(existingRow[idxPassword] || "").trim() : "";
+  const migratedHash = !newPassword && !existingHash && existingPlainPassword
+    ? hashPassword_(existingPlainPassword)
+    : "";
+  const passwordHash = newPassword ? hashPassword_(newPassword) : (existingHash || migratedHash);
+  const passwordChanged = !!(newPassword || migratedHash);
+
+  const values = headers.map((h, i) => {
+    const upper = String(h).trim().toUpperCase();
+
+    if (upper === "PASSWORD") return "";
+    if (upper === "PASSWORD_HASH") return passwordHash || "";
+
+    if (upper === "PASSWORD_UPDATED_AT") {
+      if (passwordChanged) return new Date();
+      return isExisting && existingRow ? existingRow[i] || "" : "";
+    }
+
+    if (upper === "COMPANY_ID") return targetCompany;
+    if (upper === "ROLE") return targetRole;
+
+    return data[h] !== undefined ? data[h] : (isExisting && existingRow ? existingRow[i] || "" : "");
+  });
+
+  if (isExisting) {
+    sh.getRange(Number(rowNumber), 1, 1, headers.length).setValues([values]);
+  } else {
+    sh.appendRow(values);
+  }
+
+  return true;
+}
+
+function deleteUser(rowNumber, sessionToken) {
+  rowNumber = Number(rowNumber);
+
+  if (!rowNumber || rowNumber < 2) {
+    throw new Error("Fila invalida.");
+  }
+
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.SHEET_USERS);
+  if (!sh) throw new Error("No existe la hoja USERS.");
+
+  const headers = ensureUserSecurityColumns_(sh);
+  const normalizedHeaders = headers.map(function(h) {
+    return String(h).trim().toUpperCase();
+  });
+  const row = sh.getRange(rowNumber, 1, 1, headers.length).getValues()[0];
+  const idxCompany = normalizedHeaders.indexOf("COMPANY_ID");
+  const idxRole = normalizedHeaders.indexOf("ROLE");
+  const targetCompany = idxCompany >= 0 ? String(row[idxCompany] || "").trim().toUpperCase() : "";
+  const targetRole = idxRole >= 0 ? String(row[idxRole] || "").trim().toUpperCase() : "";
+  const session = requireSession_(sessionToken, ["OWNER", "ADMIN"], targetCompany);
+
+  if (session.role !== "OWNER" && targetRole === "OWNER") {
+    throw new Error("Solo OWNER puede eliminar usuarios OWNER.");
+  }
+
+  sh.deleteRow(rowNumber);
+
+  return true;
+}
+
+function getCompaniesForUser(companyId, role, sessionToken) {
+  const session = requireSession_(sessionToken, [], companyId);
+  companyId = String(session.companyId || companyId || "").trim().toUpperCase();
+  role = String(session.role || "").trim().toUpperCase();
+
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.SHEET_COMPANIES);
+  if (!sh) throw new Error("No existe la hoja COMPANIES.");
+
+  const data = sh.getDataRange().getValues();
+  if (data.length < 2) return [];
+
+  const headers = data[0].map(String);
+  const idxActive = headers.indexOf("ACTIVE");
+
+  return data.slice(1).map(function(row) {
+    const obj = {};
+    headers.forEach(function(h, i) {
+      obj[h] = row[i];
+    });
+    return obj;
+  }).filter(function(c) {
+    const active = idxActive >= 0 ? String(c.ACTIVE || "").toUpperCase() : "YES";
+    if (active !== "YES") return false;
+
+    if (role === "OWNER") return true;
+
+    return String(c.COMPANY_ID || "").trim().toUpperCase() === companyId;
+  });
+}
+
+function isSensitiveUserHeader_(headerName) {
+  const header = String(headerName || "").trim().toUpperCase();
+  return [
+    "PASSWORD",
+    "PASSWORD_HASH",
+    "PASSWORD_SALT",
+    "SESSION_TOKEN"
+  ].indexOf(header) !== -1;
+}
+
 function getFormConfig_(e) {
   const source = e.source;
 

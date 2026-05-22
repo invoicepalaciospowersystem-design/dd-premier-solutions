@@ -205,11 +205,17 @@ function getCurrentUser() {
   }
 }
 
+function getSessionToken() {
+  const user = getCurrentUser();
+  return user.sessionToken || user.SESSION_TOKEN || "";
+}
+
 function requireOwner() {
   const user = getCurrentUser();
   const role = String(user.role || user.ROLE || "").toUpperCase();
+  const token = user.sessionToken || user.SESSION_TOKEN || "";
 
-  if (!role) {
+  if (!role || !token) {
     window.top.location.href = BASE_URL;
     return false;
   }
@@ -234,7 +240,7 @@ function load() {
     .withFailureHandler(function(err) {
       document.getElementById("companies").innerHTML = "ERROR: " + err.message;
     })
-    .getCompaniesAdmin(user.role || user.ROLE);
+    .getCompaniesAdmin(getSessionToken());
 }
 
 function render() {
@@ -322,7 +328,7 @@ function save() {
     .withFailureHandler(function(err) {
       alert(err.message);
     })
-    .saveCompanyAdmin(EDIT_ROW, data, user.role || user.ROLE);
+    .saveCompanyAdmin(EDIT_ROW, data, getSessionToken());
 }
 
 function toggleActive(rowNumber) {
@@ -334,7 +340,7 @@ function toggleActive(rowNumber) {
     .withFailureHandler(function(err) {
       alert(err.message);
     })
-    .toggleCompanyActiveAdmin(rowNumber, user.role || user.ROLE);
+    .toggleCompanyActiveAdmin(rowNumber, getSessionToken());
 }
 
 function clearForm() {

@@ -83,7 +83,7 @@
 
   try {
     const parsed = JSON.parse(user);
-    if (!parsed.role && !parsed.ROLE) {
+    if ((!parsed.role && !parsed.ROLE) || (!parsed.sessionToken && !parsed.SESSION_TOKEN)) {
       localStorage.removeItem("pps_user");
       window.top.location.href = "<?= baseUrl ?>";
       return false;
@@ -104,7 +104,7 @@ let STORES = [];
 let EDIT_ROW = "";
 let ACTIVE_COMPANY_ID = "";
 
-const BASE_URL = "https://script.google.com/macros/s/AKfycbwAiZ0Dh5BQoX-QTmMbZcRDEr974-X_nNWcW5x2XeYurC_CeXLNSrl1k-f3p1DDKppOCw/exec";
+const BASE_URL = "<?= baseUrl ?>";
 
 function getCurrentUser() {
   try {
@@ -112,6 +112,11 @@ function getCurrentUser() {
   } catch(e) {
     return {};
   }
+}
+
+function getSessionToken() {
+  const user = getCurrentUser();
+  return user.sessionToken || user.SESSION_TOKEN || "";
 }
 
 function updateHeaderCompany(companyId) {
@@ -154,7 +159,7 @@ function load() {
     .withFailureHandler(function(err) {
       document.getElementById("stores").innerHTML = "ERROR: " + err.message;
     })
-    .getCompaniesForUser(user.companyId, user.role);
+    .getCompaniesForUser(user.companyId, user.role, getSessionToken());
 }
 
 function render() {
@@ -240,7 +245,7 @@ function save() {
     .withFailureHandler(function(err) {
       alert(err.message);
     })
-    .saveStore(store);
+    .saveStore(store, getSessionToken());
 }
 
 function clearForm() {
@@ -311,7 +316,7 @@ function loadStoresForCompany() {
     .withFailureHandler(function(err) {
       document.getElementById("stores").innerHTML = "ERROR: " + err.message;
     })
-    .getStores(ACTIVE_COMPANY_ID, user.role);
+    .getStores(ACTIVE_COMPANY_ID, user.role, getSessionToken());
 }
 
 load();
