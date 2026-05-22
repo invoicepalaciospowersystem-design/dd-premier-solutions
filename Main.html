@@ -741,49 +741,6 @@
       line-height:1.35;
     }
 
-    .module-metrics {
-      display:grid;
-      grid-template-columns:repeat(auto-fit, minmax(115px, 1fr));
-      gap:8px;
-      margin-top:10px;
-    }
-
-    .module-metric {
-      background:#ffffff;
-      border:1px solid #e5e7eb;
-      border-left:4px solid #2563eb;
-      border-radius:8px;
-      padding:9px;
-      min-height:66px;
-      box-sizing:border-box;
-    }
-
-    .module-metric.warning { border-left-color:#f59e0b; }
-    .module-metric.success { border-left-color:#16a34a; }
-    .module-metric.danger { border-left-color:#dc2626; }
-
-    .module-metric-label {
-      font-size:11px;
-      color:#6b7280;
-      margin-bottom:4px;
-      line-height:1.2;
-    }
-
-    .module-metric-value {
-      color:#111827;
-      font-size:17px;
-      font-weight:bold;
-      line-height:1.1;
-      overflow-wrap:anywhere;
-    }
-
-    .module-metric-note {
-      grid-column:1 / -1;
-      color:#6b7280;
-      font-size:12px;
-      margin-top:2px;
-    }
-
     .module-footer {
       display:flex;
       justify-content:space-between;
@@ -939,7 +896,8 @@
 
     .owner-dashboard,
     .admin-dashboard,
-    .supervisor-dashboard {
+    .supervisor-dashboard,
+    .economy-dashboard {
       display:none;
       margin-bottom:18px;
     }
@@ -1694,6 +1652,21 @@
     <div id="supervisorMetricResults" class="supervisor-results"></div>
   </div>
 
+  <div id="economyDashboard" class="economy-dashboard">
+    <div class="dash-head">
+      <div>
+        <h2>Dashboard Economia</h2>
+        <div class="muted" id="economyDashboardScope">Loading...</div>
+      </div>
+      <div class="dash-actions">
+        <button class="dash-refresh" onclick="loadEconomyModuleDashboard()">Actualizar</button>
+        <button class="dash-refresh" onclick="openModule('?view=economy')">Abrir Economia</button>
+      </div>
+    </div>
+
+    <div id="economyMainMetrics" class="metric-grid"></div>
+  </div>
+
   <h2 id="moduleHeading" class="module-heading">Modulos</h2>
   <div id="modules" class="grid"></div>
 </div>
@@ -2075,7 +2048,6 @@ function renderModules() {
               <div class="module-desc">${m.desc}</div>
             </div>
           </div>
-          ${m.url === "?view=economy" ? renderEconomyModuleMetricsShell() : ""}
           <div class="module-footer">
             <span class="module-role">${getModuleRoleLabel(m.roles)}</span>
             <span class="module-open">Abrir</span>
@@ -2087,44 +2059,38 @@ function renderModules() {
   loadEconomyModuleDashboard();
 }
 
-function renderEconomyModuleMetricsShell() {
-  return `
-    <div id="economyModuleMetrics" class="module-metrics">
-      <div class="module-metric">
-        <div class="module-metric-label">Economia</div>
-        <div class="module-metric-value">...</div>
-      </div>
-      <div class="module-metric">
-        <div class="module-metric-label">Cargando</div>
-        <div class="module-metric-value">...</div>
-      </div>
-      <div class="module-metric-note">Cargando metricas del periodo actual...</div>
-    </div>
-  `;
-}
-
 function loadEconomyModuleDashboard() {
-  const box = document.getElementById("economyModuleMetrics");
-  if (!box || !CURRENT_USER) return;
+  const dashboard = document.getElementById("economyDashboard");
+  const box = document.getElementById("economyMainMetrics");
+  const scope = document.getElementById("economyDashboardScope");
+  if (!dashboard || !box || !CURRENT_USER) return;
 
   const role = String(CURRENT_USER.role || "").trim().toUpperCase();
-  if (["OWNER", "ADMIN", "ECONOMIA"].indexOf(role) === -1) return;
+  if (role !== "ECONOMIA") {
+    dashboard.style.display = "none";
+    return;
+  }
+
+  dashboard.style.display = "block";
 
   const companyId = getActiveCompanyId();
   if (!companyId) {
-    box.innerHTML = "<div class='module-metric-note'>Selecciona una compania para ver economia.</div>";
+    if (scope) scope.innerText = "Selecciona una compania para ver economia.";
+    box.innerHTML = "";
     return;
   }
 
   box.innerHTML = renderEconomyModuleLoadingMetrics();
+  if (scope) scope.innerText = "Cargando metricas de economia...";
 
   google.script.run
     .withSuccessHandler(function(data) {
       renderEconomyModuleDashboard(data || {});
     })
     .withFailureHandler(function(err) {
+      if (scope) scope.innerText = "Error cargando economia.";
       box.innerHTML =
-        "<div class='module-metric-note'>Error cargando economia: " +
+        "<div class='muted'>Error cargando economia: " +
         escapeHtmlMain(err && err.message ? err.message : err) +
         "</div>";
     })
@@ -2132,17 +2098,12 @@ function loadEconomyModuleDashboard() {
 }
 
 function renderEconomyModuleLoadingMetrics() {
-  return [
-    { label:"Total", value:"..." },
-    { label:"Profit", value:"..." },
-    { label:"David", value:"..." },
-    { label:"Yoel", value:"..." }
-  ].map(renderEconomyModuleMetric).join("") +
-    "<div class='module-metric-note'>Cargando metricas del periodo actual...</div>";
+  return renderMetricSkeletons();
 }
 
 function renderEconomyModuleDashboard(data) {
-  const box = document.getElementById("economyModuleMetrics");
+  const box = document.getElementById("economyMainMetrics");
+  const scope = document.getElementById("economyDashboardScope");
   if (!box) return;
 
   const totals = data.totals || {};
@@ -2157,18 +2118,22 @@ function renderEconomyModuleDashboard(data) {
   ];
 
   box.innerHTML =
-    cards.map(renderEconomyModuleMetric).join("") +
-    "<div class='module-metric-note'>" +
-    escapeHtmlMain(data.periodLabel || "Periodo actual") +
-    " | " + Number(totals.economyRows || 0) + " registros" +
-    "</div>";
+    cards.map(renderEconomyModuleMetric).join("");
+
+  if (scope) {
+    scope.innerText =
+      (data.companyName || data.companyId || getActiveCompanyId() || "Compania") +
+      " | " + (data.periodLabel || "Periodo actual") +
+      " | " + Number(totals.economyRows || 0) + " registros";
+  }
 }
 
 function renderEconomyModuleMetric(card) {
   return `
-    <div class="module-metric ${escapeHtmlMain(card.tone || "")}">
-      <div class="module-metric-label">${escapeHtmlMain(card.label || "")}</div>
-      <div class="module-metric-value">${escapeHtmlMain(card.value || "0")}</div>
+    <div class="metric ${escapeHtmlMain(card.tone || "")}">
+      <div class="metric-label">${escapeHtmlMain(card.label || "")}</div>
+      <div class="metric-value">${escapeHtmlMain(card.value || "0")}</div>
+      <div class="metric-note">Periodo actual</div>
     </div>
   `;
 }
