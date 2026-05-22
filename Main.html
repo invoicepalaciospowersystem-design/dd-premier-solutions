@@ -1620,6 +1620,7 @@
     </div>
 
     <div id="adminMetrics" class="metric-grid"></div>
+    <div id="adminMetricResults" class="supervisor-results"></div>
 
     <div class="dash-layout">
       <div class="dash-section">
@@ -1705,6 +1706,8 @@ let CURRENT_BRANDING = {
 };
 let OWNER_COMPANIES = [];
 let SELECTED_OWNER_COMPANY_ID = "";
+let ADMIN_DASHBOARD_DATA = null;
+let ADMIN_DASHBOARD_FILTER = "openOrders";
 let SUPERVISOR_DASHBOARD_ORDERS = [];
 let SUPERVISOR_DASHBOARD_FILTER = "open";
 let ADMIN_PERIOD_INITIALIZED = false;
@@ -2097,11 +2100,13 @@ function loadOwnerCompanySelector() {
       OWNER_COMPANIES = Array.isArray(companies) ? companies : [];
       renderOwnerCompanySelector(false);
       loadOwnerDashboard();
+      loadAdminDashboard();
     })
     .withFailureHandler(function() {
       OWNER_COMPANIES = [];
       renderOwnerCompanySelector(false);
       loadOwnerDashboard();
+      loadAdminDashboard();
     })
     .getCompaniesForUser("", "", getSessionToken());
 }
@@ -2180,6 +2185,7 @@ function onOwnerCompanyChange() {
     CURRENT_USER.name + " | " + CURRENT_USER.role + " | Company: " + (getActiveCompanyId() || "ALL");
 
   loadOwnerDashboard();
+  loadAdminDashboard();
 }
 
 function updateOwnerScopeText() {
@@ -2238,7 +2244,7 @@ function loadAdminDashboard() {
 
   if (!box) return;
 
-  if (role !== "ADMIN") {
+  if (role !== "ADMIN" && role !== "OWNER") {
     box.style.display = "none";
     return;
   }
@@ -2246,8 +2252,25 @@ function loadAdminDashboard() {
   initAdminPeriodControls();
 
   box.style.display = "block";
+
+  const companyId = getActiveCompanyId();
+
+  if (role === "OWNER" && !companyId) {
+    ADMIN_DASHBOARD_DATA = null;
+    document.getElementById("adminDashboardScope").innerText =
+      "Selecciona una compania para activar las metricas admin.";
+    document.getElementById("adminMetrics").innerHTML = "";
+    document.getElementById("adminMetricResults").style.display = "none";
+    document.getElementById("adminEconomyBreakdown").innerHTML =
+      "<div class='muted'>Las metricas admin se calculan por compania.</div>";
+    document.getElementById("adminInvestorBreakdown").innerHTML =
+      "<div class='muted'>Selecciona PPS u otra compania arriba.</div>";
+    return;
+  }
+
   document.getElementById("adminDashboardScope").innerText = "Cargando metricas de compania...";
   document.getElementById("adminMetrics").innerHTML = renderMetricSkeletons();
+  document.getElementById("adminMetricResults").style.display = "none";
   document.getElementById("adminEconomyBreakdown").innerHTML = "<div class='muted'>Cargando economia...</div>";
   document.getElementById("adminInvestorBreakdown").innerHTML = "<div class='muted'>Cargando inversionistas...</div>";
 
@@ -2255,18 +2278,21 @@ function loadAdminDashboard() {
 
   google.script.run
     .withSuccessHandler(function(data) {
+      ADMIN_DASHBOARD_DATA = data || {};
       renderAdminDashboard(data || {});
     })
     .withFailureHandler(function(err) {
+      ADMIN_DASHBOARD_DATA = null;
       document.getElementById("adminDashboardScope").innerText =
         "Error en dashboard admin: " + (err && err.message ? err.message : err);
       document.getElementById("adminMetrics").innerHTML = "";
+      document.getElementById("adminMetricResults").style.display = "none";
       document.getElementById("adminEconomyBreakdown").innerHTML = "";
       document.getElementById("adminInvestorBreakdown").innerHTML = "";
     })
     .getAdminCompanyDashboard(
       getSessionToken(),
-      getActiveCompanyId(),
+      companyId,
       period.mode,
       period.year,
       period.month
@@ -2330,48 +2356,56 @@ function renderAdminDashboard(data) {
 
   const cards = [
     {
+      key: "openOrders",
       label: "Ordenes Abiertas",
       value: totals.openOrders || 0,
       note: (totals.totalOrders || 0) + " ordenes totales",
       tone: totals.emergencyOrders ? "danger" : "info"
     },
     {
+      key: "completedPendingBilling",
       label: "Completadas por Facturar",
       value: totals.completedPendingBilling || 0,
       note: "Listas para economia",
       tone: totals.completedPendingBilling ? "warning" : "success"
     },
     {
+      key: "emergencyOrders",
       label: "Emergency / Urgent",
       value: totals.emergencyOrders || 0,
       note: "Requieren seguimiento",
       tone: totals.emergencyOrders ? "danger" : "success"
     },
     {
+      key: "economyRows",
       label: "Invoices Seleccion",
       value: totals.economyRows || 0,
       note: (totals.economyPaid || 0) + " paid / " + (totals.economyInvoiced || 0) + " invoiced",
       tone: "info"
     },
     {
+      key: "partsBilled",
       label: "Cobro Parts",
       value: formatMoneyDashboard(totals.partsBilled || 0),
       note: "Parts cobradas en invoices",
       tone: "info"
     },
     {
+      key: "laborBilled",
       label: "Cobro Horas",
       value: formatMoneyDashboard(totals.laborBilled || 0),
       note: Number(totals.laborHours || 0).toFixed(2) + " horas",
       tone: "info"
     },
     {
+      key: "partsCost",
       label: "Gasto Real Parts",
       value: formatMoneyDashboard(totals.partsCost || 0),
       note: "Costo registrado en economia",
       tone: totals.partsCost ? "warning" : "success"
     },
     {
+      key: "grossProfit",
       label: "Profit Estimado",
       value: formatMoneyDashboard(totals.grossProfit || 0),
       note: "Facturado - tax - parts - labor tech",
@@ -2380,7 +2414,8 @@ function renderAdminDashboard(data) {
   ];
 
   document.getElementById("adminMetrics").innerHTML =
-    cards.map(renderMetricCard).join("");
+    cards.map(renderAdminMetricButton).join("");
+  renderAdminMetricResults(ADMIN_DASHBOARD_FILTER);
 
   document.getElementById("adminEconomyBreakdown").innerHTML =
     renderAdminBreakdownRows([
@@ -2400,6 +2435,134 @@ function renderAdminDashboard(data) {
       { label: "Sin INV_SOURCE", value: formatMoneyDashboard(investors.unassignedPartsCost || 0), tone: investors.unassignedPartsCost ? "warning" : "success" }
     ]) +
     "<div class='company-meta' style='margin-top:10px;'>Regla: DAVID = 75/25, YOEL = 25/75, MISCELANEAS = 50/50. El gasto real total de parts queda arriba separado.</div>";
+}
+
+function renderAdminMetricButton(card) {
+  const active = card.key === ADMIN_DASHBOARD_FILTER ? " active" : "";
+  return `
+    <button type="button" class="metric metric-button ${escapeHtmlMain(card.tone || "")}${active}"
+      onclick="filterAdminDashboard('${escapeHtmlMain(card.key || "openOrders")}')">
+      <div class="metric-label">${escapeHtmlMain(card.label)}</div>
+      <div class="metric-value">${escapeHtmlMain(card.value)}</div>
+      <div class="metric-note">${escapeHtmlMain(card.note)} | Ver detalle</div>
+    </button>
+  `;
+}
+
+function filterAdminDashboard(filterKey) {
+  ADMIN_DASHBOARD_FILTER = String(filterKey || "openOrders");
+  renderAdminDashboard(ADMIN_DASHBOARD_DATA || {});
+}
+
+function renderAdminMetricResults(filterKey) {
+  const box = document.getElementById("adminMetricResults");
+  if (!box) return;
+
+  const data = ADMIN_DASHBOARD_DATA || {};
+  const label = getAdminMetricLabel(filterKey);
+  const items = getAdminMetricItems(filterKey, data);
+
+  box.style.display = "block";
+
+  if (!items.length) {
+    box.innerHTML = `
+      <div class="supervisor-results-head">
+        <div>
+          <h3>${escapeHtmlMain(label)}</h3>
+          <div class="muted">No hay datos para esta metrica en el periodo seleccionado.</div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  const isEconomy = isAdminEconomyMetric(filterKey);
+  box.innerHTML = `
+    <div class="supervisor-results-head">
+      <div>
+        <h3>${escapeHtmlMain(label)}</h3>
+        <div class="muted">${items.length} registros encontrados</div>
+      </div>
+      <button class="dash-refresh" onclick="openModule('${isEconomy ? "?view=economy" : "?view=orders"}')">
+        Abrir ${isEconomy ? "Economia" : "Ordenes"}
+      </button>
+    </div>
+    <div class="supervisor-card-grid">
+      ${items.slice(0, 12).map(function(item) {
+        return isEconomy ? renderAdminEconomyPreviewCard(item) : renderAdminOrderPreviewCard(item);
+      }).join("")}
+    </div>
+    ${items.length > 12 ? "<div class='muted' style='margin-top:10px;'>Mostrando 12 de " + items.length + ". Abre el modulo completo para ver todo.</div>" : ""}
+  `;
+}
+
+function getAdminMetricLabel(filterKey) {
+  const labels = {
+    openOrders: "Ordenes Abiertas",
+    completedPendingBilling: "Completadas por Facturar",
+    emergencyOrders: "Emergency / Urgent",
+    economyRows: "Invoices Seleccion",
+    partsBilled: "Cobro Parts",
+    laborBilled: "Cobro Horas",
+    partsCost: "Gasto Real Parts",
+    grossProfit: "Profit Estimado"
+  };
+  return labels[filterKey] || labels.openOrders;
+}
+
+function isAdminEconomyMetric(filterKey) {
+  return ["economyRows", "partsBilled", "laborBilled", "partsCost", "grossProfit"].indexOf(filterKey) !== -1;
+}
+
+function getAdminMetricItems(filterKey, data) {
+  const orders = Array.isArray(data.orderDetails) ? data.orderDetails : [];
+  const economy = Array.isArray(data.economyDetails) ? data.economyDetails : [];
+
+  if (filterKey === "openOrders") return orders.filter(function(item) { return item.isOpen; });
+  if (filterKey === "completedPendingBilling") return orders.filter(function(item) { return item.isCompletedPendingBilling; });
+  if (filterKey === "emergencyOrders") return orders.filter(function(item) { return item.isEmergency; });
+  if (filterKey === "partsBilled") return economy.filter(function(item) { return Number(item.partsBilled || 0) > 0; });
+  if (filterKey === "laborBilled") return economy.filter(function(item) { return Number(item.laborBilled || 0) > 0; });
+  if (filterKey === "partsCost") return economy.filter(function(item) { return Number(item.partsCost || 0) > 0; });
+  if (filterKey === "grossProfit") return economy;
+  return economy;
+}
+
+function renderAdminOrderPreviewCard(item) {
+  return `
+    <div class="supervisor-order-card ${escapeHtmlMain(item.tone || "info")}">
+      <div class="supervisor-order-top">
+        <div>
+          <div class="supervisor-order-title">${escapeHtmlMain(item.woNumber || "No WO")}</div>
+          <div class="supervisor-order-meta">NSN ${escapeHtmlMain(item.nsn || "")} | ${escapeHtmlMain(item.ageDays || 0)}d</div>
+        </div>
+        <div class="supervisor-order-pill">${escapeHtmlMain(item.status || "NO STATUS")}</div>
+      </div>
+      <div class="supervisor-order-meta"><b>Technician:</b> ${escapeHtmlMain(item.technician || "Not assigned")}</div>
+      <div class="supervisor-order-meta"><b>Priority:</b> ${escapeHtmlMain(item.priority || "")}</div>
+      <div class="supervisor-order-meta"><b>Store:</b> ${escapeHtmlMain(item.storeName || "")}</div>
+      <div class="supervisor-order-meta"><b>Created:</b> ${escapeHtmlMain(item.createdAt || "")}</div>
+    </div>
+  `;
+}
+
+function renderAdminEconomyPreviewCard(item) {
+  return `
+    <div class="supervisor-order-card ${Number(item.grossProfit || 0) >= 0 ? "success" : "danger"}">
+      <div class="supervisor-order-top">
+        <div>
+          <div class="supervisor-order-title">${escapeHtmlMain(item.invoiceNumber || item.woNumber || "Economia")}</div>
+          <div class="supervisor-order-meta">WO ${escapeHtmlMain(item.woNumber || "")} | ${escapeHtmlMain(item.status || "")}</div>
+        </div>
+        <div class="supervisor-order-pill">${escapeHtmlMain(formatMoneyDashboard(item.amount || 0))}</div>
+      </div>
+      <div class="supervisor-order-meta"><b>Parts billed:</b> ${escapeHtmlMain(formatMoneyDashboard(item.partsBilled || 0))}</div>
+      <div class="supervisor-order-meta"><b>Labor billed:</b> ${escapeHtmlMain(formatMoneyDashboard(item.laborBilled || 0))}</div>
+      <div class="supervisor-order-meta"><b>Real parts cost:</b> ${escapeHtmlMain(formatMoneyDashboard(item.partsCost || 0))}</div>
+      <div class="supervisor-order-meta"><b>INV_SOURCE:</b> ${escapeHtmlMain(item.invSource || "")}</div>
+      <div class="supervisor-order-meta"><b>Profit:</b> ${escapeHtmlMain(formatMoneyDashboard(item.grossProfit || 0))}</div>
+    </div>
+  `;
 }
 
 function renderAdminBreakdownRows(rows) {

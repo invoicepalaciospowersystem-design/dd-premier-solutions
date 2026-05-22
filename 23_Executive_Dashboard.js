@@ -132,7 +132,9 @@ function getAdminCompanyDashboard(sessionToken, companyId, periodMode, periodYea
       davidPartsCost: 0,
       yoelPartsCost: 0,
       unassignedPartsCost: 0
-    }
+    },
+    orderDetails: [],
+    economyDetails: []
   };
 
   const perCompany = {};
@@ -256,6 +258,26 @@ function collectAdminEconomyFinancials_(ss, dashboard, companyId, periodScope) {
     dashboard.investors.davidPartsCost += split.david;
     dashboard.investors.yoelPartsCost += split.yoel;
     dashboard.investors.unassignedPartsCost += split.unassigned;
+
+    if (Array.isArray(dashboard.economyDetails)) {
+      dashboard.economyDetails.push({
+        woNumber: String(getExecutiveValue_(row, headers, ["WO_NUMBER"]) || "").trim(),
+        invoiceNumber: String(getExecutiveValue_(row, headers, ["INVOICE_NUMBER", "INVOICE #"]) || "").trim(),
+        status: status || "PENDING",
+        amount: amount,
+        tax: tax,
+        laborHours: hours,
+        laborBilled: laborBilled,
+        partsBilled: partsBilled,
+        partsCost: partsCost,
+        techLaborCost: techLaborCost,
+        grossProfit: amount - tax - partsCost - techLaborCost,
+        invSource: invSource,
+        davidPartsCost: split.david,
+        yoelPartsCost: split.yoel,
+        unassignedPartsCost: split.unassigned
+      });
+    }
   });
 
   dashboard.totals.grossProfit =
@@ -423,6 +445,28 @@ function collectExecutiveWorkOrders_(ss, dashboard, perCompany, companyMap, requ
     if (isEmergency && !isClosed) {
       dashboard.totals.emergencyOrders++;
       company.emergencyOrders++;
+    }
+
+    if (Array.isArray(dashboard.orderDetails)) {
+      const ageDays = createdAt
+        ? Math.max(0, Math.floor((now.getTime() - createdAt.getTime()) / 86400000))
+        : 0;
+
+      dashboard.orderDetails.push({
+        woNumber: woNumber,
+        nsn: String(getExecutiveValue_(row, headers, ["NSN", "NSN #"]) || "").trim(),
+        status: status || "NO STATUS",
+        technician: String(getExecutiveValue_(row, headers, ["TECHNICIAN", "TECH"]) || "").trim(),
+        priority: String(getExecutiveValue_(row, headers, ["ORDER_PRIORITY", "PRIORITY"]) || "").trim(),
+        storeName: String(getExecutiveValue_(row, headers, ["STORE_NAME", "STORE"]) || "").trim(),
+        createdAt: createdAt ? Utilities.formatDate(createdAt, CFG.TIMEZONE, "MM/dd/yyyy") : "",
+        ageDays: ageDays,
+        isOpen: isOpen,
+        isClosed: isClosed,
+        isCompletedPendingBilling: isCompleted,
+        isEmergency: isEmergency && !isClosed,
+        tone: isEmergency && !isClosed ? "danger" : (isClosed ? "success" : "info")
+      });
     }
 
     if (createdAt) {
