@@ -400,6 +400,7 @@ function buildPMDocAndPdf_(cfg) {
     .setName(cfg.fileBase + ".pdf");
 
   const pdfFile = cfg.folder.createFile(pdfBlob);
+  hardenGeneratedPdfFile_(pdfFile);
   const docUrl = docCopy.getUrl();
 
   docCopy.setTrashed(true);

@@ -311,6 +311,36 @@ function testSystemErrorAlert() {
   return "Alert test sent to " + (CFG.SYSTEM_ALERT_EMAIL || "");
 }
 
+function hardenGeneratedPdfFile_(file) {
+  if (!file) return file;
+
+  try {
+    file.setShareableByEditors(false);
+  } catch (err) {
+    Logger.log("WARN hardenGeneratedPdfFile_ setShareableByEditors: " + err);
+  }
+
+  try {
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch (err) {
+    Logger.log("WARN hardenGeneratedPdfFile_ setSharing: " + err);
+  }
+
+  try {
+    file.getEditors().forEach(function(editor) {
+      try {
+        file.removeEditor(editor);
+      } catch (removeErr) {
+        Logger.log("WARN hardenGeneratedPdfFile_ removeEditor: " + removeErr);
+      }
+    });
+  } catch (err) {
+    Logger.log("WARN hardenGeneratedPdfFile_ getEditors: " + err);
+  }
+
+  return file;
+}
+
 function createOrderFolders_(companyId, nsn, woNumber) {
   const root = DriveApp.getFolderById(CFG.ROOT_FOLDER_ID);
   const companyFolder = getOrCreateFolder_(root, companyId || CFG.DEFAULT_COMPANY_ID);

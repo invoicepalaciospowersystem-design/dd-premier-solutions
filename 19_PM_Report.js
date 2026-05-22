@@ -409,6 +409,7 @@ function exportPMPdf_(docId, folder, baseName) {
   const pdfBlob = exportPMPdfBlob_(docId, tabId, baseName + ".pdf");
 
   const pdfFile = folder.createFile(pdfBlob);
+  hardenGeneratedPdfFile_(pdfFile);
 
   return {
     id: pdfFile.getId(),
@@ -560,13 +561,11 @@ function insertPMFilesAtMarker_(body, marker, urls, title) {
       if (mime.indexOf("image/") === 0) {
         const img = cell.appendParagraph(" ").appendInlineImage(file.getBlob());
         normalizePMImageSize_(img);
-        img.setLinkUrl(file.getUrl());
       } else {
-        const link = cell.appendParagraph("🎬 Archivo / Video");
-        link.setLinkUrl(file.getUrl());
+        cell.appendParagraph("Archivo / Video registrado");
       }
     } catch (e) {
-      cell.appendParagraph("Archivo: " + url);
+      cell.appendParagraph("Archivo registrado");
     }
 
     col++;

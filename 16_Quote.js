@@ -335,6 +335,7 @@ function generateQuotePdfFromTemplate_(data, lang, targetFolder) {
 
   const blob = docCopy.getAs(MimeType.PDF).setName(fileName);
   const pdfFile = targetFolder.createFile(blob);
+  hardenGeneratedPdfFile_(pdfFile);
 
   docCopy.setTrashed(true);
 

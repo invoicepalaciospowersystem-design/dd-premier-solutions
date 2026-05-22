@@ -81,10 +81,39 @@ function getCustomerOrdersBySupervisor(supervisorName, sessionToken, companyId) 
     obj.PM_REPORT_EN_URL = obj.PM_REPORT_EN_URL || "";
     obj.HAS_PM_REPORT_PDF = (obj.PM_REPORT_ES_URL || obj.PM_REPORT_EN_URL) ? "YES" : "NO";
 
+    sanitizeSupervisorOrderPayload_(obj);
     result.push(obj);
   }
 
   return result.reverse();
+}
+
+function sanitizeSupervisorOrderPayload_(obj) {
+  obj = obj || {};
+
+  [
+    "PM_REPORT_FOLDER_URL",
+    "PM_REPORT_FOLDER_ID",
+    "FOLDER_URL",
+    "FOLDER_ID",
+    "DRIVE_FOLDER_URL",
+    "DRIVE_FOLDER_ID",
+    "FILES_FOLDER_URL",
+    "FILES_FOLDER_ID",
+    "PDF_FOLDER_URL",
+    "PDF_FOLDER_ID",
+    "PASSWORD",
+    "PASSWORD_HASH",
+    "PASSWORD_SALT",
+    "RESET_TOKEN",
+    "SESSION_TOKEN"
+  ].forEach(function(key) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      delete obj[key];
+    }
+  });
+
+  return obj;
 }
 
 function localizeSupervisorOrderForEnglish_(obj) {

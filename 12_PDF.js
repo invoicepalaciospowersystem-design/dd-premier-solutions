@@ -60,6 +60,7 @@ function generateOnePdfFromTemplate_(invoiceRow, targetFolder, langTag, doTransl
     try {
       const blob = docCopy.getAs(MimeType.PDF).setName(pdfName);
       pdfFile = targetFolder.createFile(blob);
+      hardenGeneratedPdfFile_(pdfFile);
       break;
     } catch (err) {
       lastErr = err;
