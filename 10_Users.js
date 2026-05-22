@@ -212,7 +212,7 @@ function getCompanyBranding(companyId) {
   branding.primaryColor = branding.primaryColor || "#111827";
   branding.accentColor = branding.accentColor || "#dc2626";
   branding.backgroundImageUrl = branding.backgroundImageUrl || driveImageUrl_(branding.backgroundFileId, 1800);
-  branding.logoImageUrl = branding.logoImageUrl || driveImageUrl_(branding.logoFileId, 600);
+  branding.logoImageUrl = branding.logoImageUrl || driveImageDataUrl_(branding.logoFileId) || driveImageUrl_(branding.logoFileId, 600);
 
   return branding;
 }
@@ -271,4 +271,24 @@ function driveImageUrl_(fileId, size) {
     encodeURIComponent(fileId) +
     "&sz=w" +
     encodeURIComponent(String(size || 1200));
+}
+
+function driveImageDataUrl_(fileId) {
+  fileId = String(fileId || "").trim();
+  if (!fileId) return "";
+
+  try {
+    const blob = DriveApp.getFileById(fileId).getBlob();
+    const contentType = String(blob.getContentType() || "");
+
+    if (contentType.indexOf("image/") !== 0) return "";
+
+    return "data:" +
+      contentType +
+      ";base64," +
+      Utilities.base64Encode(blob.getBytes());
+  } catch (err) {
+    Logger.log("driveImageDataUrl_ error: " + err);
+    return "";
+  }
 }
