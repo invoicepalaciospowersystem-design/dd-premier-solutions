@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family:Arial; background:#f3f4f6; margin:0; padding:20px; color:#111827; }
+    .header, .box { background:white; padding:18px; border-radius:14px; margin-bottom:15px; box-shadow:0 3px 10px rgba(0,0,0,.08); }
+    .header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; }
+    .topbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    input, button { padding:10px; border-radius:8px; border:1px solid #ccc; margin:4px; box-sizing:border-box; }
+    button { background:#111827; color:white; border:none; cursor:pointer; font-weight:bold; }
+    .blue { background:#2563eb; }
+    .green { background:#16a34a; }
+    .gray { background:#6b7280; }
+    .red { background:#dc2626; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(360px,1fr)); gap:15px; }
+    .card { background:white; padding:15px; border-radius:14px; box-shadow:0 3px 10px rgba(0,0,0,.08); border-left:6px solid #2563eb; }
+    .inactive { border-left-color:#dc2626; opacity:.75; }
+    .line { font-size:14px; margin:6px 0; }
+    .store-list { margin-top:10px; background:#f9fafb; border-radius:10px; padding:8px; max-height:260px; overflow:auto; }
+    .store-line { display:flex; gap:8px; align-items:flex-start; font-size:13px; padding:6px 0; border-bottom:1px solid #e5e7eb; }
+    .store-line:last-child { border-bottom:none; }
+    .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:10px 0; }
+    .stat { background:#f3f4f6; border-radius:10px; padding:8px; font-size:13px; }
+    .stat b { display:block; font-size:18px; }
+  </style>
+</head>
+
+<body>
+
+<div class="header">
+  <div>
+    <div id="companyTitle" style="font-size:22px; font-weight:bold;">Company: Loading...</div>
+    <div style="font-size:13px;color:#6b7280;">Administracion del portal supervisor</div>
+  </div>
+  <div style="text-align:right;">
+    <div style="font-size:16px;font-weight:bold;">D&D Premier Solutions Corp</div>
+    <div style="font-size:13px;color:#6b7280;">Sistema de Ordenes</div>
+  </div>
+</div>
+
+<div class="box">
+  <h2>Portal Supervisor - Vista Admin</h2>
+  <div class="topbar">
+    <input id="search" placeholder="Buscar supervisor, email, tienda..." oninput="render()" style="min-width:260px;flex:1;">
+    <select id="companySelect" onchange="changeCompany()" style="display:none;min-width:220px;"></select>
+    <button onclick="load()">Actualizar</button>
+    <button class="blue" onclick="openStores()">Tiendas</button>
+    <button class="green" onclick="openUsers()">Usuarios</button>
+    <button class="gray" onclick="goHome()">Volver</button>
+  </div>
+</div>
+
+<div class="box">
+  <h3>Asignacion masiva</h3>
+  <div class="topbar">
+    <input id="assignName" placeholder="SUPERVISOR_NAME" style="min-width:220px;flex:1;">
+    <input id="assignEmail" placeholder="SUPERVISOR_EMAIL" style="min-width:260px;flex:1;">
+    <button class="green" onclick="saveAssignment()">Guardar asignacion</button>
+    <button class="red" onclick="clearSelected()">Limpiar seleccion</button>
+  </div>
+  <div class="line"><b>Tiendas seleccionadas:</b> <span id="selectedCount">0</span></div>
+</div>
+
+<div id="summary" class="box">Loading...</div>
+<div id="supervisors" class="grid"></div>
+
+<script>
+const BASE_URL = "<?= baseUrl ?>";
+const COMPANY_ID_FROM_URL = String("<?= companyId ?>").trim().toUpperCase();
+
+let DATA = { supervisors: [], totals: {}, unassignedStores: [] };
+let SELECTED = {};
+let ACTIVE_COMPANY_ID = "";
+
+function requireLogin() {
+  const raw = localStorage.getItem("pps_user");
+  if (!raw) {
+    window.top.location.href = BASE_URL;
+    return false;
+  }
+
+  try {
+    const user = JSON.parse(raw);
+    const role = String(user.role || user.ROLE || "").toUpperCase();
+    if (role !== "OWNER" && role !== "ADMIN") {
+      window.top.location.href = BASE_URL;
+      return false;
+    }
+  } catch (e) {
+    localStorage.removeItem("pps_user");
+    window.top.location.href = BASE_URL;
+    return false;
+  }
+
+  return true;
+}
+
+if (!requireLogin()) throw new Error("No autorizado");
+
+function getUser() {
+  try { return JSON.parse(localStorage.getItem("pps_user") || "{}"); }
+  catch(e) { return {}; }
+}
+
+function getCompanyId() {
+  const user = getUser();
+  if (!ACTIVE_COMPANY_ID) {
+    ACTIVE_COMPANY_ID = COMPANY_ID_FROM_URL || String(user.companyId || user.COMPANY_ID || "").toUpperCase();
+  }
+  return ACTIVE_COMPANY_ID;
+}
+
+function loadCompanyOptions() {
+  const user = getUser();
+  const role = String(user.role || user.ROLE || "").toUpperCase();
+
+  if (role !== "OWNER") return;
+
+  google.script.run
+    .withSuccessHandler(function(companies) {
+      const select = document.getElementById("companySelect");
+      select.style.display = "inline-block";
+      select.innerHTML = (companies || []).map(function(c) {
+        return `<option value="${esc(c.COMPANY_ID || "")}">${esc(c.COMPANY_ID || "")} - ${esc(c.COMPANY_NAME || "")}</option>`;
+      }).join("");
+
+      if (getCompanyId()) select.value = getCompanyId();
+    })
+    .getCompaniesForUser(user.companyId, role);
+}
+
+function changeCompany() {
+  ACTIVE_COMPANY_ID = document.getElementById("companySelect").value;
+  SELECTED = {};
+  load();
+}
+
+function load() {
+  const user = getUser();
+  const companyId = getCompanyId();
+
+  document.getElementById("companyTitle").innerText = "Company: " + companyId;
+  document.getElementById("summary").innerHTML = "Cargando supervisores...";
+  document.getElementById("supervisors").innerHTML = "";
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      DATA = res || { supervisors: [], totals: {}, unassignedStores: [] };
+      document.getElementById("companyTitle").innerText =
+        "Company: " + (DATA.companyName || companyId);
+      render();
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById("summary").innerHTML = "ERROR: " + (err.message || err);
+    })
+    .getSupervisorPortalAdminData(companyId, user.role || user.ROLE);
+}
+
+function render() {
+  const q = String(document.getElementById("search").value || "").toLowerCase();
+  const list = (DATA.supervisors || []).filter(function(s) {
+    return JSON.stringify(s).toLowerCase().includes(q);
+  });
+
+  renderSummary();
+
+  document.getElementById("supervisors").innerHTML = list.length
+    ? list.map(supervisorCard).join("")
+    : "No hay supervisores para esta empresa.";
+
+  syncSelectedChecks();
+}
+
+function renderSummary() {
+  const totals = DATA.totals || {};
+
+  document.getElementById("summary").innerHTML = `
+    <div class="stats">
+      <div class="stat"><b>${totals.supervisors || 0}</b>Supervisores</div>
+      <div class="stat"><b>${totals.stores || 0}</b>Tiendas</div>
+      <div class="stat"><b>${totals.unassignedStores || 0}</b>Sin supervisor</div>
+    </div>
+    ${(DATA.unassignedStores || []).length ? `
+      <div class="store-list">
+        <b>Tiendas sin supervisor</b>
+        ${(DATA.unassignedStores || []).map(storeLine).join("")}
+      </div>
+    ` : ""}
+  `;
+}
+
+function supervisorCard(s) {
+  const inactive = String(s.active || "").toUpperCase() === "NO" ? "inactive" : "";
+
+  return `
+    <div class="card ${inactive}">
+      <h3>${esc(s.name || "Sin nombre")}</h3>
+      <div class="line"><b>Email supervisor:</b> ${esc(s.email || "")}</div>
+      <div class="line"><b>Usuario:</b> ${esc(s.userEmail || "")}</div>
+      <div class="line"><b>Active:</b> ${esc(s.active || "")}</div>
+      <div class="line"><b>Tiendas asignadas:</b> ${s.storeCount || 0}</div>
+      <button class="blue" onclick="openSupervisorPortal('${jsEsc(s.name || "")}')">Abrir Portal</button>
+      <button onclick="selectSupervisorStores('${jsEsc(s.name || "")}', '${jsEsc(s.email || "")}')">Seleccionar tiendas</button>
+      <button class="green" onclick="openUsers()">Editar Usuario</button>
+      <div class="store-list">
+        ${(s.stores || []).length ? (s.stores || []).map(storeLine).join("") : "Sin tiendas asignadas."}
+      </div>
+    </div>
+  `;
+}
+
+function storeLine(store) {
+  return `
+    <label class="store-line">
+      <input type="checkbox" value="${store.ROW_NUMBER}" onchange="toggleStore(${store.ROW_NUMBER}, this.checked)">
+      <span>
+        <b>NSN ${esc(store["NSN #"] || "")}</b> ${esc(store.STORE_NAME || "")}<br>
+        ${esc(store.ADDRESS || "")}, ${esc(store.CITY || "")} ${esc(store.STATE || "")} ${esc(store.ZIP || "")}
+      </span>
+    </label>
+  `;
+}
+
+function toggleStore(row, checked) {
+  if (checked) SELECTED[row] = true;
+  else delete SELECTED[row];
+  updateSelectedCount();
+}
+
+function selectSupervisorStores(name, email) {
+  document.getElementById("assignName").value = name || "";
+  document.getElementById("assignEmail").value = email || "";
+
+  const supervisor = (DATA.supervisors || []).find(function(s) {
+    return String(s.name || "") === String(name || "");
+  });
+
+  SELECTED = {};
+  (supervisor && supervisor.stores || []).forEach(function(store) {
+    SELECTED[store.ROW_NUMBER] = true;
+  });
+
+  syncSelectedChecks();
+  updateSelectedCount();
+}
+
+function syncSelectedChecks() {
+  Array.from(document.querySelectorAll("input[type='checkbox'][value]")).forEach(function(cb) {
+    cb.checked = !!SELECTED[cb.value];
+  });
+  updateSelectedCount();
+}
+
+function updateSelectedCount() {
+  document.getElementById("selectedCount").innerText = Object.keys(SELECTED).length;
+}
+
+function clearSelected() {
+  SELECTED = {};
+  syncSelectedChecks();
+}
+
+function saveAssignment() {
+  const rowNumbers = Object.keys(SELECTED).map(Number);
+  const supervisorName = document.getElementById("assignName").value.trim();
+  const supervisorEmail = document.getElementById("assignEmail").value.trim();
+
+  if (!rowNumbers.length) {
+    alert("Seleccione al menos una tienda.");
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      alert("Tiendas actualizadas: " + ((res && res.updated) || 0));
+      SELECTED = {};
+      load();
+    })
+    .withFailureHandler(function(err) {
+      alert(err.message || err);
+    })
+    .saveSupervisorStoreAssignment({
+      companyId: getCompanyId(),
+      rowNumbers: rowNumbers,
+      supervisorName: supervisorName,
+      supervisorEmail: supervisorEmail
+    });
+}
+
+function openSupervisorPortal(name) {
+  window.top.location.href =
+    BASE_URL + "?view=customer&supervisor=" + encodeURIComponent(name) +
+    "&companyId=" + encodeURIComponent(getCompanyId());
+}
+
+function openStores() {
+  window.top.location.href = BASE_URL + "?view=stores&companyId=" + encodeURIComponent(getCompanyId());
+}
+
+function openUsers() {
+  window.top.location.href = BASE_URL + "?view=users&companyId=" + encodeURIComponent(getCompanyId());
+}
+
+function goHome() {
+  window.top.location.href = BASE_URL + "?companyId=" + encodeURIComponent(getCompanyId());
+}
+
+function esc(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;");
+}
+
+function jsEsc(value) {
+  return String(value == null ? "" : value)
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'");
+}
+
+loadCompanyOptions();
+load();
+</script>
+
+</body>
+</html>

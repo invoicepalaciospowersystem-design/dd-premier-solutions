@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family:Arial; background:#f3f4f6; margin:0; padding:20px; color:#111827; }
+    .header, .box { background:white; padding:18px; border-radius:14px; margin-bottom:15px; box-shadow:0 3px 10px rgba(0,0,0,.08); }
+    .header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; }
+    .topbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    input, button { padding:10px; border-radius:8px; border:1px solid #ccc; margin:4px; box-sizing:border-box; }
+    button { background:#111827; color:white; border:none; cursor:pointer; font-weight:bold; }
+    .blue { background:#2563eb; }
+    .green { background:#16a34a; }
+    .gray { background:#6b7280; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:15px; }
+    .card { background:white; padding:15px; border-radius:14px; box-shadow:0 3px 10px rgba(0,0,0,.08); border-left:6px solid #2563eb; }
+    .inactive { border-left-color:#dc2626; opacity:.75; }
+    .line { font-size:14px; margin:6px 0; }
+    .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:10px 0; }
+    .stat { background:#f3f4f6; border-radius:10px; padding:8px; font-size:13px; }
+    .stat b { display:block; font-size:18px; }
+    @media (max-width:760px){ .stats{grid-template-columns:repeat(2,1fr);} }
+  </style>
+</head>
+
+<body>
+
+<div class="header">
+  <div>
+    <div id="companyTitle" style="font-size:22px; font-weight:bold;">Company: Loading...</div>
+    <div style="font-size:13px;color:#6b7280;">Administracion del portal tecnico</div>
+  </div>
+  <div style="text-align:right;">
+    <div style="font-size:16px;font-weight:bold;">D&D Premier Solutions Corp</div>
+    <div style="font-size:13px;color:#6b7280;">Sistema de Ordenes</div>
+  </div>
+</div>
+
+<div class="box">
+  <h2>Portal Tecnico - Vista Admin</h2>
+  <div class="topbar">
+    <input id="search" placeholder="Buscar tecnico, email..." oninput="render()" style="min-width:260px;flex:1;">
+    <select id="companySelect" onchange="changeCompany()" style="display:none;min-width:220px;"></select>
+    <button onclick="load()">Actualizar</button>
+    <button class="blue" onclick="openUsers()">Usuarios</button>
+    <button class="green" onclick="openOrders()">Ordenes</button>
+    <button class="gray" onclick="goHome()">Volver</button>
+  </div>
+</div>
+
+<div id="summary" class="box">Loading...</div>
+<div id="techs" class="grid"></div>
+
+<script>
+const BASE_URL = "<?= baseUrl ?>";
+const COMPANY_ID_FROM_URL = String("<?= companyId ?>").trim().toUpperCase();
+
+let DATA = { techs: [], totals: {}, unassignedOrders: [] };
+let ACTIVE_COMPANY_ID = "";
+
+function requireLogin() {
+  const raw = localStorage.getItem("pps_user");
+  if (!raw) {
+    window.top.location.href = BASE_URL;
+    return false;
+  }
+
+  try {
+    const user = JSON.parse(raw);
+    const role = String(user.role || user.ROLE || "").toUpperCase();
+    if (role !== "OWNER" && role !== "ADMIN") {
+      window.top.location.href = BASE_URL;
+      return false;
+    }
+  } catch (e) {
+    localStorage.removeItem("pps_user");
+    window.top.location.href = BASE_URL;
+    return false;
+  }
+
+  return true;
+}
+
+if (!requireLogin()) throw new Error("No autorizado");
+
+function getUser() {
+  try { return JSON.parse(localStorage.getItem("pps_user") || "{}"); }
+  catch(e) { return {}; }
+}
+
+function getCompanyId() {
+  const user = getUser();
+  if (!ACTIVE_COMPANY_ID) {
+    ACTIVE_COMPANY_ID = COMPANY_ID_FROM_URL || String(user.companyId || user.COMPANY_ID || "").toUpperCase();
+  }
+  return ACTIVE_COMPANY_ID;
+}
+
+function loadCompanyOptions() {
+  const user = getUser();
+  const role = String(user.role || user.ROLE || "").toUpperCase();
+
+  if (role !== "OWNER") return;
+
+  google.script.run
+    .withSuccessHandler(function(companies) {
+      const select = document.getElementById("companySelect");
+      select.style.display = "inline-block";
+      select.innerHTML = (companies || []).map(function(c) {
+        return `<option value="${esc(c.COMPANY_ID || "")}">${esc(c.COMPANY_ID || "")} - ${esc(c.COMPANY_NAME || "")}</option>`;
+      }).join("");
+
+      if (getCompanyId()) select.value = getCompanyId();
+    })
+    .getCompaniesForUser(user.companyId, role);
+}
+
+function changeCompany() {
+  ACTIVE_COMPANY_ID = document.getElementById("companySelect").value;
+  load();
+}
+
+function load() {
+  const user = getUser();
+  const companyId = getCompanyId();
+
+  document.getElementById("companyTitle").innerText = "Company: " + companyId;
+  document.getElementById("summary").innerHTML = "Cargando tecnicos...";
+  document.getElementById("techs").innerHTML = "";
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      DATA = res || { techs: [], totals: {}, unassignedOrders: [] };
+      document.getElementById("companyTitle").innerText =
+        "Company: " + (DATA.companyName || companyId);
+      render();
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById("summary").innerHTML = "ERROR: " + (err.message || err);
+    })
+    .getTechPortalAdminData(companyId, user.role || user.ROLE);
+}
+
+function render() {
+  const q = String(document.getElementById("search").value || "").toLowerCase();
+  const list = (DATA.techs || []).filter(function(t) {
+    return JSON.stringify(t).toLowerCase().includes(q);
+  });
+
+  renderSummary();
+
+  document.getElementById("techs").innerHTML = list.length
+    ? list.map(techCard).join("")
+    : "No hay tecnicos para esta empresa.";
+}
+
+function renderSummary() {
+  const totals = DATA.totals || {};
+  const unassigned = DATA.unassignedOrders || [];
+
+  document.getElementById("summary").innerHTML = `
+    <div class="stats">
+      <div class="stat"><b>${totals.techs || 0}</b>Tecnicos</div>
+      <div class="stat"><b>${totals.openOrders || 0}</b>Ordenes abiertas</div>
+      <div class="stat"><b>${totals.completedOrders || 0}</b>Completadas</div>
+      <div class="stat"><b>${totals.unassignedOrders || 0}</b>Sin tecnico</div>
+    </div>
+    ${unassigned.length ? `
+      <div style="margin-top:10px;">
+        <b>Ordenes abiertas sin tecnico:</b>
+        ${unassigned.slice(0,8).map(function(o) {
+          return `<div class="line">${esc(o.woNumber)} | NSN ${esc(o.nsn)} | ${esc(o.status)}</div>`;
+        }).join("")}
+      </div>
+    ` : ""}
+  `;
+}
+
+function techCard(t) {
+  const stats = t.stats || {};
+  const inactive = String(t.active || "").toUpperCase() === "NO" ? "inactive" : "";
+
+  return `
+    <div class="card ${inactive}">
+      <h3>${esc(t.name || t.email || "")}</h3>
+      <div class="line"><b>Email:</b> ${esc(t.email || "")}</div>
+      <div class="line"><b>Active:</b> ${esc(t.active || "")}</div>
+      <div class="line"><b>Rate:</b> ${esc(t.hourlyRate || "")}</div>
+      <div class="stats">
+        <div class="stat"><b>${stats.openOrders || 0}</b>Abiertas</div>
+        <div class="stat"><b>${stats.completedOrders || 0}</b>Completadas</div>
+        <div class="stat"><b>${stats.pmOrders || 0}</b>PM</div>
+        <div class="stat"><b>${stats.totalOrders || 0}</b>Total</div>
+      </div>
+      <button class="blue" onclick="openTechPortal('${jsEsc(t.name || "")}')">Abrir Portal</button>
+      <button onclick="openUsers()">Editar Usuario</button>
+    </div>
+  `;
+}
+
+function openTechPortal(name) {
+  window.top.location.href =
+    BASE_URL + "?view=tech&tech=" + encodeURIComponent(name) +
+    "&companyId=" + encodeURIComponent(getCompanyId());
+}
+
+function openUsers() {
+  window.top.location.href = BASE_URL + "?view=users&companyId=" + encodeURIComponent(getCompanyId());
+}
+
+function openOrders() {
+  window.top.location.href = BASE_URL + "?view=orders&companyId=" + encodeURIComponent(getCompanyId());
+}
+
+function goHome() {
+  window.top.location.href = BASE_URL + "?companyId=" + encodeURIComponent(getCompanyId());
+}
+
+function esc(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;");
+}
+
+function jsEsc(value) {
+  return String(value == null ? "" : value)
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'");
+}
+
+loadCompanyOptions();
+load();
+</script>
+
+</body>
+</html>

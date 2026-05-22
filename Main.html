@@ -292,15 +292,27 @@ const MODULES = [
     url: "?view=users"
   },
   {
+    title: "Admin Portal Tecnico",
+    desc: "Ver tecnicos, ordenes asignadas y abrir el portal de cada tecnico.",
+    roles: ["OWNER", "ADMIN"],
+    url: "?view=techAdmin"
+  },
+  {
+    title: "Admin Portal Supervisor",
+    desc: "Ver supervisores, tiendas asignadas y administrar asignaciones.",
+    roles: ["OWNER", "ADMIN"],
+    url: "?view=supervisorAdmin"
+  },
+  {
     title: "Portal Tecnico",
     desc: "Vista de ordenes para tecnicos.",
-    roles: ["OWNER", "ADMIN", "TECH"],
+    roles: ["TECH"],
     url: "?view=tech&tech="
   },
   {
     title: "Portal Supervisor",
     desc: "Vista de estados para supervisores.",
-    roles: ["OWNER", "ADMIN", "SUPERVISOR"],
+    roles: ["SUPERVISOR"],
     url: "?view=customer&supervisor="
   }
 ];

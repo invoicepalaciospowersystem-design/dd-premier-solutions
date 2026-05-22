@@ -31,6 +31,26 @@ function doGet(e) {
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
 
+    if (p.view === "techAdmin") {
+      const template = HtmlService.createTemplateFromFile("TechAdmin");
+      template.baseUrl = CFG.WEB_APP_URL;
+      template.companyId = p.companyId || "";
+
+      return template.evaluate()
+        .setTitle("Admin Technician Portal")
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
+
+    if (p.view === "supervisorAdmin") {
+      const template = HtmlService.createTemplateFromFile("SupervisorAdmin");
+      template.baseUrl = CFG.WEB_APP_URL;
+      template.companyId = p.companyId || "";
+
+      return template.evaluate()
+        .setTitle("Admin Supervisor Portal")
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
+
     if (p.view === "orders") {
       const template = HtmlService.createTemplateFromFile("Ordenes");
       template.baseUrl = CFG.WEB_APP_URL;
