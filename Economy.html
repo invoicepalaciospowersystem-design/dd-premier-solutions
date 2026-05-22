@@ -286,7 +286,7 @@ const BASE_URL = "<?= baseUrl ?>";
 const COMPANY_ID_FROM_URL = String("<?= companyId ?>").trim().toUpperCase();
 const OWNER_PORTAL = String("<?= ownerOnly ?>").trim().toLowerCase() === "true";
 let ECONOMY = [];
-let ACTIVE_COMPANY_ID = COMPANY_ID_FROM_URL;
+let ACTIVE_COMPANY_ID = COMPANY_ID_FROM_URL || getSavedOwnerCompanyId();
 let CURRENT_PERIOD_LABEL = "";
 let VIEW_MODE = "REGULAR";
 let ECONOMY_METRIC_FILTER = "all";
@@ -302,6 +302,23 @@ function getCurrentUser() {
 function getSessionToken() {
   const user = getCurrentUser();
   return user.sessionToken || user.SESSION_TOKEN || "";
+}
+
+function getSavedOwnerCompanyId() {
+  try {
+    return String(localStorage.getItem("owner_selected_company_ALL") || "").trim().toUpperCase();
+  } catch (err) {
+    return "";
+  }
+}
+
+function saveOwnerCompanyId(companyId) {
+  companyId = String(companyId || "").trim().toUpperCase();
+  if (!companyId) return;
+
+  try {
+    localStorage.setItem("owner_selected_company_ALL", companyId);
+  } catch (err) {}
 }
 
 function getErrorMessage(err) {
@@ -1080,8 +1097,17 @@ function loadCompanySelector() {
 
   google.script.run
     .withSuccessHandler(function(companies) {
+      companies = companies || [];
+      const companyIds = companies.map(function(c) {
+        return String(c.COMPANY_ID || "").trim().toUpperCase();
+      }).filter(Boolean);
+
+      if (ACTIVE_COMPANY_ID && companyIds.indexOf(ACTIVE_COMPANY_ID) === -1) {
+        ACTIVE_COMPANY_ID = "";
+      }
+
       select.style.display = "inline-block";
-      select.innerHTML = (companies || []).map(function(c) {
+      select.innerHTML = companies.map(function(c) {
         return `
           <option value="${c.COMPANY_ID}">
             ${c.COMPANY_ID} - ${c.COMPANY_NAME || ""}
@@ -1091,9 +1117,20 @@ function loadCompanySelector() {
 
       if (ACTIVE_COMPANY_ID) {
         select.value = ACTIVE_COMPANY_ID;
+        saveOwnerCompanyId(ACTIVE_COMPANY_ID);
       }
 
       if (!ACTIVE_COMPANY_ID) {
+        if (companyIds.length) {
+          ACTIVE_COMPANY_ID = companyIds[0];
+          select.value = ACTIVE_COMPANY_ID;
+          saveOwnerCompanyId(ACTIVE_COMPANY_ID);
+          updateHeaderCompany(ACTIVE_COMPANY_ID);
+          loadPeriod();
+          load();
+          return;
+        }
+
         document.getElementById("cards").innerHTML =
           '<div class="box"><h3>Seleccionar Empresa</h3><p>Seleccione una empresa arriba para ver Economia.</p></div>';
       }
@@ -1113,6 +1150,7 @@ function activateCompany() {
     return;
   }
 
+  saveOwnerCompanyId(ACTIVE_COMPANY_ID);
   updateHeaderCompany(ACTIVE_COMPANY_ID);
   loadPeriod();
   load();
