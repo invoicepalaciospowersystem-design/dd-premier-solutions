@@ -53,6 +53,15 @@
       text-shadow:0 2px 12px rgba(0,0,0,.28);
     }
 
+    .brand-logo {
+      display:none;
+      max-width:min(360px, 82vw);
+      max-height:210px;
+      object-fit:contain;
+      margin:0 0 18px;
+      filter:drop-shadow(0 18px 28px rgba(0,0,0,.35));
+    }
+
     .login-kicker {
       display:inline-block;
       background:rgba(255,255,255,.14);
@@ -94,6 +103,15 @@
     .box h2 {
       margin:0 0 6px;
       color:#111827;
+    }
+
+    .box-logo {
+      display:none;
+      width:150px;
+      max-width:70%;
+      max-height:110px;
+      object-fit:contain;
+      margin:0 auto 14px;
     }
 
     .panel {
@@ -211,12 +229,14 @@
 
 <div id="loginShell" class="login-shell">
   <section class="login-brand">
+    <img id="brandLogo" class="brand-logo" alt="">
     <div class="login-kicker" id="loginKicker">Company Login</div>
     <h1 id="heroTitle">D&D Premier Solutions Corp</h1>
     <p id="heroSubtitle">Sistema de ordenes y operaciones</p>
   </section>
 
   <div id="loginBox" class="box">
+    <img id="loginLogo" class="box-logo" alt="">
     <h2 id="loginTitle">D&D Premier Solutions Corp</h2>
     <div class="muted" id="loginSubtitle">Login de acceso</div>
 
@@ -257,7 +277,8 @@ let CURRENT_BRANDING = {
   ownerName: "D&D Premier Solutions Corp",
   primaryColor: "#111827",
   accentColor: "#dc2626",
-  backgroundImageUrl: ""
+  backgroundImageUrl: "",
+  logoImageUrl: ""
 };
 
 const MODULES = [
@@ -351,6 +372,8 @@ function applyBranding(branding) {
   document.getElementById("ownerTitle").innerText =
     CURRENT_BRANDING.ownerName || "D&D Premier Solutions Corp";
 
+  applyLogo(CURRENT_BRANDING.logoImageUrl);
+
   const bg = String(CURRENT_BRANDING.backgroundImageUrl || "").trim();
   if (bg) {
     document.body.classList.add("has-login-bg");
@@ -359,6 +382,23 @@ function applyBranding(branding) {
     document.body.classList.remove("has-login-bg");
     document.documentElement.style.setProperty("--login-bg-image", "none");
   }
+}
+
+function applyLogo(url) {
+  url = safeImageUrl(url);
+
+  ["brandLogo", "loginLogo"].forEach(function(id) {
+    const img = document.getElementById(id);
+
+    if (!url) {
+      img.style.display = "none";
+      img.removeAttribute("src");
+      return;
+    }
+
+    img.src = url;
+    img.style.display = "block";
+  });
 }
 
 function login() {
@@ -527,6 +567,11 @@ function safeCssColor(value, fallback) {
 
 function cssUrl(value) {
   return String(value || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+function safeImageUrl(value) {
+  value = String(value || "").trim();
+  return /^https:\/\//i.test(value) || /^data:image\//i.test(value) ? value : "";
 }
 
 window.onload = function() {
