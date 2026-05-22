@@ -895,6 +895,7 @@
     }
 
     .owner-dashboard,
+    .admin-dashboard,
     .supervisor-dashboard {
       display:none;
       margin-bottom:18px;
@@ -1566,6 +1567,34 @@
     </div>
   </div>
 
+  <div id="adminDashboard" class="admin-dashboard">
+    <div class="dash-head">
+      <div>
+        <h2>Dashboard Admin</h2>
+        <div class="muted" id="adminDashboardScope">Loading...</div>
+      </div>
+      <div class="dash-actions">
+        <button class="dash-refresh" onclick="loadAdminDashboard()">Actualizar</button>
+        <button class="dash-refresh" onclick="openModule('?view=orders')">Ordenes</button>
+        <button class="dash-refresh" onclick="openModule('?view=economy')">Economia</button>
+      </div>
+    </div>
+
+    <div id="adminMetrics" class="metric-grid"></div>
+
+    <div class="dash-layout">
+      <div class="dash-section">
+        <h3>Economia de la Compania</h3>
+        <div id="adminEconomyBreakdown"></div>
+      </div>
+
+      <div class="dash-section">
+        <h3>Distribucion de Parts</h3>
+        <div id="adminInvestorBreakdown"></div>
+      </div>
+    </div>
+  </div>
+
   <div id="supervisorDashboard" class="supervisor-dashboard">
     <div class="dash-head">
       <div>
@@ -1863,6 +1892,7 @@ function showPanel() {
 
   renderModules();
   updateTechAccountBanner();
+  loadAdminDashboard();
   loadSupervisorDashboard();
   loadOwnerCompanySelector();
 }
@@ -2112,6 +2142,133 @@ function loadOwnerDashboard() {
       document.getElementById("ownerRecentActivity").innerHTML = "";
     })
     .getOwnerExecutiveDashboard(getSessionToken(), getDashboardCompanyScope());
+}
+
+function loadAdminDashboard() {
+  const role = String(CURRENT_USER && CURRENT_USER.role || "").trim().toUpperCase();
+  const box = document.getElementById("adminDashboard");
+
+  if (!box) return;
+
+  if (role !== "ADMIN") {
+    box.style.display = "none";
+    return;
+  }
+
+  box.style.display = "block";
+  document.getElementById("adminDashboardScope").innerText = "Cargando metricas de compania...";
+  document.getElementById("adminMetrics").innerHTML = renderMetricSkeletons();
+  document.getElementById("adminEconomyBreakdown").innerHTML = "<div class='muted'>Cargando economia...</div>";
+  document.getElementById("adminInvestorBreakdown").innerHTML = "<div class='muted'>Cargando inversionistas...</div>";
+
+  google.script.run
+    .withSuccessHandler(function(data) {
+      renderAdminDashboard(data || {});
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById("adminDashboardScope").innerText =
+        "Error en dashboard admin: " + (err && err.message ? err.message : err);
+      document.getElementById("adminMetrics").innerHTML = "";
+      document.getElementById("adminEconomyBreakdown").innerHTML = "";
+      document.getElementById("adminInvestorBreakdown").innerHTML = "";
+    })
+    .getAdminCompanyDashboard(getSessionToken(), getActiveCompanyId());
+}
+
+function renderAdminDashboard(data) {
+  const totals = data.totals || {};
+  const investors = data.investors || {};
+  const generated = data.generatedAt ? " | Actualizado " + data.generatedAt : "";
+  const period = data.periodLabel ? " | Periodo " + data.periodLabel : "";
+
+  document.getElementById("adminDashboardScope").innerText =
+    (data.companyName || data.companyId || getActiveCompanyId() || "Compania") + period + generated;
+
+  const cards = [
+    {
+      label: "Ordenes Abiertas",
+      value: totals.openOrders || 0,
+      note: (totals.totalOrders || 0) + " ordenes totales",
+      tone: totals.emergencyOrders ? "danger" : "info"
+    },
+    {
+      label: "Completadas por Facturar",
+      value: totals.completedPendingBilling || 0,
+      note: "Listas para economia",
+      tone: totals.completedPendingBilling ? "warning" : "success"
+    },
+    {
+      label: "Emergency / Urgent",
+      value: totals.emergencyOrders || 0,
+      note: "Requieren seguimiento",
+      tone: totals.emergencyOrders ? "danger" : "success"
+    },
+    {
+      label: "Invoices Periodo",
+      value: totals.economyRows || totals.invoicesCreated || 0,
+      note: (totals.economyPaid || 0) + " paid / " + (totals.economyInvoiced || 0) + " invoiced",
+      tone: "info"
+    },
+    {
+      label: "Cobro Parts",
+      value: formatMoneyDashboard(totals.partsBilled || 0),
+      note: "Parts cobradas en invoices",
+      tone: "info"
+    },
+    {
+      label: "Cobro Horas",
+      value: formatMoneyDashboard(totals.laborBilled || 0),
+      note: Number(totals.laborHours || 0).toFixed(2) + " horas",
+      tone: "info"
+    },
+    {
+      label: "Gasto Real Parts",
+      value: formatMoneyDashboard(totals.partsCost || 0),
+      note: "Costo registrado en economia",
+      tone: totals.partsCost ? "warning" : "success"
+    },
+    {
+      label: "Profit Estimado",
+      value: formatMoneyDashboard(totals.grossProfit || 0),
+      note: "Facturado - tax - parts - labor tech",
+      tone: Number(totals.grossProfit || 0) >= 0 ? "success" : "danger"
+    }
+  ];
+
+  document.getElementById("adminMetrics").innerHTML =
+    cards.map(renderMetricCard).join("");
+
+  document.getElementById("adminEconomyBreakdown").innerHTML =
+    renderAdminBreakdownRows([
+      { label: "Total Facturado", value: formatMoneyDashboard(totals.totalBilled || totals.revenueTracked || 0), tone: "info" },
+      { label: "Tax", value: formatMoneyDashboard(totals.taxTotal || 0), tone: "neutral" },
+      { label: "Cobro Parts", value: formatMoneyDashboard(totals.partsBilled || 0), tone: "info" },
+      { label: "Cobro Horas", value: formatMoneyDashboard(totals.laborBilled || 0), tone: "info" },
+      { label: "Gasto Real Parts", value: formatMoneyDashboard(totals.partsCost || 0), tone: "warning" },
+      { label: "Pago Labor Tecnicos", value: formatMoneyDashboard(totals.techLaborCost || 0), tone: "warning" },
+      { label: "Pendiente en Economia", value: totals.economyPending || 0, tone: totals.economyPending ? "warning" : "success" }
+    ]);
+
+  document.getElementById("adminInvestorBreakdown").innerHTML =
+    renderAdminBreakdownRows([
+      { label: "David - cobra por parts", value: formatMoneyDashboard(investors.davidPartsCost || 0), tone: "info" },
+      { label: "Yoel - cobra por parts", value: formatMoneyDashboard(investors.yoelPartsCost || 0), tone: "info" },
+      { label: "Sin INV_SOURCE", value: formatMoneyDashboard(investors.unassignedPartsCost || 0), tone: investors.unassignedPartsCost ? "warning" : "success" }
+    ]) +
+    "<div class='company-meta' style='margin-top:10px;'>Regla: DAVID = 75/25, YOEL = 25/75, MISCELANEAS = 50/50. El gasto real total de parts queda arriba separado.</div>";
+}
+
+function renderAdminBreakdownRows(rows) {
+  return rows.map(function(row) {
+    return `
+      <div class="alert-row ${escapeHtmlMain(row.tone || "")}">
+        <div>
+          <div class="company-name">${escapeHtmlMain(row.label || "")}</div>
+        </div>
+        <div class="alert-value">${escapeHtmlMain(row.value)}</div>
+      </div>
+    `;
+  }).join("");
 }
 
 function loadSupervisorDashboard() {
