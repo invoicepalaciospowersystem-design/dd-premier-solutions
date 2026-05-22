@@ -214,9 +214,11 @@ function dispatchRowToTech_(sh, row) {
 
   const techEmail = getTechEmails_(technician);
 
-  const startJobLink = CFG.WEB_APP_URL + "?action=START&wo=" + encodeURIComponent(obj.WO_NUMBER);
-  const waitingPartsLink = CFG.WEB_APP_URL + "?action=WAITING&wo=" + encodeURIComponent(obj.WO_NUMBER);
-  const completedLink = CFG.WEB_APP_URL + "?action=COMPLETED&wo=" + encodeURIComponent(obj.WO_NUMBER);
+  const publicBaseUrl = getWebAppBaseUrl_(companyId);
+  const companyParam = companyId ? "&companyId=" + encodeURIComponent(companyId) : "";
+  const startJobLink = publicBaseUrl + "?action=START&wo=" + encodeURIComponent(obj.WO_NUMBER) + companyParam;
+  const waitingPartsLink = publicBaseUrl + "?action=WAITING&wo=" + encodeURIComponent(obj.WO_NUMBER) + companyParam;
+  const completedLink = publicBaseUrl + "?action=COMPLETED&wo=" + encodeURIComponent(obj.WO_NUMBER) + companyParam;
 
   if (CFG.TEST_MODE) {
     Logger.log("TEST MODE: Email NO enviado. Técnicos: " + technician + " / " + techEmail);

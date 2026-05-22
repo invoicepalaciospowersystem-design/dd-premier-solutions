@@ -29,6 +29,9 @@ PM_REPORT_TEMPLATE_ID: "1wuLdLD_W4IAb4MoA8IHf0birHG6f1rJ0O7Umf5ahbMg",
 
   // IMPORTANTE: cambia esto cuando publiques la Web App V2.
   WEB_APP_URL: "https://script.google.com/macros/s/AKfycbwAiZ0Dh5BQoX-QTmMbZcRDEr974-X_nNWcW5x2XeYurC_CeXLNSrl1k-f3p1DDKppOCw/exec",
+  PUBLIC_WEB_APP_URLS: {
+    PPS: "https://app.palaciospowersystems.com"
+  },
 
   SHEET_COMPANIES: "COMPANIES",
   SHEET_USERS: "USERS",

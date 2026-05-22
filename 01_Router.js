@@ -6,6 +6,7 @@ function doGet(e) {
   try {
     e = e || { parameter: {} };
     const p = e.parameter || {};
+    const baseUrl = getWebAppBaseUrl_(p.companyId);
 
     if (p.action && p.wo) {
       return handleWorkOrderAction_(e);
@@ -14,7 +15,7 @@ function doGet(e) {
     if (p.view === "tech") {
       const template = HtmlService.createTemplateFromFile("Tech");
       template.techName = p.tech || "";
-      template.baseUrl = CFG.WEB_APP_URL;
+      template.baseUrl = baseUrl;
 
       return template.evaluate()
         .setTitle("Technician Work Orders")
@@ -24,7 +25,7 @@ function doGet(e) {
     if (p.view === "customer") {
       const template = HtmlService.createTemplateFromFile("Customer");
       template.supervisor = p.supervisor || "";
-      template.baseUrl = CFG.WEB_APP_URL;
+      template.baseUrl = baseUrl;
 
       return template.evaluate()
         .setTitle("Supervisor Dashboard")
@@ -33,7 +34,7 @@ function doGet(e) {
 
     if (p.view === "techAdmin") {
       const template = HtmlService.createTemplateFromFile("TechAdmin");
-      template.baseUrl = CFG.WEB_APP_URL;
+      template.baseUrl = baseUrl;
       template.companyId = p.companyId || "";
 
       return template.evaluate()
@@ -43,7 +44,7 @@ function doGet(e) {
 
     if (p.view === "supervisorAdmin") {
       const template = HtmlService.createTemplateFromFile("SupervisorAdmin");
-      template.baseUrl = CFG.WEB_APP_URL;
+      template.baseUrl = baseUrl;
       template.companyId = p.companyId || "";
 
       return template.evaluate()
@@ -53,7 +54,7 @@ function doGet(e) {
 
     if (p.view === "orders") {
       const template = HtmlService.createTemplateFromFile("Ordenes");
-      template.baseUrl = CFG.WEB_APP_URL;
+      template.baseUrl = baseUrl;
       template.companyId = p.companyId || "";
 
       return template.evaluate()
@@ -63,7 +64,7 @@ function doGet(e) {
 
     if (p.view === "economy") {
       const template = HtmlService.createTemplateFromFile("Economy");
-      template.baseUrl = CFG.WEB_APP_URL;
+      template.baseUrl = baseUrl;
 
       return template.evaluate()
         .setTitle("Economy")
@@ -72,7 +73,7 @@ function doGet(e) {
 
     if (p.view === "stores") {
       const template = HtmlService.createTemplateFromFile("Stores");
-      template.baseUrl = CFG.WEB_APP_URL;
+      template.baseUrl = baseUrl;
 
       return template.evaluate()
         .setTitle("Stores")
@@ -88,7 +89,7 @@ function doGet(e) {
 
     if (p.view === "users") {
       const template = HtmlService.createTemplateFromFile("Users");
-      template.baseUrl = CFG.WEB_APP_URL;
+      template.baseUrl = baseUrl;
 
       return template.evaluate()
         .setTitle("Users")
@@ -100,7 +101,7 @@ function doGet(e) {
       template.row = p.row || "";
       template.wo = p.wo || "";
       template.techName = p.tech || "";
-      template.baseUrl = CFG.WEB_APP_URL;
+      template.baseUrl = baseUrl;
       template.returnTo = p.returnTo || "";
 
       return template.evaluate()
@@ -113,7 +114,7 @@ function doGet(e) {
       template.row = p.row || "";
       template.wo = p.wo || "";
       template.techName = p.tech || "";
-      template.baseUrl = CFG.WEB_APP_URL;
+      template.baseUrl = baseUrl;
       template.returnTo = p.returnTo || "";
 
       return template.evaluate()
@@ -124,7 +125,7 @@ function doGet(e) {
     if (p.view === "createOrder") {
       const template = HtmlService.createTemplateFromFile("CreateOrder");
       template.companyId = p.companyId || "";
-      template.baseUrl = CFG.WEB_APP_URL;
+      template.baseUrl = baseUrl;
 
       return template.evaluate()
         .setTitle("Create Work Order")
@@ -136,7 +137,7 @@ function doGet(e) {
   template.row = p.row || "";
   template.wo = p.wo || "";
   template.companyId = p.companyId || "";
-  template.baseUrl = CFG.WEB_APP_URL;
+  template.baseUrl = baseUrl;
   template.returnTo = p.returnTo || "";
 
   return template.evaluate()
@@ -145,7 +146,7 @@ function doGet(e) {
 }
 
     const template = HtmlService.createTemplateFromFile("Main");
-    template.baseUrl = CFG.WEB_APP_URL;
+    template.baseUrl = baseUrl;
     template.companyId = p.companyId || "";
 
     return template.evaluate()
@@ -161,6 +162,16 @@ function doGet(e) {
       "<h2>Error</h2><p>" + err.message + "</p>"
     );
   }
+}
+
+function getWebAppBaseUrl_(companyId) {
+  companyId = String(companyId || "").trim().toUpperCase();
+
+  if (companyId && CFG.PUBLIC_WEB_APP_URLS && CFG.PUBLIC_WEB_APP_URLS[companyId]) {
+    return CFG.PUBLIC_WEB_APP_URLS[companyId];
+  }
+
+  return CFG.WEB_APP_URL;
 }
 
 function onFormSubmit(e) {
