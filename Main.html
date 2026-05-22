@@ -21,6 +21,12 @@
       box-sizing:border-box;
     }
 
+    body.app-mode {
+      background:
+        linear-gradient(180deg, #f8fafc 0%, #eef2f7 46%, #e5e7eb 100%);
+      padding:18px;
+    }
+
     body.login-mode {
       padding:clamp(14px, 2vw, 30px);
       overflow-x:hidden;
@@ -533,7 +539,7 @@
 
     .panel {
       max-width:1180px;
-      margin:22px auto 30px;
+      margin:0 auto 30px;
       padding:0;
       display:none;
     }
@@ -541,15 +547,58 @@
     .global-header {
       display:none;
       max-width:1180px;
-      margin:0 auto 15px auto;
-      background:white;
-      padding:15px;
-      border-radius:12px;
-      box-shadow:0 3px 10px rgba(0,0,0,0.08);
+      margin:0 auto 16px auto;
+      background:
+        linear-gradient(135deg, rgba(17,24,39,.98), rgba(31,41,55,.96)),
+        #111827;
+      color:#f8fafc;
+      padding:16px 18px;
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:14px;
+      box-shadow:0 18px 40px rgba(15,23,42,.16);
       justify-content:space-between;
       align-items:center;
       flex-wrap:wrap;
       gap:12px;
+    }
+
+    .global-company-block,
+    .global-system-block {
+      min-width:0;
+    }
+
+    .global-system-block {
+      text-align:right;
+    }
+
+    .global-label {
+      color:#9ca3af;
+      font-size:11px;
+      font-weight:bold;
+      letter-spacing:0;
+      text-transform:uppercase;
+      margin-bottom:4px;
+    }
+
+    .global-company-name {
+      color:#ffffff;
+      font-size:22px;
+      font-weight:bold;
+      line-height:1.2;
+      overflow-wrap:anywhere;
+    }
+
+    .global-owner-title {
+      color:#f8fafc;
+      font-size:16px;
+      font-weight:bold;
+      line-height:1.25;
+    }
+
+    .global-subtitle {
+      color:#cbd5e1;
+      font-size:13px;
+      margin-top:3px;
     }
 
     input, button {
@@ -594,18 +643,68 @@
 
     .grid {
       display:grid;
-      grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
-      gap:15px;
-      margin-top:14px;
+      grid-template-columns:repeat(auto-fit, minmax(250px, 1fr));
+      gap:16px;
+      margin-top:12px;
     }
 
     .module {
-      background:#f9fafb;
+      min-height:156px;
+      background:
+        linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
       border:1px solid #e5e7eb;
-      border-left:5px solid var(--brand-primary);
-      border-radius:14px;
-      padding:18px;
+      border-radius:8px;
+      padding:16px;
       cursor:pointer;
+      display:flex;
+      flex-direction:column;
+      justify-content:space-between;
+      gap:12px;
+      box-shadow:0 8px 22px rgba(15,23,42,.06);
+      transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+      position:relative;
+      overflow:hidden;
+    }
+
+    .module::before {
+      content:"";
+      position:absolute;
+      left:0;
+      right:0;
+      top:0;
+      height:4px;
+      background:linear-gradient(90deg, var(--brand-primary), var(--brand-accent));
+    }
+
+    .module:hover {
+      transform:translateY(-2px);
+      border-color:#cbd5e1;
+      box-shadow:0 16px 32px rgba(15,23,42,.12);
+    }
+
+    .module-top {
+      display:flex;
+      gap:12px;
+      align-items:flex-start;
+    }
+
+    .module-icon {
+      width:42px;
+      height:42px;
+      flex:0 0 42px;
+      border-radius:8px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:var(--brand-primary);
+      color:#ffffff;
+      font-size:13px;
+      font-weight:bold;
+      letter-spacing:0;
+    }
+
+    .module-copy {
+      min-width:0;
     }
 
     .module-title {
@@ -620,13 +719,51 @@
       line-height:1.35;
     }
 
+    .module-footer {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      padding-top:12px;
+      border-top:1px solid #eef2f7;
+      color:#374151;
+      font-size:13px;
+      font-weight:bold;
+    }
+
+    .module-role {
+      color:#6b7280;
+      font-size:12px;
+      font-weight:bold;
+      text-transform:uppercase;
+      letter-spacing:0;
+    }
+
+    .module-open {
+      color:var(--brand-accent);
+      white-space:nowrap;
+    }
+
     .panel-hero {
-      background:#ffffff;
+      background:
+        linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
       border:1px solid #e5e7eb;
-      border-radius:12px;
-      padding:18px;
-      box-shadow:0 3px 10px rgba(0,0,0,0.07);
+      border-radius:8px;
+      padding:20px;
+      box-shadow:0 12px 30px rgba(15,23,42,.08);
       margin-bottom:16px;
+      position:relative;
+      overflow:hidden;
+    }
+
+    .panel-hero::before {
+      content:"";
+      position:absolute;
+      left:0;
+      right:0;
+      top:0;
+      height:5px;
+      background:linear-gradient(90deg, var(--brand-primary), var(--brand-accent));
     }
 
     .panel-title-row {
@@ -635,11 +772,13 @@
       align-items:flex-start;
       gap:14px;
       flex-wrap:wrap;
+      position:relative;
+      z-index:1;
     }
 
     .panel-title-row h1 {
       margin:0 0 4px;
-      font-size:28px;
+      font-size:30px;
       letter-spacing:0;
     }
 
@@ -936,6 +1075,7 @@
     .module-heading {
       margin:22px 0 0;
       font-size:20px;
+      letter-spacing:0;
     }
 
     #error {
@@ -956,10 +1096,47 @@
 
     .logout {
       background:#dc2626;
+      width:auto;
+      min-width:112px;
       max-width:180px;
+      padding:12px 18px;
+      margin:0;
+      border-radius:8px;
+      box-shadow:0 10px 22px rgba(220,38,38,.18);
     }
 
     @media (max-width: 800px) {
+      body.app-mode {
+        padding:12px;
+      }
+
+      .global-header {
+        border-radius:10px;
+        padding:14px;
+        align-items:flex-start;
+      }
+
+      .global-system-block {
+        text-align:left;
+      }
+
+      .global-company-name {
+        font-size:18px;
+      }
+
+      .panel-title-row {
+        flex-direction:column;
+      }
+
+      .panel-title-row h1 {
+        font-size:25px;
+      }
+
+      .logout {
+        width:100%;
+        max-width:none;
+      }
+
       body.login-mode {
         padding:14px;
       }
@@ -1182,10 +1359,13 @@
 </div>
 
 <div id="globalHeader" class="global-header">
-  <div id="companyTitle" style="font-size:22px; font-weight:bold;">Company: Loading...</div>
-  <div style="text-align:right;">
-    <div id="ownerTitle" style="font-size:16px; font-weight:bold;">D&D Premier Solutions Corp</div>
-    <div id="systemSubtitle" style="font-size:13px; color:#6b7280;">Sistema de Ordenes</div>
+  <div class="global-company-block">
+    <div class="global-label">Compa&ntilde;ia activa</div>
+    <div id="companyTitle" class="global-company-name">Company: Loading...</div>
+  </div>
+  <div class="global-system-block">
+    <div id="ownerTitle" class="global-owner-title">D&amp;D Premier Solutions Corp</div>
+    <div id="systemSubtitle" class="global-subtitle">Sistema de Ordenes</div>
   </div>
 </div>
 
@@ -1313,54 +1493,63 @@ setLoginTheme(LOGIN_COMPANY_ID);
 const MODULES = [
   {
     title: "Ordenes",
+    icon: "WO",
     desc: "Manejo de work orders, tecnicos y estados.",
     roles: ["OWNER", "ADMIN", "ORDENES"],
     url: "?view=orders"
   },
   {
     title: "Economia",
+    icon: "$",
     desc: "Facturacion, costos, pagos y profit.",
     roles: ["OWNER", "ADMIN", "ECONOMIA"],
     url: "?view=economy"
   },
   {
     title: "Tiendas / Direcciones",
+    icon: "NSN",
     desc: "Base de datos de NSN, direcciones y clientes.",
     roles: ["OWNER", "ADMIN"],
     url: "?view=stores"
   },
   {
     title: "Empresas",
+    icon: "CO",
     desc: "Administracion multi-empresa.",
     roles: ["OWNER"],
     url: "?view=companies"
   },
   {
     title: "Usuarios",
+    icon: "USR",
     desc: "Crear usuarios y asignar roles.",
     roles: ["OWNER", "ADMIN"],
     url: "?view=users"
   },
   {
     title: "Admin Portal Tecnico",
+    icon: "TEC",
     desc: "Ver tecnicos, ordenes asignadas y abrir el portal de cada tecnico.",
     roles: ["OWNER", "ADMIN"],
     url: "?view=techAdmin"
   },
   {
     title: "Admin Portal Supervisor",
+    icon: "SUP",
     desc: "Ver supervisores, tiendas asignadas y administrar asignaciones.",
     roles: ["OWNER", "ADMIN"],
     url: "?view=supervisorAdmin"
   },
   {
     title: "Portal Tecnico",
+    icon: "PT",
     desc: "Vista de ordenes para tecnicos.",
     roles: ["TECH"],
     url: "?view=tech&tech="
   },
   {
     title: "Portal Supervisor",
+    icon: "PS",
     desc: "Vista de estados para supervisores.",
     roles: ["SUPERVISOR"],
     url: "?view=customer&supervisor="
@@ -1495,6 +1684,7 @@ function showPanel() {
   SELECTED_OWNER_COMPANY_ID = getInitialOwnerCompanySelection();
 
   document.body.classList.remove("login-mode");
+  document.body.classList.add("app-mode");
   document.getElementById("loginShell").style.display = "none";
   document.getElementById("globalHeader").style.display = "flex";
   document.getElementById("mainPanel").style.display = "block";
@@ -1534,11 +1724,31 @@ function renderModules() {
     allowed.map(function(m) {
       return `
         <div class="module" onclick="openModule('${m.url}')">
-          <div class="module-title">${m.title}</div>
-          <div class="module-desc">${m.desc}</div>
+          <div class="module-top">
+            <div class="module-icon">${m.icon || "APP"}</div>
+            <div class="module-copy">
+              <div class="module-title">${m.title}</div>
+              <div class="module-desc">${m.desc}</div>
+            </div>
+          </div>
+          <div class="module-footer">
+            <span class="module-role">${getModuleRoleLabel(m.roles)}</span>
+            <span class="module-open">Abrir</span>
+          </div>
         </div>
       `;
     }).join("");
+}
+
+function getModuleRoleLabel(roles) {
+  roles = Array.isArray(roles) ? roles : [];
+  if (roles.indexOf("OWNER") !== -1 && roles.indexOf("ADMIN") !== -1) return "Admin";
+  if (roles.indexOf("OWNER") !== -1) return "Owner";
+  if (roles.indexOf("TECH") !== -1) return "Tecnico";
+  if (roles.indexOf("SUPERVISOR") !== -1) return "Supervisor";
+  if (roles.indexOf("ECONOMIA") !== -1) return "Economia";
+  if (roles.indexOf("ORDENES") !== -1) return "Ordenes";
+  return "Modulo";
 }
 
 function updateTechAccountBanner() {
@@ -1981,6 +2191,7 @@ function logout() {
   CURRENT_USER = null;
 
   document.body.classList.add("login-mode");
+  document.body.classList.remove("app-mode");
   document.getElementById("globalHeader").style.display = "none";
   document.getElementById("mainPanel").style.display = "none";
   document.getElementById("loginShell").style.display = "grid";
