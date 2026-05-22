@@ -2,7 +2,7 @@
 // FILE: 09_CloseOrder.gs
 // =====================================================
 
-function getCloseOrderData(rowNumber, woNumber) {
+function getCloseOrderData(rowNumber, woNumber, sessionToken) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
   if (!sh) throw new Error("No existe WORK_ORDERS.");
@@ -42,6 +42,8 @@ function getCloseOrderData(rowNumber, woNumber) {
     throw new Error("No se encontró la orden con WO: " + woNumber);
   }
 
+  requireWorkOrderSession_(sessionToken, foundRow, headers, ["TECH", "OWNER", "ADMIN", "ORDENES", "ECONOMIA"], "abrir");
+
   const obj = {};
   headers.forEach(function(h, i) {
     obj[h] = safeValue(foundRow[i]);
@@ -69,8 +71,10 @@ function getCloseOrderData(rowNumber, woNumber) {
   return obj;
 }
 
-function saveCloseOrder(data) {
+function saveCloseOrder(data, sessionToken) {
   try {
+    data = data || {};
+    data.sessionToken = sessionToken || data.sessionToken || "";
     return saveCloseOrder_(data);
   } catch (err) {
     notifySystemError_("INVOICE_SAVE_ERROR", err, {
@@ -98,6 +102,9 @@ function saveCloseOrder_(data) {
   const companyId = String(data.COMPANY_ID || "").trim().toUpperCase();
   const woNumber = String(data.WO_NUMBER || "").trim();
   const woType = String(data.WO_TYPE || "REPAIR_FORM").trim().toUpperCase();
+  const headersWO = shWO.getRange(1, 1, 1, shWO.getLastColumn()).getValues()[0].map(String);
+  const rowWO = shWO.getRange(rowNumber, 1, 1, shWO.getLastColumn()).getValues()[0];
+  const session = requireWorkOrderSession_(data.sessionToken, rowWO, headersWO, ["TECH", "OWNER", "ADMIN", "ORDENES", "ECONOMIA"], "cerrar");
 
   if (woType === "PM_FORM") {
     const result = createPMInvoiceFromCloseOrder_(data);
@@ -111,6 +118,11 @@ function saveCloseOrder_(data) {
       message: "PM invoice created and returned from saveCloseOrder"
     };
   }
+
+  addAuditLog_("INVOICE", "CLOSE_ORDER_STARTED", companyId, "WORK_ORDER", woNumber, session, {
+    rowNumber: rowNumber,
+    woType: woType
+  });
 
   const hours = Number(data.LABOR_HOURS || data.HORAS || data.HOURS || 0);
   const partsTotal = Number(data.MATERIAL_COST || data.PARTS_TOTAL || data.INVERSION || data.COMPRA || data.PARTS || 0);
@@ -293,7 +305,7 @@ function saveCloseOrder_(data) {
   }
 
   try {
-    updateTechOrderStatus(rowNumber, "COMPLETED");
+    updateTechOrderStatusInternal_(rowNumber, "COMPLETED", "Invoice Close");
   } catch (statusErr) {
     Logger.log("ERROR updateTechOrderStatus desde saveCloseOrder: " + statusErr);
     notifySystemError_("ORDER_STATUS_UPDATE_ERROR", statusErr, {

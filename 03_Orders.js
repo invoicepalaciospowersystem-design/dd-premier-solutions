@@ -94,6 +94,8 @@ function getDashboardData(companyId, role, sessionToken) {
 
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
+    if (isSoftDeletedRow_(row, headers)) continue;
+
     const rowCompany = String(row[idxCompany] || "").trim().toUpperCase();
 
     if (rowCompany !== companyId) continue;
@@ -141,7 +143,7 @@ function updateWorkOrderFromDashboard(rowNumber, updates, sessionToken) {
   const companyId = getCellByHeader_(sh, rowNumber, headers, "COMPANY_ID") || CFG.DEFAULT_COMPANY_ID;
   const woNumber = getCellByHeader_(sh, rowNumber, headers, "WO_NUMBER");
   const oldStatus = getCellByHeader_(sh, rowNumber, headers, "STATUS");
-  requireSession_(sessionToken, ["OWNER", "ADMIN", "ORDENES"], companyId);
+  const session = requireSession_(sessionToken, ["OWNER", "ADMIN", "ORDENES"], companyId);
 
   Object.keys(updates).forEach(function(key) {
     setCellByHeader_(sh, rowNumber, headers, key, updates[key]);
@@ -177,10 +179,15 @@ function updateWorkOrderFromDashboard(rowNumber, updates, sessionToken) {
       "STATUS UPDATED FROM DASHBOARD",
       oldStatus,
       updates.STATUS,
-      Session.getActiveUser().getEmail() || "Dashboard",
+      getSessionActorLabel_(session),
       ""
     );
   }
+
+  addAuditLog_("ORDERS", "WORK_ORDER_UPDATED", companyId, "WORK_ORDER", woNumber, session, {
+    rowNumber: rowNumber,
+    updates: updates
+  });
 
   return true;
 }
@@ -194,9 +201,14 @@ function sendWorkOrderFromDashboard(rowNumber, sessionToken) {
   const sh = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
   const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
   const companyId = getCellByHeader_(sh, Number(rowNumber), headers, "COMPANY_ID") || CFG.DEFAULT_COMPANY_ID;
-  requireSession_(sessionToken, ["OWNER", "ADMIN", "ORDENES"], companyId);
+  const session = requireSession_(sessionToken, ["OWNER", "ADMIN", "ORDENES"], companyId);
+  const woNumber = getCellByHeader_(sh, Number(rowNumber), headers, "WO_NUMBER");
 
   dispatchRowToTech_(sh, Number(rowNumber));
+
+  addAuditLog_("ORDERS", "WORK_ORDER_SENT_TO_TECH", companyId, "WORK_ORDER", woNumber, session, {
+    rowNumber: Number(rowNumber)
+  });
 
   return true;
 }
@@ -209,11 +221,27 @@ function deleteWorkOrder(rowNumber, sessionToken) {
   const sh = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
   if (!sh) throw new Error("No existe la hoja: " + CFG.SHEET_WORK_ORDERS);
 
-  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+  let headers = ensureSheetColumns_(sh, ["ACTIVE", "DELETED_AT", "DELETED_BY"]);
   const companyId = getCellByHeader_(sh, rowNumber, headers, "COMPANY_ID") || CFG.DEFAULT_COMPANY_ID;
-  requireSession_(sessionToken, ["OWNER", "ADMIN", "ORDENES"], companyId);
+  const woNumber = getCellByHeader_(sh, rowNumber, headers, "WO_NUMBER");
+  const session = requireSession_(sessionToken, ["OWNER", "ADMIN", "ORDENES"], companyId);
 
-  sh.deleteRow(rowNumber);
+  setCellByHeader_(sh, rowNumber, headers, "ACTIVE", "NO");
+  setCellByHeader_(sh, rowNumber, headers, "DELETED_AT", new Date());
+  setCellByHeader_(sh, rowNumber, headers, "DELETED_BY", getSessionActorLabel_(session));
+
+  const idxStatus = headers.map(function(h) {
+    return String(h || "").trim().toUpperCase();
+  }).indexOf("STATUS");
+
+  if (idxStatus >= 0) {
+    setCellByHeader_(sh, rowNumber, headers, "STATUS", "DELETED");
+  }
+
+  addAuditLog_("ORDERS", "WORK_ORDER_SOFT_DELETED", companyId, "WORK_ORDER", woNumber, session, {
+    rowNumber: rowNumber
+  });
+
   return true;
 }
 

@@ -11,14 +11,9 @@ function sendSMS_(to, message) {
     if (!to) return null;
 
     const props = PropertiesService.getScriptProperties();
-    const ACCOUNT_SID = props.getProperty("TWILIO_SID");
-    const AUTH_TOKEN = props.getProperty("TWILIO_TOKEN");
-    const FROM = normalizeSmsPhone_(props.getProperty("TWILIO_FROM"));
-
-    if (!ACCOUNT_SID || !AUTH_TOKEN || !FROM) {
-      Logger.log("Twilio properties missing.");
-      return null;
-    }
+    const ACCOUNT_SID = getRequiredScriptProperty_("TWILIO_SID");
+    const AUTH_TOKEN = getRequiredScriptProperty_("TWILIO_TOKEN");
+    const FROM = normalizeSmsPhone_(getRequiredScriptProperty_("TWILIO_FROM"));
 
     const url = "https://api.twilio.com/2010-04-01/Accounts/" + ACCOUNT_SID + "/Messages.json";
 
@@ -153,13 +148,9 @@ function checkLastSMSStatus() {
 
 function checkSMSStatus_(messageSid) {
   const props = PropertiesService.getScriptProperties();
-  const ACCOUNT_SID = props.getProperty("TWILIO_SID");
-  const AUTH_TOKEN = props.getProperty("TWILIO_TOKEN");
+  const ACCOUNT_SID = getRequiredScriptProperty_("TWILIO_SID");
+  const AUTH_TOKEN = getRequiredScriptProperty_("TWILIO_TOKEN");
   const sid = String(messageSid || "").trim();
-
-  if (!ACCOUNT_SID || !AUTH_TOKEN) {
-    throw new Error("Faltan TWILIO_SID o TWILIO_TOKEN en Script Properties.");
-  }
 
   if (!sid) {
     throw new Error("Falta el Message SID del SMS.");

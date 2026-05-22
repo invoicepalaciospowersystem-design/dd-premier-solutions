@@ -14,9 +14,15 @@ function addNotification_(companyId, to, wo, type, message) {
   sh.appendRow([companyId || CFG.DEFAULT_COMPANY_ID, new Date(), to, wo, type, message, "NO"]);
 }
 
-function getNotifications(companyId, role) {
+function getNotifications(companyId, role, sessionToken) {
   companyId = String(companyId || "").trim().toUpperCase();
   role = String(role || "").trim().toUpperCase();
+  requireSession_(sessionToken, ["OWNER", "ADMIN", "ORDENES", "ECONOMIA"], companyId);
+  return readNotificationsForCompany_(companyId);
+}
+
+function readNotificationsForCompany_(companyId) {
+  companyId = String(companyId || "").trim().toUpperCase();
 
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.SHEET_NOTIFICATIONS);
   if (!sh) return [];
@@ -25,7 +31,6 @@ function getNotifications(companyId, role) {
   if (data.length < 2) return [];
 
   const headers = data[0].map(String);
-  const idxCompany = headers.indexOf("COMPANY_ID");
 
   return data.slice(1).map(function(row) {
     const obj = {};
@@ -48,18 +53,23 @@ function getNotifications(companyId, role) {
   }).reverse();
 }
 
-function getNotificationsByUser(name, companyId) {
-  const all = getNotifications(companyId, "");
-  const target = String(name || "").trim().toLowerCase();
+function getNotificationsByUser(name, companyId, sessionToken) {
+  const session = requireNamedSession_(sessionToken, ["TECH", "SUPERVISOR", "OWNER", "ADMIN"], companyId, name, "usuario");
+  const effectiveName = String(session.role || "").toUpperCase() === "OWNER" || String(session.role || "").toUpperCase() === "ADMIN"
+    ? name
+    : session.name;
+  const all = readNotificationsForCompany_(companyId);
+  const target = String(effectiveName || "").trim().toLowerCase();
 
   return all.filter(function(n) {
-    const to = String(n.TO || "").trim().toLowerCase();
-    return to === target || to === "tech";
+    const to = String(n.TO || n.ROLE || "").trim().toLowerCase();
+    return to === target || (String(session.role || "").toUpperCase() === "TECH" && to === "tech");
   });
 }
 
-function markNotificationsRead(companyId) {
+function markNotificationsRead(companyId, sessionToken) {
   companyId = String(companyId || "").trim().toUpperCase();
+  requireSession_(sessionToken, ["OWNER", "ADMIN", "ORDENES", "ECONOMIA"], companyId);
 
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.SHEET_NOTIFICATIONS);
   if (!sh || sh.getLastRow() < 2) return true;
@@ -83,8 +93,9 @@ function markNotificationsRead(companyId) {
   return true;
 }
 
-function markNotificationsReadByUser(name, companyId) {
+function markNotificationsReadByUser(name, companyId, sessionToken) {
   companyId = String(companyId || "").trim().toUpperCase();
+  const session = requireNamedSession_(sessionToken, ["TECH", "SUPERVISOR", "OWNER", "ADMIN"], companyId, name, "usuario");
 
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.SHEET_NOTIFICATIONS);
   if (!sh || sh.getLastRow() < 2) return true;
@@ -93,12 +104,17 @@ function markNotificationsReadByUser(name, companyId) {
   const headers = data[0].map(String);
 
   const colCompany = headers.indexOf("COMPANY_ID");
-  const colTo = headers.indexOf("TO");
+  let colTo = headers.indexOf("TO");
+  if (colTo === -1) colTo = headers.indexOf("ROLE");
   const colRead = headers.indexOf("READ");
 
   if (colCompany === -1 || colTo === -1 || colRead === -1) return true;
 
-  const target = String(name || "").trim().toLowerCase();
+  const target = String(
+    String(session.role || "").toUpperCase() === "OWNER" || String(session.role || "").toUpperCase() === "ADMIN"
+      ? name
+      : session.name
+  || "").trim().toLowerCase();
 
   for (let i = 1; i < data.length; i++) {
     const rowCompany = String(data[i][colCompany] || "").trim().toUpperCase();

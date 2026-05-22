@@ -108,7 +108,7 @@ function saveSupervisorStoreAssignment(data, sessionToken) {
   data = data || {};
 
   const companyId = normalizeAdminCompanyId_(data.companyId);
-  requireSession_(sessionToken, ["OWNER", "ADMIN"], companyId);
+  const session = requireSession_(sessionToken, ["OWNER", "ADMIN"], companyId);
   const rowNumbers = (data.rowNumbers || []).map(Number).filter(function(n) {
     return n && n > 1;
   });
@@ -153,6 +153,12 @@ function saveSupervisorStoreAssignment(data, sessionToken) {
     setCellByHeader_(sh, row, freshHeaders, "SUPERVISOR_NAME", supervisorName);
     setCellByHeader_(sh, row, freshHeaders, "SUPERVISOR_EMAIL", supervisorEmail);
     updated++;
+  });
+
+  addAuditLog_("SUPERVISOR_ADMIN", "SUPERVISOR_STORES_ASSIGNED", companyId, "SUPERVISOR", supervisorName, session, {
+    supervisorEmail: supervisorEmail,
+    requestedRows: rowNumbers,
+    updated: updated
   });
 
   return {

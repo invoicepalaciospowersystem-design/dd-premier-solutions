@@ -2,7 +2,7 @@
 // FILE: 19_PM_Report.gs
 // =====================================================
 
-function getPMOrderData(row, woNumber) {
+function getPMOrderData(row, woNumber, sessionToken) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const shWO = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
   if (!shWO) throw new Error("No existe la hoja: " + CFG.SHEET_WORK_ORDERS);
@@ -15,6 +15,7 @@ function getPMOrderData(row, woNumber) {
   if (!rowNumber) throw new Error("No se encontró la orden PM: " + (woNumber || row || ""));
 
   const dataRow = woValues[rowNumber - 1];
+  requireWorkOrderSession_(sessionToken, dataRow, woHeaders, ["TECH", "OWNER", "ADMIN", "ORDENES"], "abrir reporte PM");
 
   const obj = {};
   woHeaders.forEach(function(h, i) {
@@ -95,6 +96,7 @@ function getPMTexts() {
 
 function uploadPMFile(fileObj) {
   try {
+    requireSession_(fileObj && fileObj.sessionToken, ["TECH", "OWNER", "ADMIN", "ORDENES"]);
     return uploadPMFile_(fileObj);
   } catch (err) {
     notifySystemError_("PM_FILE_UPLOAD_ERROR", err, {
@@ -132,6 +134,7 @@ function uploadPMFile_(fileObj) {
 
 function createPMReportFolder(data) {
   try {
+    requirePMReportPayloadSession_(data, "crear carpeta PM");
     return createPMReportFolder_(data);
   } catch (err) {
     notifySystemError_("PM_REPORT_FOLDER_ERROR", err, {
@@ -166,6 +169,9 @@ function createPMReportFolder_(data) {
 
 function generatePMReportPDF(payload) {
   try {
+    const session = requirePMReportPayloadSession_(payload, "generar reporte PM");
+    payload = payload || {};
+    payload.auditActor = session;
     return generatePMReportPDF_(payload);
   } catch (err) {
     notifySystemError_("PM_REPORT_PDF_ERROR", err, {
@@ -177,6 +183,32 @@ function generatePMReportPDF(payload) {
     });
     throw err;
   }
+}
+
+function requirePMReportPayloadSession_(payload, actionName) {
+  payload = payload || {};
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const shWO = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
+  if (!shWO) throw new Error("No existe la hoja: " + CFG.SHEET_WORK_ORDERS);
+
+  const values = shWO.getDataRange().getValues();
+  if (values.length < 2) throw new Error("No hay ordenes.");
+
+  const headers = values[0].map(function(h) {
+    return String(h).trim();
+  });
+
+  const rowNumber = resolvePMOrderDataRow_(values, headers, payload.row, payload.woNumber);
+  if (!rowNumber) throw new Error("No se encontro la orden PM: " + (payload.woNumber || payload.row || ""));
+
+  return requireWorkOrderSession_(
+    payload.sessionToken,
+    values[rowNumber - 1],
+    headers,
+    ["TECH", "OWNER", "ADMIN", "ORDENES"],
+    actionName || "usar"
+  );
 }
 
 function generatePMReportPDF_(payload) {
@@ -241,6 +273,13 @@ function generatePMReportPDF_(payload) {
       status: "ERROR: " + emailErr
     };
   }
+
+  addAuditLog_("PM_REPORT", "PM_REPORT_GENERATED", payload.companyId || CFG.DEFAULT_COMPANY_ID, "WORK_ORDER", payload.woNumber || "", payload.auditActor || {}, {
+    storeNumber: payload.storeNumber || "",
+    pdfEsUrl: result.pdfEsUrl || "",
+    pdfEnUrl: result.pdfEnUrl || "",
+    savedToWorkOrder: result.savedToWorkOrder
+  });
 
   return result;
 }

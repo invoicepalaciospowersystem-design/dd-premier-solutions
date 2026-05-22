@@ -251,6 +251,11 @@ function getCurrentCompanyId() {
   return String(user.companyId || "").toUpperCase();
 }
 
+function getSessionToken() {
+  const user = getCurrentUser();
+  return user.sessionToken || user.SESSION_TOKEN || "";
+}
+
 function loadHeader() {
   const companyId = getCurrentCompanyId();
 
@@ -281,7 +286,7 @@ function loadOrders() {
     .withFailureHandler(function(err) {
       document.getElementById("orders").innerHTML = "ERROR: " + err.message;
     })
-    .getTechnicianOrders(TECH_NAME);
+    .getTechnicianOrders(TECH_NAME, getSessionToken(), getCurrentCompanyId());
 }
 
 function renderOrders(data) {
@@ -419,7 +424,7 @@ function updateStatus(row, status) {
     .withFailureHandler(function(err) {
       alert(err.message);
     })
-    .updateTechOrderStatus(row, status);
+    .updateTechOrderStatus(row, status, getSessionToken());
 }
 
 function loadNotifications() {
@@ -444,7 +449,7 @@ function loadNotifications() {
       document.getElementById("notificationsBox").innerHTML =
         "ERROR: " + err.message;
     })
-    .getNotificationsByUser(TECH_NAME, getCurrentCompanyId());
+    .getNotificationsByUser(TECH_NAME, getCurrentCompanyId(), getSessionToken());
 }
 
 function toggleNotifications() {
@@ -458,7 +463,7 @@ function toggleNotifications() {
       .withFailureHandler(function(err) {
         alert(err.message);
       })
-      .markNotificationsReadByUser(TECH_NAME, getCurrentCompanyId());
+      .markNotificationsReadByUser(TECH_NAME, getCurrentCompanyId(), getSessionToken());
 
   } else {
     box.style.display = "none";
@@ -516,7 +521,7 @@ function loadMyTechSummary() {
       document.getElementById("myTechSummaryBox").innerHTML =
         "ERROR resumen: " + err.message;
     })
-    .getMyTechMonthlySummary(companyId, TECH_NAME, month, year);
+    .getMyTechMonthlySummary(companyId, TECH_NAME, month, year, getSessionToken());
 }
 
 function renderMyTechSummary(r) {
@@ -551,7 +556,7 @@ function loadMyTechInvoiceTable() {
       document.getElementById("myTechInvoiceTableBox").innerHTML =
         "ERROR tabla: " + err.message;
     })
-    .getMyTechInvoiceSummary(companyId, TECH_NAME, month, year);
+    .getMyTechInvoiceSummary(companyId, TECH_NAME, month, year, getSessionToken());
 }
 
 function renderMyTechInvoiceTable(r) {

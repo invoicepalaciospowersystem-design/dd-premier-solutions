@@ -381,7 +381,7 @@ function loadNotifications() {
       document.getElementById("notificationsBox").innerHTML =
         "ERROR loading notifications: " + err.message;
     })
-    .getNotifications(ACTIVE_COMPANY_ID, getCurrentRole());
+    .getNotifications(ACTIVE_COMPANY_ID, getCurrentRole(), getSessionToken());
 }
 
 function toggleNotifications() {
@@ -397,7 +397,7 @@ function toggleNotifications() {
       .withFailureHandler(function(err) {
         alert(err.message);
       })
-      .markNotificationsRead(ACTIVE_COMPANY_ID);
+      .markNotificationsRead(ACTIVE_COMPANY_ID, getSessionToken());
 
   } else {
     box.style.display = "none";

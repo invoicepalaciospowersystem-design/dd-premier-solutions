@@ -105,7 +105,7 @@ function requireLogin() {
 
   try {
     const parsed = JSON.parse(user);
-    if (!parsed.role && !parsed.ROLE) {
+    if ((!parsed.role && !parsed.ROLE) || (!parsed.sessionToken && !parsed.SESSION_TOKEN)) {
       localStorage.removeItem("pps_user");
       window.top.location.href = "<?= baseUrl ?>";
       return false;
@@ -131,6 +131,19 @@ const RETURN_TO = "<?= returnTo ?>";
 
 let ORDER = null;
 let ORDER_READY = false;
+
+function getCurrentUser() {
+  try {
+    return JSON.parse(localStorage.getItem("pps_user") || "{}");
+  } catch (e) {
+    return {};
+  }
+}
+
+function getSessionToken() {
+  const user = getCurrentUser();
+  return user.sessionToken || user.SESSION_TOKEN || "";
+}
 
 function isPMOrder() {
   return String((ORDER && ORDER.WO_TYPE) || "").toUpperCase() === "PM_FORM";
@@ -171,7 +184,7 @@ function load() {
         JSON.stringify(err, null, 2) +
         "</pre>";
     })
-    .getCloseOrderData(ROW_NUMBER, WO_NUMBER_FROM_URL);
+    .getCloseOrderData(ROW_NUMBER, WO_NUMBER_FROM_URL, getSessionToken());
 }
 
 function renderOrder() {
@@ -336,7 +349,7 @@ function saveClose() {
       const msg = err && err.message ? err.message : JSON.stringify(err);
       alert("ERROR guardando invoice: " + msg);
     })
-    .saveCloseOrder(payload);
+    .saveCloseOrder(payload, getSessionToken());
 }
 
 function getCloseOrderReturnUrl(tech) {

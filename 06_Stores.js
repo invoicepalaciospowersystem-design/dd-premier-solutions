@@ -226,7 +226,7 @@ function getStores(companyId, role, sessionToken) {
 function saveStore(store, sessionToken) {
   store = store || {};
   const targetCompany = String(store.COMPANY_ID || "").trim().toUpperCase();
-  requireSession_(sessionToken, ["OWNER", "ADMIN"], targetCompany);
+  const session = requireSession_(sessionToken, ["OWNER", "ADMIN"], targetCompany);
 
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.SHEET_STORES);
   if (!sh) throw new Error("No existe la hoja STORES.");
@@ -245,16 +245,23 @@ function saveStore(store, sessionToken) {
   store.ZIP = normalized.ZIP;
 
   const row = Number(store.ROW_NUMBER || 0);
+  const isExisting = row > 1;
 
   const values = headers.map(function(h) {
     return store[h] !== undefined ? store[h] : "";
   });
 
-  if (row > 1) {
+  if (isExisting) {
     sh.getRange(row, 1, 1, headers.length).setValues([values]);
   } else {
     sh.appendRow(values);
   }
+
+  addAuditLog_("STORES", isExisting ? "STORE_UPDATED" : "STORE_CREATED", targetCompany, "STORE", store["NSN #"] || store.NSN || "", session, {
+    rowNumber: isExisting ? row : sh.getLastRow(),
+    supervisorName: store.SUPERVISOR_NAME || "",
+    supervisorEmail: store.SUPERVISOR_EMAIL || ""
+  });
 
   return true;
 }

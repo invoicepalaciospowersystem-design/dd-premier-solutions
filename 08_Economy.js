@@ -136,6 +136,8 @@ function getEconomyData(companyId, role, sessionToken) {
   }
 
   return data.slice(1).map(function(row, i) {
+    if (isSoftDeletedRow_(row, headers)) return null;
+
     const obj = {};
 
     headers.forEach(function(h, c) {
@@ -151,6 +153,7 @@ function getEconomyData(companyId, role, sessionToken) {
     obj.ROW_NUMBER = i + 2;
     return obj;
   }).filter(function(o) {
+    if (!o) return false;
     return String(o.COMPANY_ID || "").trim().toUpperCase() === companyId;
   }).reverse();
 }
@@ -526,7 +529,7 @@ function removePMFromRegularEconomy() {
   const data = sh.getDataRange().getValues();
   if (data.length < 2) return 0;
 
-  const headers = data[0].map(h => String(h).trim());
+  let headers = ensureSheetColumns_(sh, ["ACTIVE", "DELETED_AT", "DELETED_BY"]);
 
   const idxInvSource = headers.indexOf("INV_SOURCE");
   const idxNotes = headers.indexOf("NOTES");
@@ -542,7 +545,9 @@ function removePMFromRegularEconomy() {
       notes.includes("PM INVOICE TOTAL") ||
       notes.includes("PAID TO D&D")
     ) {
-      sh.deleteRow(i + 1);
+      setCellByHeader_(sh, i + 1, headers, "ACTIVE", "NO");
+      setCellByHeader_(sh, i + 1, headers, "DELETED_AT", new Date());
+      setCellByHeader_(sh, i + 1, headers, "DELETED_BY", "removePMFromRegularEconomy");
       removed++;
     }
   }

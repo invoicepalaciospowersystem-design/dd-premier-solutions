@@ -264,7 +264,7 @@ function loadTechSummary() {
       document.getElementById("techSummaryBox").innerHTML =
         "ERROR resumen técnicos: " + err.message;
     })
-    .getTechMonthlySummary(ACTIVE_COMPANY_ID, month, year);
+    .getTechMonthlySummary(ACTIVE_COMPANY_ID, month, year, getSessionToken());
 }
 
 function renderTechSummary(rows) {

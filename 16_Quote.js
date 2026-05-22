@@ -390,7 +390,7 @@ function updateWorkOrderQuoteLinks_(rowNumber, pdfEn, pdfEs) {
   setCellByHeader_(sh, rowNumber, headers, "QUOTE_STATUS", "CREATED");
 }
 
-function approveQuote(rowNumber) {
+function approveQuote(rowNumber, sessionToken) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
   if (!sh) throw new Error("No existe WORK_ORDERS");
@@ -408,7 +408,15 @@ function approveQuote(rowNumber) {
   const quoteEnUrl = getCellByHeader_(sh, rowNumber, headers, "QUOTE_EN_URL");
   const quoteEsUrl = getCellByHeader_(sh, rowNumber, headers, "QUOTE_ES_URL");
 
-  const approvedBy = Session.getActiveUser().getEmail() || "Supervisor";
+  const session = requireSession_(sessionToken, ["SUPERVISOR", "OWNER", "ADMIN"], companyId);
+  if (String(session.role || "").toUpperCase() === "SUPERVISOR") {
+    const allowedStores = getSupervisorAllowedStores_(session.name, companyId);
+    if (allowedStores.indexOf(normalizeNSN_(nsn)) === -1) {
+      throw new Error("No autorizado para aprobar este quote.");
+    }
+  }
+
+  const approvedBy = getSessionActorLabel_(session);
 
   setCellByHeader_(sh, rowNumber, headers, "QUOTE_STATUS", "APPROVED");
 
@@ -427,6 +435,11 @@ function approveQuote(rowNumber) {
     approvedBy: approvedBy,
     quoteEnUrl: quoteEnUrl,
     quoteEsUrl: quoteEsUrl
+  });
+
+  addAuditLog_("SUPERVISOR", "QUOTE_APPROVED", companyId, "WORK_ORDER", woNumber, session, {
+    rowNumber: rowNumber,
+    nsn: nsn
   });
 
   return true;

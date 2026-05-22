@@ -238,7 +238,7 @@ function createPMInvoiceFromCloseOrder_(data) {
   }
 
   try {
-    updateTechOrderStatus(rowNumber, "COMPLETED");
+    updateTechOrderStatusInternal_(rowNumber, "COMPLETED", "PM Invoice");
   } catch (err) {
     Logger.log("ERROR updateTechOrderStatus PM: " + err);
     notifySystemError_("PM_ORDER_STATUS_UPDATE_ERROR", err, {

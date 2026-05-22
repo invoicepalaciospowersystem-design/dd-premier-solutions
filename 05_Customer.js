@@ -2,8 +2,16 @@
 // FILE: 05_Customer.gs
 // =====================================================
 
-function getCustomerOrdersBySupervisor(supervisorName) {
+function getCustomerOrdersBySupervisor(supervisorName, sessionToken, companyId) {
   supervisorName = String(supervisorName || "").trim();
+  companyId = String(companyId || "").trim().toUpperCase();
+  const session = requireNamedSession_(sessionToken, ["SUPERVISOR", "OWNER", "ADMIN"], companyId, supervisorName, "supervisor");
+  const role = String(session.role || "").trim().toUpperCase();
+
+  if (role === "SUPERVISOR") {
+    supervisorName = String(session.name || "").trim();
+    companyId = String(session.companyId || companyId || "").trim().toUpperCase();
+  }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
@@ -12,7 +20,7 @@ function getCustomerOrdersBySupervisor(supervisorName) {
     throw new Error("Missing sheet: " + CFG.SHEET_WORK_ORDERS);
   }
 
-  const allowedStores = getSupervisorAllowedStores_(supervisorName);
+  const allowedStores = getSupervisorAllowedStores_(supervisorName, companyId);
 
   if (allowedStores.length === 0) {
     throw new Error("Supervisor not found or has no assigned stores: " + supervisorName);
@@ -28,6 +36,7 @@ function getCustomerOrdersBySupervisor(supervisorName) {
   });
 
   const idxNSN = headers.indexOf("NSN");
+  const idxCompany = headers.indexOf("COMPANY_ID");
 
   if (idxNSN === -1) {
     throw new Error("Missing NSN column in WORK_ORDERS.");
@@ -37,9 +46,13 @@ function getCustomerOrdersBySupervisor(supervisorName) {
 
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
+    if (isSoftDeletedRow_(row, headers)) continue;
+
     const nsn = normalizeNSN_(row[idxNSN]);
+    const rowCompany = idxCompany >= 0 ? String(row[idxCompany] || "").trim().toUpperCase() : "";
 
     if (!allowedSet.has(nsn)) continue;
+    if (companyId && rowCompany && rowCompany !== companyId) continue;
 
     const obj = {};
 
@@ -73,8 +86,8 @@ function getCustomerOrdersBySupervisor(supervisorName) {
   return result.reverse();
 }
 
-function getSupervisorAllowedStores_(supervisorName) {
-  const fromSheet = getSupervisorStoresFromSheet_(supervisorName);
+function getSupervisorAllowedStores_(supervisorName, companyId) {
+  const fromSheet = getSupervisorStoresFromSheet_(supervisorName, companyId);
   const fromConstant = getSupervisorStoresFromConstant_(supervisorName);
 
   const all = fromSheet.concat(fromConstant)
@@ -96,8 +109,9 @@ function getSupervisorStoresFromConstant_(supervisorName) {
   return SUPERVISORS[supervisorName] || [];
 }
 
-function getSupervisorStoresFromSheet_(supervisorName) {
+function getSupervisorStoresFromSheet_(supervisorName, companyId) {
   supervisorName = String(supervisorName || "").trim().toUpperCase();
+  companyId = String(companyId || "").trim().toUpperCase();
 
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.SHEET_STORES);
   if (!sh) return [];
@@ -112,6 +126,7 @@ function getSupervisorStoresFromSheet_(supervisorName) {
   const idxNSN = headers.indexOf("NSN #");
   const idxSupervisor = headers.indexOf("SUPERVISOR_NAME");
   const idxActive = headers.indexOf("ACTIVE");
+  const idxCompany = headers.indexOf("COMPANY_ID");
 
   if (idxNSN === -1 || idxSupervisor === -1) return [];
 
@@ -119,12 +134,14 @@ function getSupervisorStoresFromSheet_(supervisorName) {
 
   for (let i = 1; i < data.length; i++) {
     const rowSupervisor = String(data[i][idxSupervisor] || "").trim().toUpperCase();
+    const rowCompany = idxCompany >= 0 ? String(data[i][idxCompany] || "").trim().toUpperCase() : "";
 
     const active = idxActive >= 0
       ? String(data[i][idxActive] || "YES").trim().toUpperCase()
       : "YES";
 
     if (rowSupervisor !== supervisorName) continue;
+    if (companyId && rowCompany && rowCompany !== companyId) continue;
     if (active === "NO") continue;
 
     result.push(normalizeNSN_(data[i][idxNSN]));
@@ -176,7 +193,7 @@ function getSupervisorCompany(supervisorName) {
   return supervisorClients[supervisorName] || "McDonald's";
 }
 
-function sendSupervisorOrderMessage(rowNumber, supervisorName, message) {
+function sendSupervisorOrderMessage(rowNumber, supervisorName, message, sessionToken) {
   if (!rowNumber || isNaN(rowNumber)) {
     throw new Error("Fila inválida.");
   }
@@ -205,7 +222,17 @@ function sendSupervisorOrderMessage(rowNumber, supervisorName, message) {
   const equipment = getCellByHeader_(sh, rowNumber, headers, "REPORTED_EQUIPMENT");
   const problem = getCellByHeader_(sh, rowNumber, headers, "REPORTED_PROBLEM_ORIGINAL");
 
-  const sentBy = supervisorName || Session.getActiveUser().getEmail() || "Supervisor";
+  const session = requireNamedSession_(sessionToken, ["SUPERVISOR", "OWNER", "ADMIN"], companyId, supervisorName, "supervisor");
+  const sentBy = getSessionActorLabel_(session);
+  const allowedStores = getSupervisorAllowedStores_(
+    String(session.role || "").toUpperCase() === "SUPERVISOR" ? session.name : supervisorName,
+    companyId
+  );
+
+  if (String(session.role || "").toUpperCase() === "SUPERVISOR" &&
+      allowedStores.indexOf(normalizeNSN_(nsn)) === -1) {
+    throw new Error("No autorizado para enviar mensajes de esta orden.");
+  }
 
   if (!woNumber) {
     throw new Error("No se encontró WO_NUMBER para esta orden.");

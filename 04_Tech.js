@@ -2,7 +2,16 @@
 // FILE: 04_Tech.gs
 // =====================================================
 
-function getTechnicianOrders(techName) {
+function getTechnicianOrders(techName, sessionToken, companyId) {
+  const session = requireNamedSession_(sessionToken, ["TECH", "OWNER", "ADMIN"], companyId, techName, "tecnico");
+  const sessionRole = String(session.role || "").trim().toUpperCase();
+  const effectiveTechName = sessionRole === "TECH" ? session.name : techName;
+  const effectiveCompanyId = String(companyId || session.companyId || "").trim().toUpperCase();
+
+  if (!String(effectiveTechName || "").trim()) {
+    throw new Error("No se encontro el nombre del tecnico.");
+  }
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
   if (!sh) throw new Error("No existe la hoja: " + CFG.SHEET_WORK_ORDERS);
@@ -29,14 +38,39 @@ function getTechnicianOrders(techName) {
 
   return data.filter(function(o) {
     const assignedTech = String(o.TECHNICIAN || "").toLowerCase();
-    const selectedTech = String(techName || "").toLowerCase();
+    const selectedTech = String(effectiveTechName || "").toLowerCase();
+    const rowCompany = String(o.COMPANY_ID || "").trim().toUpperCase();
     const status = String(o.STATUS || "").toUpperCase();
+
+    if (isSoftDeletedObject_(o)) return false;
+    if (effectiveCompanyId && rowCompany && rowCompany !== effectiveCompanyId) return false;
 
     return assignedTech.includes(selectedTech) && status !== "CLOSED" && status !== "COMPLETED";
   }).reverse();
 }
 
-function updateTechOrderStatus(rowNumber, newStatus) {
+function updateTechOrderStatus(rowNumber, newStatus, sessionToken) {
+  rowNumber = Number(rowNumber);
+  if (!rowNumber || rowNumber < 2) throw new Error("Fila invalida.");
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
+  if (!sh) throw new Error("No existe la hoja: " + CFG.SHEET_WORK_ORDERS);
+
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+  const companyId = getCellByHeader_(sh, rowNumber, headers, "COMPANY_ID") || CFG.DEFAULT_COMPANY_ID;
+  const assignedTech = String(getCellByHeader_(sh, rowNumber, headers, "TECHNICIAN") || "").toLowerCase();
+  const session = requireSession_(sessionToken, ["TECH", "OWNER", "ADMIN"], companyId);
+
+  if (String(session.role || "").toUpperCase() === "TECH" &&
+      !assignedTech.includes(String(session.name || "").trim().toLowerCase())) {
+    throw new Error("No autorizado para modificar esta orden.");
+  }
+
+  return updateTechOrderStatusInternal_(rowNumber, newStatus, getSessionActorLabel_(session));
+}
+
+function updateTechOrderStatusInternal_(rowNumber, newStatus, actorLabel) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
   const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
@@ -64,15 +98,21 @@ function updateTechOrderStatus(rowNumber, newStatus) {
     addNotification_(companyId, "Dayre", woNumber, "TRANSIT", "🚚 Parts in transit for " + woNumber);
   }
 
-  addLog_(companyId, woNumber, "STATUS UPDATED FROM TECH APP", oldStatus, newStatus, "Technician App", "");
+  addLog_(companyId, woNumber, "STATUS UPDATED FROM TECH APP", oldStatus, newStatus, actorLabel || "Technician App", "");
   return true;
 }
 
-function getMyTechInvoiceSummary(companyId, techName, month, year) {
+function getMyTechInvoiceSummary(companyId, techName, month, year, sessionToken) {
   companyId = String(companyId || "").trim().toUpperCase();
   techName = String(techName || "").trim();
   month = Number(month);
   year = Number(year);
+
+  const session = requireNamedSession_(sessionToken, ["TECH", "OWNER", "ADMIN"], companyId, techName, "tecnico");
+  if (String(session.role || "").trim().toUpperCase() === "TECH") {
+    techName = String(session.name || "").trim();
+    companyId = String(session.companyId || companyId || "").trim().toUpperCase();
+  }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
@@ -145,6 +185,7 @@ function getMyTechInvoiceSummary(companyId, techName, month, year) {
   if (ecoData.length > 1) {
     for (let i = 1; i < ecoData.length; i++) {
       const row = ecoData[i];
+      if (isSoftDeletedRow_(row, eh)) continue;
 
       const rowCompany = String(getRowValue_(row, eh, "COMPANY_ID") || "").trim().toUpperCase();
       const woNumber = String(getRowValue_(row, eh, "WO_NUMBER") || "").trim();
@@ -209,6 +250,7 @@ function getMyTechInvoiceSummary(companyId, techName, month, year) {
   if (pmData.length > 1) {
     for (let i = 1; i < pmData.length; i++) {
       const row = pmData[i];
+      if (isSoftDeletedRow_(row, ph)) continue;
 
       const rowCompany = String(getRowValue_(row, ph, "COMPANY_ID") || "").trim().toUpperCase();
       const woNumber = String(getRowValue_(row, ph, "WO_NUMBER") || "").trim();

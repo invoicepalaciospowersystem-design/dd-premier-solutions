@@ -4,6 +4,7 @@
 
 const AUTH_SESSION_PREFIX = "SESSION_";
 const AUTH_HASH_PREFIX = "sha256$";
+const AUTH_LOGIN_FAIL_PREFIX = "LOGIN_FAIL_";
 
 function loginUser(email, password) {
   email = String(email || "").trim().toLowerCase();
@@ -12,6 +13,8 @@ function loginUser(email, password) {
   if (!email || !password) {
     throw new Error("Debe escribir email y password.");
   }
+
+  assertLoginNotLocked_(email);
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = ss.getSheetByName(CFG.SHEET_USERS);
@@ -62,9 +65,11 @@ function loginUser(email, password) {
     const session = createSession_(user);
     user.sessionToken = session.token;
     user.sessionExpiresAt = session.expiresAt;
+    clearLoginFailures_(email);
     return user;
   }
 
+  recordLoginFailure_(email);
   throw new Error("Email o password incorrecto.");
 }
 
@@ -91,7 +96,7 @@ function ensureUserSecurityColumns_(sh) {
       return String(h || "").trim();
     });
 
-  ["PASSWORD_HASH", "PASSWORD_UPDATED_AT", "LAST_LOGIN_AT"].forEach(function(columnName) {
+  ["PASSWORD_HASH", "PASSWORD_UPDATED_AT", "LAST_LOGIN_AT", "DELETED_AT", "DELETED_BY"].forEach(function(columnName) {
     const hasColumn = headers.some(function(h) {
       return String(h || "").trim().toUpperCase() === columnName;
     });
@@ -107,6 +112,65 @@ function ensureUserSecurityColumns_(sh) {
     .map(function(h) {
       return String(h || "").trim();
     });
+}
+
+function assertLoginNotLocked_(email) {
+  const record = getLoginFailureRecord_(email);
+  const lockedUntil = Number(record.lockedUntil || 0);
+
+  if (lockedUntil && lockedUntil > Date.now()) {
+    const minutes = Math.ceil((lockedUntil - Date.now()) / 60000);
+    throw new Error("Demasiados intentos fallidos. Intente nuevamente en " + minutes + " minutos.");
+  }
+}
+
+function recordLoginFailure_(email) {
+  const props = PropertiesService.getScriptProperties();
+  const key = getLoginFailureKey_(email);
+  const record = getLoginFailureRecord_(email);
+  const now = Date.now();
+  const maxAttempts = Number(CFG.LOGIN_LOCK_MAX_ATTEMPTS || 5);
+  const lockMinutes = Number(CFG.LOGIN_LOCK_MINUTES || 15);
+
+  const next = {
+    count: Number(record.count || 0) + 1,
+    firstAt: record.firstAt || now,
+    lockedUntil: 0
+  };
+
+  if (next.count >= maxAttempts) {
+    next.lockedUntil = now + lockMinutes * 60 * 1000;
+  }
+
+  props.setProperty(key, JSON.stringify(next));
+}
+
+function clearLoginFailures_(email) {
+  PropertiesService.getScriptProperties().deleteProperty(getLoginFailureKey_(email));
+}
+
+function getLoginFailureRecord_(email) {
+  const raw = PropertiesService.getScriptProperties().getProperty(getLoginFailureKey_(email));
+  if (!raw) return {};
+
+  try {
+    const parsed = JSON.parse(raw);
+    const lockedUntil = Number(parsed.lockedUntil || 0);
+
+    if (lockedUntil && lockedUntil < Date.now()) {
+      clearLoginFailures_(email);
+      return {};
+    }
+
+    return parsed || {};
+  } catch (err) {
+    clearLoginFailures_(email);
+    return {};
+  }
+}
+
+function getLoginFailureKey_(email) {
+  return AUTH_LOGIN_FAIL_PREFIX + hashSessionToken_(String(email || "").trim().toLowerCase());
 }
 
 function verifyUserPassword_(sh, rowNumber, headers, row, password) {

@@ -49,19 +49,14 @@ function saveUser(rowNumber, data) {
   return true;
 }
 
-function deleteUser(rowNumber) {
+function deleteUserLegacyDisabled_(rowNumber) {
   rowNumber = Number(rowNumber);
 
   if (!rowNumber || rowNumber < 2) {
     throw new Error("Fila inválida.");
   }
 
-  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.SHEET_USERS);
-  if (!sh) throw new Error("No existe la hoja USERS.");
-
-  sh.deleteRow(rowNumber);
-
-  return true;
+  throw new Error("deleteUser requiere sesion segura.");
 }
 
 function getCompaniesForUser(companyId, role) {
@@ -205,6 +200,11 @@ function saveUser(rowNumber, data, sessionToken) {
     sh.appendRow(values);
   }
 
+  addAuditLog_("USERS", isExisting ? "USER_UPDATED" : "USER_CREATED", targetCompany, "USER", data.EMAIL || "", session, {
+    rowNumber: isExisting ? Number(rowNumber) : sh.getLastRow(),
+    role: targetRole
+  });
+
   return true;
 }
 
@@ -225,15 +225,24 @@ function deleteUser(rowNumber, sessionToken) {
   const row = sh.getRange(rowNumber, 1, 1, headers.length).getValues()[0];
   const idxCompany = normalizedHeaders.indexOf("COMPANY_ID");
   const idxRole = normalizedHeaders.indexOf("ROLE");
+  const idxEmail = normalizedHeaders.indexOf("EMAIL");
   const targetCompany = idxCompany >= 0 ? String(row[idxCompany] || "").trim().toUpperCase() : "";
   const targetRole = idxRole >= 0 ? String(row[idxRole] || "").trim().toUpperCase() : "";
+  const targetEmail = idxEmail >= 0 ? String(row[idxEmail] || "").trim() : "";
   const session = requireSession_(sessionToken, ["OWNER", "ADMIN"], targetCompany);
 
   if (session.role !== "OWNER" && targetRole === "OWNER") {
     throw new Error("Solo OWNER puede eliminar usuarios OWNER.");
   }
 
-  sh.deleteRow(rowNumber);
+  setCellByHeader_(sh, rowNumber, headers, "ACTIVE", "NO");
+  setCellByHeader_(sh, rowNumber, headers, "DELETED_AT", new Date());
+  setCellByHeader_(sh, rowNumber, headers, "DELETED_BY", getSessionActorLabel_(session));
+
+  addAuditLog_("USERS", "USER_SOFT_DELETED", targetCompany, "USER", targetEmail, session, {
+    rowNumber: rowNumber,
+    role: targetRole
+  });
 
   return true;
 }

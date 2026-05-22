@@ -10,6 +10,167 @@ function addLog_(companyId, woNumber, action, oldStatus, newStatus, user, notes)
   sh.appendRow([companyId || CFG.DEFAULT_COMPANY_ID, new Date(), woNumber, action, oldStatus, newStatus, user, notes]);
 }
 
+function normalizeIdentity_(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function requireNamedSession_(sessionToken, allowedRoles, companyId, requestedName, label) {
+  const session = requireSession_(sessionToken, allowedRoles, companyId);
+  const role = String(session.role || "").trim().toUpperCase();
+  const target = normalizeIdentity_(requestedName);
+
+  if (target && role !== "OWNER" && role !== "ADMIN" && normalizeIdentity_(session.name) !== target) {
+    throw new Error("No autorizado para ver este " + (label || "portal") + ".");
+  }
+
+  return session;
+}
+
+function requireWorkOrderSession_(sessionToken, row, headers, allowedRoles, actionName) {
+  if (isSoftDeletedRow_(row, headers)) {
+    throw new Error("Esta orden fue eliminada o desactivada.");
+  }
+
+  const companyId = getRowValue_(row, headers, "COMPANY_ID") || CFG.DEFAULT_COMPANY_ID;
+  const session = requireSession_(sessionToken, allowedRoles, companyId);
+  const role = String(session.role || "").trim().toUpperCase();
+
+  if (role === "TECH") {
+    const assignedTech = String(getRowValue_(row, headers, "TECHNICIAN") || "").trim().toLowerCase();
+    if (!assignedTech.includes(String(session.name || "").trim().toLowerCase())) {
+      throw new Error("No autorizado para " + (actionName || "usar") + " esta orden.");
+    }
+  }
+
+  if (role === "SUPERVISOR") {
+    const nsn = normalizeNSN_(getRowValue_(row, headers, "NSN"));
+    const stores = getSupervisorAllowedStores_(session.name, companyId);
+    if (stores.indexOf(nsn) === -1) {
+      throw new Error("No autorizado para " + (actionName || "usar") + " esta orden.");
+    }
+  }
+
+  return session;
+}
+
+function getSessionActorLabel_(session) {
+  session = session || {};
+  return String(session.email || session.name || session.role || "SYSTEM").trim() || "SYSTEM";
+}
+
+function ensureSheetColumns_(sh, requiredColumns) {
+  let headers = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1))
+    .getValues()[0]
+    .map(function(h) {
+      return String(h || "").trim();
+    });
+
+  requiredColumns.forEach(function(columnName) {
+    const exists = headers.some(function(h) {
+      return String(h || "").trim().toUpperCase() === String(columnName || "").trim().toUpperCase();
+    });
+
+    if (!exists) {
+      sh.getRange(1, sh.getLastColumn() + 1).setValue(columnName);
+      headers.push(columnName);
+    }
+  });
+
+  return sh.getRange(1, 1, 1, sh.getLastColumn())
+    .getValues()[0]
+    .map(function(h) {
+      return String(h || "").trim();
+    });
+}
+
+function isSoftDeletedRow_(row, headers) {
+  const normalized = headers.map(function(h) {
+    return String(h || "").trim().toUpperCase();
+  });
+
+  const idxActive = normalized.indexOf("ACTIVE");
+  const idxDeletedAt = normalized.indexOf("DELETED_AT");
+  const idxStatus = normalized.indexOf("STATUS");
+
+  const active = idxActive >= 0 ? String(row[idxActive] || "").trim().toUpperCase() : "YES";
+  const deletedAt = idxDeletedAt >= 0 ? String(row[idxDeletedAt] || "").trim() : "";
+  const status = idxStatus >= 0 ? String(row[idxStatus] || "").trim().toUpperCase() : "";
+
+  return active === "NO" || !!deletedAt || status === "DELETED";
+}
+
+function isSoftDeletedObject_(obj) {
+  obj = obj || {};
+  const active = String(obj.ACTIVE || "YES").trim().toUpperCase();
+  const deletedAt = String(obj.DELETED_AT || "").trim();
+  const status = String(obj.STATUS || "").trim().toUpperCase();
+
+  return active === "NO" || !!deletedAt || status === "DELETED";
+}
+
+function addAuditLog_(moduleName, action, companyId, entityType, entityId, actor, details) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheetName = CFG.SHEET_AUDIT_LOGS || "AUDIT_LOGS";
+    let sh = ss.getSheetByName(sheetName);
+
+    if (!sh) {
+      sh = ss.insertSheet(sheetName);
+    }
+
+    if (sh.getLastRow() === 0) {
+      sh.appendRow([
+        "TIMESTAMP",
+        "MODULE",
+        "ACTION",
+        "COMPANY_ID",
+        "ENTITY_TYPE",
+        "ENTITY_ID",
+        "ACTOR_EMAIL",
+        "ACTOR_NAME",
+        "ACTOR_ROLE",
+        "DETAILS"
+      ]);
+    }
+
+    actor = actor || {};
+
+    sh.appendRow([
+      new Date(),
+      moduleName || "",
+      action || "",
+      companyId || CFG.DEFAULT_COMPANY_ID,
+      entityType || "",
+      entityId || "",
+      actor.email || "",
+      actor.name || "",
+      actor.role || "",
+      safeStringifySystemError_(details || {})
+    ]);
+  } catch (err) {
+    Logger.log("ERROR addAuditLog_: " + err);
+  }
+}
+
+function getRequiredScriptProperty_(key) {
+  const value = PropertiesService.getScriptProperties().getProperty(key);
+  if (!value) throw new Error("Falta " + key + " en Script Properties.");
+  return value;
+}
+
+function validateSecurityProperties() {
+  const missing = [];
+  ["TWILIO_SID", "TWILIO_TOKEN", "TWILIO_FROM"].forEach(function(key) {
+    if (!PropertiesService.getScriptProperties().getProperty(key)) missing.push(key);
+  });
+
+  return {
+    environment: CFG.APP_ENV || "PRODUCTION",
+    missing: missing,
+    ok: missing.length === 0
+  };
+}
+
 function notifySystemError_(context, err, details) {
   details = details || {};
   context = String(context || "SYSTEM_ERROR").trim() || "SYSTEM_ERROR";

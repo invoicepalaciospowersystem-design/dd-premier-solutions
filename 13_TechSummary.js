@@ -4,11 +4,12 @@
 // FILE: 14_Tech_Summary.gs
 // =====================================================
 
-function getTechMonthlySummary(companyId, month, year) {
+function getTechMonthlySummary(companyId, month, year, sessionToken) {
 
   companyId = String(companyId || "").trim().toUpperCase();
   month = Number(month);
   year = Number(year);
+  const session = requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA", "TECH"], companyId);
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
@@ -92,6 +93,7 @@ function getTechMonthlySummary(companyId, month, year) {
   for (let i = 1; i < ecoData.length; i++) {
 
     const row = ecoData[i];
+    if (isSoftDeletedRow_(row, eh)) continue;
 
     const comp = String(row[eCompany] || "").trim().toUpperCase();
 
@@ -207,6 +209,7 @@ function getTechMonthlySummary(companyId, month, year) {
     for (let i = 1; i < pmData.length; i++) {
 
       const row = pmData[i];
+      if (isSoftDeletedRow_(row, ph)) continue;
 
       const comp = String(row[pCompany] || "").trim().toUpperCase();
 
@@ -279,9 +282,18 @@ function getTechMonthlySummary(companyId, month, year) {
     }
   }
 
-  return Object.keys(summary)
+  let rows = Object.keys(summary)
     .map(k => summary[k])
     .sort((a, b) => Number(b.totalPay || 0) - Number(a.totalPay || 0));
+
+  if (String(session.role || "").trim().toUpperCase() === "TECH") {
+    const ownName = normalizeIdentity_(session.name);
+    rows = rows.filter(function(row) {
+      return normalizeIdentity_(row.name) === ownName;
+    });
+  }
+
+  return rows;
 }
 
 // =====================================================
@@ -357,9 +369,14 @@ function addOldDDMonthlyToSummary_(summary, month, year) {
 // SOLO UN TECNICO
 // =====================================================
 
-function getMyTechMonthlySummary(companyId, techName, month, year) {
+function getMyTechMonthlySummary(companyId, techName, month, year, sessionToken) {
+  const session = requireNamedSession_(sessionToken, ["TECH", "OWNER", "ADMIN"], companyId, techName, "tecnico");
+  if (String(session.role || "").trim().toUpperCase() === "TECH") {
+    techName = String(session.name || "").trim();
+    companyId = String(session.companyId || companyId || "").trim().toUpperCase();
+  }
 
-  const all = getTechMonthlySummary(companyId, month, year);
+  const all = getTechMonthlySummary(companyId, month, year, sessionToken);
 
   const target = String(techName || "").trim().toLowerCase();
 

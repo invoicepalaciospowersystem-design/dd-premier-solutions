@@ -26,7 +26,9 @@ const COMPANY_ADMIN_COLUMNS = [
   "LOGIN_BACKGROUND_FILE_ID",
   "LOGIN_BACKGROUND_URL",
   "NOTES",
-  "ACTIVE"
+  "ACTIVE",
+  "DELETED_AT",
+  "DELETED_BY"
 ];
 
 function getCompaniesAdmin(sessionToken) {
@@ -49,7 +51,7 @@ function getCompaniesAdmin(sessionToken) {
 }
 
 function saveCompanyAdmin(rowNumber, data, sessionToken) {
-  requireCompaniesOwner_(sessionToken);
+  const session = requireCompaniesOwner_(sessionToken);
 
   data = data || {};
 
@@ -81,11 +83,16 @@ function saveCompanyAdmin(rowNumber, data, sessionToken) {
     sh.appendRow(values);
   }
 
+  addAuditLog_("COMPANIES", isExisting ? "COMPANY_UPDATED" : "COMPANY_CREATED", companyId, "COMPANY", companyId, session, {
+    rowNumber: isExisting ? rowNumber : sh.getLastRow(),
+    companyName: companyName
+  });
+
   return true;
 }
 
 function toggleCompanyActiveAdmin(rowNumber, sessionToken) {
-  requireCompaniesOwner_(sessionToken);
+  const session = requireCompaniesOwner_(sessionToken);
 
   rowNumber = Number(rowNumber || 0);
   if (!rowNumber || rowNumber < 2) throw new Error("Fila invalida.");
@@ -97,7 +104,24 @@ function toggleCompanyActiveAdmin(rowNumber, sessionToken) {
   if (idxActive === -1) throw new Error("COMPANIES debe tener ACTIVE.");
 
   const current = String(sh.getRange(rowNumber, idxActive + 1).getValue() || "").trim().toUpperCase();
-  sh.getRange(rowNumber, idxActive + 1).setValue(current === "YES" ? "NO" : "YES");
+  const next = current === "YES" ? "NO" : "YES";
+  sh.getRange(rowNumber, idxActive + 1).setValue(next);
+
+  const idxCompany = headers.indexOf("COMPANY_ID");
+  const companyId = idxCompany >= 0 ? String(sh.getRange(rowNumber, idxCompany + 1).getValue() || "").trim().toUpperCase() : "";
+
+  if (next === "NO") {
+    setCellByHeader_(sh, rowNumber, headers, "DELETED_AT", new Date());
+    setCellByHeader_(sh, rowNumber, headers, "DELETED_BY", getSessionActorLabel_(session));
+  } else {
+    setCellByHeader_(sh, rowNumber, headers, "DELETED_AT", "");
+    setCellByHeader_(sh, rowNumber, headers, "DELETED_BY", "");
+  }
+
+  addAuditLog_("COMPANIES", "COMPANY_ACTIVE_TOGGLED", companyId, "COMPANY", companyId, session, {
+    rowNumber: rowNumber,
+    active: next
+  });
 
   return true;
 }
