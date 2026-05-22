@@ -1582,7 +1582,7 @@
     <div id="supervisorMetricResults" class="supervisor-results"></div>
   </div>
 
-  <h2 class="module-heading">Modulos</h2>
+  <h2 id="moduleHeading" class="module-heading">Modulos</h2>
   <div id="modules" class="grid"></div>
 </div>
 
@@ -1869,13 +1869,25 @@ function showPanel() {
 
 function renderModules() {
   const role = String(CURRENT_USER.role || "").trim().toUpperCase();
+  const heading = document.getElementById("moduleHeading");
+  const modulesBox = document.getElementById("modules");
+
+  if (role === "SUPERVISOR") {
+    heading.style.display = "none";
+    modulesBox.style.display = "none";
+    modulesBox.innerHTML = "";
+    return;
+  }
+
+  heading.style.display = "";
+  modulesBox.style.display = "";
 
   const allowed = MODULES.filter(function(m) {
     return m.roles.includes(role);
   });
 
   if (!allowed.length) {
-    document.getElementById("modules").innerHTML = `
+    modulesBox.innerHTML = `
       <div class="module">
         <div class="module-title">No hay modulos disponibles</div>
         <div class="module-desc">
@@ -1888,7 +1900,7 @@ function renderModules() {
     return;
   }
 
-  document.getElementById("modules").innerHTML =
+  modulesBox.innerHTML =
     allowed.map(function(m) {
       return `
         <div class="module" onclick="openModule('${m.url}')">
