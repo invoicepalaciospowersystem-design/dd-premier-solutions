@@ -643,6 +643,58 @@
       letter-spacing:0;
     }
 
+    .owner-company-control {
+      display:none;
+      grid-template-columns:minmax(220px, 1fr) minmax(260px, 380px);
+      gap:14px;
+      align-items:end;
+      margin-top:16px;
+      padding-top:16px;
+      border-top:1px solid #e5e7eb;
+    }
+
+    .owner-scope-label {
+      color:#6b7280;
+      font-size:12px;
+      font-weight:bold;
+      text-transform:uppercase;
+      letter-spacing:0;
+    }
+
+    .owner-scope-pill {
+      display:inline-flex;
+      align-items:center;
+      min-height:38px;
+      margin-top:7px;
+      padding:8px 12px;
+      border-radius:8px;
+      background:#eef2ff;
+      color:#1e3a8a;
+      border:1px solid #c7d2fe;
+      font-weight:bold;
+      line-height:1.2;
+      overflow-wrap:anywhere;
+    }
+
+    .owner-company-select {
+      width:100%;
+      height:46px;
+      margin:7px 0 0;
+      padding:0 12px;
+      border:1px solid #d1d5db;
+      border-radius:8px;
+      background:#ffffff;
+      color:#111827;
+      font-size:14px;
+      box-sizing:border-box;
+    }
+
+    .owner-company-select:disabled {
+      background:#f3f4f6;
+      color:#6b7280;
+      cursor:not-allowed;
+    }
+
     .owner-dashboard {
       display:none;
       margin-bottom:18px;
@@ -913,6 +965,10 @@
       .dash-layout {
         grid-template-columns:1fr;
       }
+
+      .owner-company-control {
+        grid-template-columns:1fr;
+      }
     }
   </style>
 </head>
@@ -1031,6 +1087,19 @@
       </div>
       <button class="logout" onclick="logout()">Salir</button>
     </div>
+
+    <div id="ownerCompanyControl" class="owner-company-control">
+      <div>
+        <div class="owner-scope-label">Vista actual</div>
+        <div id="ownerScopeText" class="owner-scope-pill">Todas las empresas</div>
+      </div>
+      <div>
+        <label class="owner-scope-label" for="ownerCompanySelect">Empresa</label>
+        <select id="ownerCompanySelect" class="owner-company-select" onchange="onOwnerCompanyChange()">
+          <option value="">Cargando empresas...</option>
+        </select>
+      </div>
+    </div>
   </div>
 
   <div id="ownerDashboard" class="owner-dashboard">
@@ -1079,6 +1148,8 @@ let CURRENT_BRANDING = {
   backgroundImageUrl: "",
   logoImageUrl: ""
 };
+let OWNER_COMPANIES = [];
+let SELECTED_OWNER_COMPANY_ID = "";
 
 setLoginTheme(LOGIN_COMPANY_ID);
 
@@ -1264,6 +1335,7 @@ function getSessionToken() {
 
 function showPanel() {
   CURRENT_USER = normalizeUser(CURRENT_USER);
+  SELECTED_OWNER_COMPANY_ID = getInitialOwnerCompanySelection();
 
   document.body.classList.remove("login-mode");
   document.getElementById("loginShell").style.display = "none";
@@ -1273,10 +1345,10 @@ function showPanel() {
   updateHeaderCompany(getActiveCompanyId());
 
   document.getElementById("userInfo").innerText =
-    CURRENT_USER.name + " | " + CURRENT_USER.role + " | Company: " + CURRENT_USER.companyId;
+    CURRENT_USER.name + " | " + CURRENT_USER.role + " | Company: " + (getActiveCompanyId() || "ALL");
 
   renderModules();
-  loadOwnerDashboard();
+  loadOwnerCompanySelector();
 }
 
 function renderModules() {
@@ -1311,6 +1383,143 @@ function renderModules() {
     }).join("");
 }
 
+function getInitialOwnerCompanySelection() {
+  const role = String(CURRENT_USER && CURRENT_USER.role || "").trim().toUpperCase();
+  if (role !== "OWNER") {
+    return LOGIN_COMPANY_ID || String(CURRENT_USER && CURRENT_USER.companyId || "").trim().toUpperCase();
+  }
+
+  if (LOGIN_COMPANY_ID) return LOGIN_COMPANY_ID;
+
+  return String(localStorage.getItem(getOwnerSelectionStorageKey()) || "").trim().toUpperCase();
+}
+
+function getOwnerSelectionStorageKey() {
+  return "owner_selected_company_" + (LOGIN_COMPANY_ID || "ALL");
+}
+
+function loadOwnerCompanySelector() {
+  const role = String(CURRENT_USER && CURRENT_USER.role || "").trim().toUpperCase();
+  const control = document.getElementById("ownerCompanyControl");
+
+  if (role !== "OWNER") {
+    control.style.display = "none";
+    loadOwnerDashboard();
+    return;
+  }
+
+  control.style.display = "grid";
+  renderOwnerCompanySelector(true);
+
+  google.script.run
+    .withSuccessHandler(function(companies) {
+      OWNER_COMPANIES = Array.isArray(companies) ? companies : [];
+      renderOwnerCompanySelector(false);
+      loadOwnerDashboard();
+    })
+    .withFailureHandler(function() {
+      OWNER_COMPANIES = [];
+      renderOwnerCompanySelector(false);
+      loadOwnerDashboard();
+    })
+    .getCompaniesForUser("", "", getSessionToken());
+}
+
+function renderOwnerCompanySelector(isLoading) {
+  const select = document.getElementById("ownerCompanySelect");
+  if (!select) return;
+
+  let options = [];
+  if (!LOGIN_COMPANY_ID) {
+    options.push({ id: "", name: "Todas las empresas" });
+  }
+
+  OWNER_COMPANIES.forEach(function(company) {
+    const id = String(company.COMPANY_ID || company.companyId || "").trim().toUpperCase();
+    if (!id) return;
+    if (LOGIN_COMPANY_ID && id !== LOGIN_COMPANY_ID) return;
+
+    options.push({
+      id: id,
+      name: getCompanyOptionName(company, id)
+    });
+  });
+
+  if (LOGIN_COMPANY_ID && !options.some(function(opt) { return opt.id === LOGIN_COMPANY_ID; })) {
+    options.push({ id: LOGIN_COMPANY_ID, name: LOGIN_COMPANY_ID });
+  }
+
+  if (!options.length) {
+    options.push({ id: "", name: isLoading ? "Cargando empresas..." : "Todas las empresas" });
+  }
+
+  if (isLoading && SELECTED_OWNER_COMPANY_ID &&
+      !options.some(function(opt) { return opt.id === SELECTED_OWNER_COMPANY_ID; })) {
+    options.push({ id: SELECTED_OWNER_COMPANY_ID, name: "Cargando seleccion..." });
+  }
+
+  if (!options.some(function(opt) { return opt.id === SELECTED_OWNER_COMPANY_ID; })) {
+    SELECTED_OWNER_COMPANY_ID = options[0].id;
+  }
+
+  select.innerHTML = options.map(function(opt) {
+    return "<option value=\"" + escapeHtmlMain(opt.id) + "\">" +
+      escapeHtmlMain(opt.name) + "</option>";
+  }).join("");
+  select.value = SELECTED_OWNER_COMPANY_ID;
+  select.disabled = Boolean(LOGIN_COMPANY_ID);
+
+  updateOwnerScopeText();
+  updateHeaderCompany(getActiveCompanyId());
+}
+
+function getCompanyOptionName(company, fallbackId) {
+  return String(
+    company.COMPANY_NAME ||
+    company.companyName ||
+    company.NAME ||
+    company.CLIENTE ||
+    fallbackId ||
+    ""
+  ).trim();
+}
+
+function onOwnerCompanyChange() {
+  const select = document.getElementById("ownerCompanySelect");
+  SELECTED_OWNER_COMPANY_ID = String(select && select.value || "").trim().toUpperCase();
+
+  if (!LOGIN_COMPANY_ID) {
+    localStorage.setItem(getOwnerSelectionStorageKey(), SELECTED_OWNER_COMPANY_ID);
+  }
+
+  updateOwnerScopeText();
+  updateHeaderCompany(getActiveCompanyId());
+
+  document.getElementById("userInfo").innerText =
+    CURRENT_USER.name + " | " + CURRENT_USER.role + " | Company: " + (getActiveCompanyId() || "ALL");
+
+  loadOwnerDashboard();
+}
+
+function updateOwnerScopeText() {
+  const target = document.getElementById("ownerScopeText");
+  if (!target) return;
+
+  const companyId = getActiveCompanyId();
+  target.innerText = companyId ? getOwnerCompanyLabel(companyId) : "Todas las empresas";
+}
+
+function getOwnerCompanyLabel(companyId) {
+  companyId = String(companyId || "").trim().toUpperCase();
+  if (!companyId) return "Todas las empresas";
+
+  const found = OWNER_COMPANIES.find(function(company) {
+    return String(company.COMPANY_ID || company.companyId || "").trim().toUpperCase() === companyId;
+  });
+
+  return found ? getCompanyOptionName(found, companyId) : companyId;
+}
+
 function loadOwnerDashboard() {
   const role = String(CURRENT_USER && CURRENT_USER.role || "").trim().toUpperCase();
   const box = document.getElementById("ownerDashboard");
@@ -1341,7 +1550,6 @@ function loadOwnerDashboard() {
 }
 
 function getDashboardCompanyScope() {
-  if (OWNER_ONLY_LOGIN && !LOGIN_COMPANY_ID) return "";
   return getActiveCompanyId();
 }
 
@@ -1515,6 +1723,12 @@ function openModule(url) {
 }
 
 function getActiveCompanyId() {
+  const role = String(CURRENT_USER && CURRENT_USER.role || "").trim().toUpperCase();
+  if (role === "OWNER") {
+    if (LOGIN_COMPANY_ID) return LOGIN_COMPANY_ID;
+    return String(SELECTED_OWNER_COMPANY_ID || "").trim().toUpperCase();
+  }
+
   return LOGIN_COMPANY_ID || String(CURRENT_USER && CURRENT_USER.companyId || "").trim().toUpperCase();
 }
 
@@ -1530,7 +1744,10 @@ function updateHeaderCompany(companyId) {
   companyId = String(companyId || "").toUpperCase();
 
   if (!companyId) {
-    document.getElementById("companyTitle").innerText = "Company: Loading...";
+    document.getElementById("companyTitle").innerText = "Company: Todas las empresas";
+    document.getElementById("ownerTitle").innerText =
+      CURRENT_BRANDING.ownerName || "D&D Premier Solutions Corp";
+    document.getElementById("systemSubtitle").innerText = "Vista ejecutiva central";
     return;
   }
 
