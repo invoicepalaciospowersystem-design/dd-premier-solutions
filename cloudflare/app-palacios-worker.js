@@ -1,20 +1,32 @@
 const APPS_SCRIPT_URL =
   "https://script.google.com/macros/s/AKfycbwAiZ0Dh5BQoX-QTmMbZcRDEr974-X_nNWcW5x2XeYurC_CeXLNSrl1k-f3p1DDKppOCw/exec";
 
-const DEFAULT_COMPANY_ID = "PPS";
-
 export default {
   async fetch(request) {
     const requestUrl = new URL(request.url);
     const params = new URLSearchParams(requestUrl.search);
+    const host = requestUrl.hostname.toLowerCase();
+    const isPalacios = host === "app.palaciospowersystems.com";
+    const isDdPremier = host === "ddpremiersolutionscorp.com" ||
+      host === "www.ddpremiersolutionscorp.com";
 
-    if (!params.get("companyId")) {
-      params.set("companyId", DEFAULT_COMPANY_ID);
+    if (isPalacios) {
+      params.set("companyId", "PPS");
+      params.delete("ownerOnly");
     }
 
-    const iframeUrl = APPS_SCRIPT_URL + "?" + params.toString();
+    if (isDdPremier) {
+      params.delete("companyId");
+      params.set("ownerOnly", "1");
+    }
 
-    return new Response(renderAppShell(iframeUrl), {
+    const query = params.toString();
+    const iframeUrl = APPS_SCRIPT_URL + (query ? "?" + query : "");
+    const title = isDdPremier
+      ? "D&D Premier Solutions Corp"
+      : "Palacios Power Systems Corp";
+
+    return new Response(renderAppShell(iframeUrl, title), {
       headers: {
         "content-type": "text/html; charset=UTF-8",
         "cache-control": "no-store"
@@ -23,13 +35,13 @@ export default {
   }
 };
 
-function renderAppShell(iframeUrl) {
+function renderAppShell(iframeUrl, title) {
   return `<!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Palacios Power Systems Corp</title>
+  <title>${escapeHtml(title)}</title>
   <style>
     html,
     body {
@@ -53,7 +65,7 @@ function renderAppShell(iframeUrl) {
 </head>
 <body>
   <iframe
-    title="Palacios Power Systems"
+    title="${escapeHtml(title)}"
     src="${escapeHtml(iframeUrl)}"
     allow="clipboard-read; clipboard-write"
   ></iframe>

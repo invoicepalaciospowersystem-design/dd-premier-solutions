@@ -73,13 +73,21 @@ function loginUser(email, password) {
   throw new Error("Email o password incorrecto.");
 }
 
-function loginUserForCompany(email, password, requestedCompanyId) {
+function loginUserForCompany(email, password, requestedCompanyId, ownerOnly) {
   const user = loginUser(email, password);
   const requested = String(requestedCompanyId || "").trim().toUpperCase();
+  const role = String(user.role || "").trim().toUpperCase();
+
+  if (ownerOnly === true || String(ownerOnly || "").trim() === "true" || String(ownerOnly || "").trim() === "1") {
+    if (role !== "OWNER") {
+      destroySession(user.sessionToken);
+      throw new Error("Este acceso es solo para OWNER.");
+    }
+  }
 
   if (
     requested &&
-    String(user.role || "").trim().toUpperCase() !== "OWNER" &&
+    role !== "OWNER" &&
     String(user.companyId || "").trim().toUpperCase() !== requested
   ) {
     destroySession(user.sessionToken);

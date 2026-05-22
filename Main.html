@@ -857,6 +857,7 @@
 <script>
 const BASE_URL = "<?= baseUrl ?>";
 const LOGIN_COMPANY_ID = String("<?= companyId ?>").trim().toUpperCase();
+const OWNER_ONLY_LOGIN = String("<?= ownerOnly ?>").trim().toLowerCase() === "true";
 
 let CURRENT_USER = null;
 let CURRENT_BRANDING = {
@@ -1024,7 +1025,7 @@ function login() {
       document.getElementById("loginButton").disabled = false;
       document.getElementById("loginButton").innerText = "INICIAR SESION";
     })
-    .loginUserForCompany(email, password, LOGIN_COMPANY_ID);
+    .loginUserForCompany(email, password, LOGIN_COMPANY_ID, OWNER_ONLY_LOGIN);
 }
 
 function togglePassword() {

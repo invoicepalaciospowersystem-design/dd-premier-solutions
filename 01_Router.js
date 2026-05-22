@@ -150,6 +150,7 @@ function doGet(e) {
     const template = HtmlService.createTemplateFromFile("Main");
     template.baseUrl = baseUrl;
     template.companyId = p.companyId || "";
+    template.ownerOnly = (p.ownerOnly === "1" || p.ownerOnly === "true" || p.portal === "owner") ? "true" : "";
 
     return template.evaluate()
       .setTitle(CFG.APP_NAME)
