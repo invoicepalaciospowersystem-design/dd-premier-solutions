@@ -9,6 +9,7 @@
       --brand-primary:#111827;
       --brand-accent:#dc2626;
       --login-bg-image:none;
+      --company-watermark-logo:none;
     }
 
     body {
@@ -25,6 +26,27 @@
       background:
         linear-gradient(180deg, #f8fafc 0%, #eef2f7 46%, #e5e7eb 100%);
       padding:18px;
+      position:relative;
+      overflow-x:hidden;
+    }
+
+    body.app-mode::before {
+      content:"";
+      position:fixed;
+      inset:0;
+      background-image:var(--company-watermark-logo);
+      background-repeat:no-repeat;
+      background-position:right 5vw center;
+      background-size:min(56vw, 720px);
+      opacity:.055;
+      filter:grayscale(100%);
+      pointer-events:none;
+      z-index:0;
+    }
+
+    body.app-mode > * {
+      position:relative;
+      z-index:1;
     }
 
     body.login-mode {
@@ -1110,6 +1132,12 @@
         padding:12px;
       }
 
+      body.app-mode::before {
+        background-position:center 68%;
+        background-size:min(88vw, 420px);
+        opacity:.035;
+      }
+
       .global-header {
         border-radius:10px;
         padding:14px;
@@ -1594,6 +1622,7 @@ function applyBranding(branding) {
     (CURRENT_BRANDING.companyId ? CURRENT_BRANDING.companyId + " Login" : "System Login");
 
   applyLogo(CURRENT_BRANDING.logoImageUrl);
+  applyWatermark(CURRENT_BRANDING.logoImageUrl);
 
   const bg = String(CURRENT_BRANDING.backgroundImageUrl || "").trim();
   if (bg) {
@@ -1603,6 +1632,15 @@ function applyBranding(branding) {
     document.body.classList.remove("has-login-bg");
     document.documentElement.style.setProperty("--login-bg-image", "none");
   }
+}
+
+function applyWatermark(url) {
+  url = safeImageUrl(url);
+
+  document.documentElement.style.setProperty(
+    "--company-watermark-logo",
+    url ? "url('" + cssUrl(url) + "')" : "none"
+  );
 }
 
 function setLoginTheme(companyId) {
@@ -2160,6 +2198,7 @@ function updateHeaderCompany(companyId) {
     document.getElementById("ownerTitle").innerText =
       CURRENT_BRANDING.ownerName || "D&D Premier Solutions Corp";
     document.getElementById("systemSubtitle").innerText = "Vista ejecutiva central";
+    applyWatermark(CURRENT_BRANDING.logoImageUrl);
     return;
   }
 
@@ -2172,10 +2211,12 @@ function updateHeaderCompany(companyId) {
         branding.ownerName || CURRENT_BRANDING.ownerName || "D&D Premier Solutions Corp";
       document.getElementById("systemSubtitle").innerText =
         branding.loginSubtitle || "Sistema de Ordenes";
+      applyWatermark(branding.logoImageUrl || CURRENT_BRANDING.logoImageUrl);
     })
     .withFailureHandler(function() {
       document.getElementById("companyTitle").innerText =
         "Company: " + companyId;
+      applyWatermark(CURRENT_BRANDING.logoImageUrl);
     })
     .getCompanyBranding(companyId);
 }
