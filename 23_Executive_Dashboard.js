@@ -210,6 +210,7 @@ function buildAdminPeriodScope_(periodMode, periodYear, periodMonth) {
 
 function collectAdminEconomyFinancials_(ss, dashboard, companyId, periodScope) {
   const sh = ss.getSheetByName(CFG.SHEET_ECONOMY);
+  const dateLookup = buildAdminEconomyDateLookup_(ss);
 
   if (sh && sh.getLastRow() >= 2) {
     const data = sh.getDataRange().getValues();
@@ -227,7 +228,7 @@ function collectAdminEconomyFinancials_(ss, dashboard, companyId, periodScope) {
     }
 
     const rows = companyRows.filter(function(row) {
-      return adminEconomyRowMatchesScope_(row, headers, periodScope);
+      return adminEconomyRowMatchesScope_(row, headers, periodScope, dateLookup);
     });
 
     rows.forEach(function(row) {
@@ -284,6 +285,90 @@ function getAdminEconomyCost_(row, headers) {
   ]));
 }
 
+function buildAdminEconomyDateLookup_(ss) {
+  const lookup = {};
+
+  addAdminEconomyInvoiceDatesToLookup_(ss, lookup);
+  addAdminEconomyWorkOrderDatesToLookup_(ss, lookup);
+
+  return lookup;
+}
+
+function addAdminEconomyInvoiceDatesToLookup_(ss, lookup) {
+  const sh = ss.getSheetByName("INVOICES");
+  if (!sh || sh.getLastRow() < 2) return;
+
+  const data = sh.getDataRange().getValues();
+  const headers = data[0].map(function(h) { return String(h || "").trim(); });
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (isSoftDeletedRow_(row, headers)) continue;
+
+    const dateValue = parseExecutiveDate_(getExecutiveValue_(row, headers, [
+      "DATE_INVOICE",
+      "Timestamp",
+      "INVOICE_DATE",
+      "DATE_COMPLETED",
+      "DATE_PAID"
+    ]));
+
+    if (!dateValue) continue;
+
+    const invoiceNumber = getInvoiceNumberValue_(row, headers);
+    const woNumber = String(getExecutiveValue_(row, headers, ["WO_NUMBER"]) || "").trim();
+
+    setAdminEconomyLookupDate_(lookup, "INV", invoiceNumber, dateValue);
+    setAdminEconomyLookupDate_(lookup, "WO", woNumber, dateValue);
+  }
+}
+
+function addAdminEconomyWorkOrderDatesToLookup_(ss, lookup) {
+  const sh = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
+  if (!sh || sh.getLastRow() < 2) return;
+
+  const data = sh.getDataRange().getValues();
+  const headers = data[0].map(function(h) { return String(h || "").trim(); });
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (isSoftDeletedRow_(row, headers)) continue;
+
+    const dateValue = parseExecutiveDate_(getExecutiveValue_(row, headers, [
+      "DATE_INVOICE",
+      "DATE_COMPLETED",
+      "DATE_CLOSED",
+      "DATE_CREATED",
+      "CREATED_AT"
+    ]));
+
+    if (!dateValue) continue;
+
+    const woNumber = String(getExecutiveValue_(row, headers, ["WO_NUMBER"]) || "").trim();
+    setAdminEconomyLookupDate_(lookup, "WO", woNumber, dateValue);
+  }
+}
+
+function setAdminEconomyLookupDate_(lookup, prefix, value, dateValue) {
+  const key = String(value || "").trim().toUpperCase();
+  if (!key || !dateValue) return;
+
+  const fullKey = String(prefix || "").trim().toUpperCase() + ":" + key;
+  if (!lookup[fullKey]) lookup[fullKey] = dateValue;
+}
+
+function getAdminEconomyRowLookupDate_(row, headers, dateLookup) {
+  dateLookup = dateLookup || {};
+
+  const invoiceNumber = String(getExecutiveValue_(row, headers, ["INVOICE_NUMBER", "INVOICE #"]) || "").trim().toUpperCase();
+  const woNumber = String(getExecutiveValue_(row, headers, ["WO_NUMBER"]) || "").trim().toUpperCase();
+
+  if (invoiceNumber && dateLookup["INV:" + invoiceNumber]) return dateLookup["INV:" + invoiceNumber];
+  if (woNumber && dateLookup["WO:" + woNumber]) return dateLookup["WO:" + woNumber];
+
+  return null;
+}
+
 function addAdminEconomyEntryToDashboard_(dashboard, entry) {
   entry = entry || {};
 
@@ -331,7 +416,7 @@ function addAdminEconomyEntryToDashboard_(dashboard, entry) {
   }
 }
 
-function adminEconomyRowMatchesScope_(row, headers, periodScope) {
+function adminEconomyRowMatchesScope_(row, headers, periodScope, dateLookup) {
   periodScope = periodScope || { mode: "monthly" };
   if (periodScope.mode === "all") return true;
 
@@ -340,20 +425,20 @@ function adminEconomyRowMatchesScope_(row, headers, periodScope) {
   const periodLabel = String(getExecutiveValue_(row, headers, ["PERIOD_LABEL"]) || "").trim();
 
   if (periodScope.mode === "monthly") {
-    if (periodLabel) return periodLabel === periodScope.periodLabel;
+    if (periodLabel && periodLabel === periodScope.periodLabel) return true;
     if (periodYear && periodMonth) {
-      return periodYear === Number(periodScope.year) && periodMonth === Number(periodScope.month);
+      if (periodYear === Number(periodScope.year) && periodMonth === Number(periodScope.month)) return true;
     }
   }
 
   if (periodScope.mode === "annual") {
-    if (periodYear) return periodYear === Number(periodScope.year);
+    if (periodYear && periodYear === Number(periodScope.year)) return true;
     if (periodLabel && periodLabel.indexOf(String(periodScope.year)) === 0) return true;
   }
 
-  const rowDate = parseExecutiveDate_(
-    getExecutiveValue_(row, headers, ["DATE_INVOICE", "DATE_COMPLETED", "DATE_PAID"])
-  );
+  const rowDate =
+    parseExecutiveDate_(getExecutiveValue_(row, headers, ["DATE_INVOICE", "DATE_COMPLETED", "DATE_PAID"])) ||
+    getAdminEconomyRowLookupDate_(row, headers, dateLookup);
 
   return adminDateMatchesScope_(rowDate, periodScope);
 }
