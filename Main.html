@@ -532,18 +532,15 @@
     }
 
     .panel {
-      max-width:900px;
-      margin:30px auto;
-      background:white;
-      padding:25px;
-      border-radius:16px;
-      box-shadow:0 4px 14px rgba(0,0,0,0.08);
+      max-width:1180px;
+      margin:22px auto 30px;
+      padding:0;
       display:none;
     }
 
     .global-header {
       display:none;
-      max-width:900px;
+      max-width:1180px;
       margin:0 auto 15px auto;
       background:white;
       padding:15px;
@@ -599,7 +596,7 @@
       display:grid;
       grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
       gap:15px;
-      margin-top:20px;
+      margin-top:14px;
     }
 
     .module {
@@ -621,6 +618,181 @@
       font-size:14px;
       color:#6b7280;
       line-height:1.35;
+    }
+
+    .panel-hero {
+      background:#ffffff;
+      border:1px solid #e5e7eb;
+      border-radius:12px;
+      padding:18px;
+      box-shadow:0 3px 10px rgba(0,0,0,0.07);
+      margin-bottom:16px;
+    }
+
+    .panel-title-row {
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:14px;
+      flex-wrap:wrap;
+    }
+
+    .panel-title-row h1 {
+      margin:0 0 4px;
+      font-size:28px;
+      letter-spacing:0;
+    }
+
+    .owner-dashboard {
+      display:none;
+      margin-bottom:18px;
+    }
+
+    .dash-head {
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-end;
+      gap:14px;
+      flex-wrap:wrap;
+      margin-bottom:12px;
+    }
+
+    .dash-head h2 {
+      margin:0;
+      font-size:22px;
+      letter-spacing:0;
+    }
+
+    .dash-actions {
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+
+    .dash-refresh {
+      width:auto;
+      min-height:38px;
+      padding:9px 12px;
+      margin:0;
+      border-radius:8px;
+      background:#111827;
+      box-shadow:none;
+      font-size:13px;
+    }
+
+    .metric-grid {
+      display:grid;
+      grid-template-columns:repeat(4, minmax(160px, 1fr));
+      gap:12px;
+      margin-bottom:14px;
+    }
+
+    .metric {
+      min-height:104px;
+      background:#ffffff;
+      border:1px solid #e5e7eb;
+      border-radius:8px;
+      padding:14px;
+      box-shadow:0 2px 8px rgba(0,0,0,0.06);
+      box-sizing:border-box;
+    }
+
+    .metric-label {
+      color:#6b7280;
+      font-size:13px;
+      line-height:1.25;
+    }
+
+    .metric-value {
+      margin-top:9px;
+      font-size:30px;
+      line-height:1;
+      font-weight:bold;
+      color:#111827;
+      letter-spacing:0;
+    }
+
+    .metric-note {
+      margin-top:8px;
+      font-size:12px;
+      color:#6b7280;
+    }
+
+    .metric.danger { border-left:5px solid #dc2626; }
+    .metric.warning { border-left:5px solid #d97706; }
+    .metric.success { border-left:5px solid #16a34a; }
+    .metric.info { border-left:5px solid #2563eb; }
+
+    .dash-layout {
+      display:grid;
+      grid-template-columns:1.6fr .9fr;
+      gap:14px;
+      align-items:start;
+    }
+
+    .dash-section {
+      background:#ffffff;
+      border:1px solid #e5e7eb;
+      border-radius:8px;
+      padding:14px;
+      box-shadow:0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .dash-section h3 {
+      margin:0 0 12px;
+      font-size:16px;
+      letter-spacing:0;
+    }
+
+    .company-row,
+    .alert-row {
+      display:grid;
+      grid-template-columns:1fr auto;
+      gap:12px;
+      padding:10px 0;
+      border-top:1px solid #f3f4f6;
+      align-items:center;
+    }
+
+    .company-row:first-of-type,
+    .alert-row:first-of-type {
+      border-top:0;
+      padding-top:0;
+    }
+
+    .company-name {
+      font-weight:bold;
+      color:#111827;
+      overflow-wrap:anywhere;
+    }
+
+    .company-meta {
+      margin-top:4px;
+      color:#6b7280;
+      font-size:12px;
+      line-height:1.35;
+    }
+
+    .company-score,
+    .alert-value {
+      min-width:42px;
+      padding:7px 9px;
+      border-radius:8px;
+      text-align:center;
+      font-weight:bold;
+      background:#f3f4f6;
+      color:#111827;
+    }
+
+    .alert-row.danger .alert-value { background:#fee2e2; color:#991b1b; }
+    .alert-row.warning .alert-value { background:#fef3c7; color:#92400e; }
+    .alert-row.info .alert-value { background:#dbeafe; color:#1e40af; }
+    .alert-row.success .alert-value { background:#dcfce7; color:#166534; }
+
+    .module-heading {
+      margin:22px 0 0;
+      font-size:20px;
     }
 
     #error {
@@ -736,6 +908,11 @@
       .box h2 {
         font-size:28px;
       }
+
+      .metric-grid,
+      .dash-layout {
+        grid-template-columns:1fr;
+      }
     }
   </style>
 </head>
@@ -846,12 +1023,44 @@
 </div>
 
 <div id="mainPanel" class="panel">
-  <h1>Panel Principal</h1>
-  <div class="muted" id="userInfo"></div>
+  <div class="panel-hero">
+    <div class="panel-title-row">
+      <div>
+        <h1>Panel Principal</h1>
+        <div class="muted" id="userInfo"></div>
+      </div>
+      <button class="logout" onclick="logout()">Salir</button>
+    </div>
+  </div>
 
+  <div id="ownerDashboard" class="owner-dashboard">
+    <div class="dash-head">
+      <div>
+        <h2>Dashboard Ejecutivo</h2>
+        <div class="muted" id="dashboardScope">Loading...</div>
+      </div>
+      <div class="dash-actions">
+        <button class="dash-refresh" onclick="loadOwnerDashboard()">Actualizar</button>
+      </div>
+    </div>
+
+    <div id="ownerMetrics" class="metric-grid"></div>
+
+    <div class="dash-layout">
+      <div class="dash-section">
+        <h3>Resumen por Empresa</h3>
+        <div id="ownerCompanyBreakdown"></div>
+      </div>
+
+      <div class="dash-section">
+        <h3>Prioridades</h3>
+        <div id="ownerAlerts"></div>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="module-heading">Modulos</h2>
   <div id="modules" class="grid"></div>
-
-  <button class="logout" onclick="logout()">Salir</button>
 </div>
 
 <script>
@@ -1049,6 +1258,10 @@ function normalizeUser(user) {
   };
 }
 
+function getSessionToken() {
+  return CURRENT_USER && CURRENT_USER.sessionToken ? CURRENT_USER.sessionToken : "";
+}
+
 function showPanel() {
   CURRENT_USER = normalizeUser(CURRENT_USER);
 
@@ -1063,6 +1276,7 @@ function showPanel() {
     CURRENT_USER.name + " | " + CURRENT_USER.role + " | Company: " + CURRENT_USER.companyId;
 
   renderModules();
+  loadOwnerDashboard();
 }
 
 function renderModules() {
@@ -1095,6 +1309,193 @@ function renderModules() {
         </div>
       `;
     }).join("");
+}
+
+function loadOwnerDashboard() {
+  const role = String(CURRENT_USER && CURRENT_USER.role || "").trim().toUpperCase();
+  const box = document.getElementById("ownerDashboard");
+
+  if (role !== "OWNER") {
+    box.style.display = "none";
+    return;
+  }
+
+  box.style.display = "block";
+  document.getElementById("dashboardScope").innerText = "Cargando metricas ejecutivas...";
+  document.getElementById("ownerMetrics").innerHTML = renderMetricSkeletons();
+  document.getElementById("ownerCompanyBreakdown").innerHTML = "<div class='muted'>Cargando empresas...</div>";
+  document.getElementById("ownerAlerts").innerHTML = "<div class='muted'>Cargando prioridades...</div>";
+
+  google.script.run
+    .withSuccessHandler(function(data) {
+      renderOwnerDashboard(data || {});
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById("dashboardScope").innerText =
+        "Error en dashboard: " + (err && err.message ? err.message : err);
+      document.getElementById("ownerMetrics").innerHTML = "";
+      document.getElementById("ownerCompanyBreakdown").innerHTML = "";
+      document.getElementById("ownerAlerts").innerHTML = "";
+    })
+    .getOwnerExecutiveDashboard(getSessionToken(), getDashboardCompanyScope());
+}
+
+function getDashboardCompanyScope() {
+  if (OWNER_ONLY_LOGIN && !LOGIN_COMPANY_ID) return "";
+  return getActiveCompanyId();
+}
+
+function renderOwnerDashboard(data) {
+  const totals = data.totals || {};
+  const scope = data.scopeLabel || "Todas las empresas";
+  const generated = data.generatedAt ? "Actualizado " + data.generatedAt : "";
+
+  document.getElementById("dashboardScope").innerText = scope + (generated ? " | " + generated : "");
+
+  const cards = [
+    {
+      label: "Ordenes Abiertas",
+      value: totals.openOrders || 0,
+      note: (totals.totalOrders || 0) + " ordenes totales",
+      tone: totals.emergencyOrders ? "danger" : "info"
+    },
+    {
+      label: "Completadas por Facturar",
+      value: totals.completedPendingBilling || 0,
+      note: "Listas para economia",
+      tone: totals.completedPendingBilling ? "warning" : "success"
+    },
+    {
+      label: "Invoices Creados",
+      value: totals.invoicesCreated || 0,
+      note: (totals.economyInvoiced || 0) + " sincronizados en economia",
+      tone: "success"
+    },
+    {
+      label: "Quotes Abiertos",
+      value: totals.quotesOpen || 0,
+      note: (totals.pmReportsGenerated || 0) + " reportes PM generados",
+      tone: totals.quotesOpen ? "warning" : "info"
+    },
+    {
+      label: "Emergency / Urgent",
+      value: totals.emergencyOrders || 0,
+      note: "Requieren atencion rapida",
+      tone: totals.emergencyOrders ? "danger" : "success"
+    },
+    {
+      label: "Nuevas 7 Dias",
+      value: totals.ordersLast7Days || 0,
+      note: (totals.ordersToday || 0) + " creadas hoy",
+      tone: "info"
+    },
+    {
+      label: "Orden Abierta Mas Vieja",
+      value: (totals.oldestOpenDays || 0) + "d",
+      note: "Edad en dias",
+      tone: totals.oldestOpenDays > 7 ? "danger" : (totals.oldestOpenDays > 3 ? "warning" : "success")
+    },
+    {
+      label: "Revenue Registrado",
+      value: formatMoneyDashboard(totals.revenueTracked || 0),
+      note: (totals.activeCompanies || 0) + " empresas activas",
+      tone: "info"
+    }
+  ];
+
+  document.getElementById("ownerMetrics").innerHTML =
+    cards.map(renderMetricCard).join("");
+
+  renderCompanyBreakdown(data.companies || []);
+  renderExecutiveAlerts(data.alerts || []);
+}
+
+function renderMetricSkeletons() {
+  const empty = [];
+  for (let i = 0; i < 4; i++) {
+    empty.push(`
+      <div class="metric">
+        <div class="metric-label">Cargando</div>
+        <div class="metric-value">...</div>
+        <div class="metric-note">Espere un momento</div>
+      </div>
+    `);
+  }
+  return empty.join("");
+}
+
+function renderMetricCard(card) {
+  return `
+    <div class="metric ${escapeHtmlMain(card.tone || "")}">
+      <div class="metric-label">${escapeHtmlMain(card.label)}</div>
+      <div class="metric-value">${escapeHtmlMain(card.value)}</div>
+      <div class="metric-note">${escapeHtmlMain(card.note)}</div>
+    </div>
+  `;
+}
+
+function renderCompanyBreakdown(companies) {
+  if (!companies.length) {
+    document.getElementById("ownerCompanyBreakdown").innerHTML =
+      "<div class='muted'>Todavia no hay actividad de empresas.</div>";
+    return;
+  }
+
+  document.getElementById("ownerCompanyBreakdown").innerHTML =
+    companies.slice(0, 8).map(function(c) {
+      return `
+        <div class="company-row">
+          <div>
+            <div class="company-name">${escapeHtmlMain(c.companyName || c.companyId)}</div>
+            <div class="company-meta">
+              ${escapeHtmlMain(c.companyId)} | ${Number(c.totalOrders || 0)} ordenes |
+              ${Number(c.completedPendingBilling || 0)} por facturar |
+              ${Number(c.invoicesCreated || 0)} invoices |
+              ${Number(c.pmReportsGenerated || 0)} reportes PM
+            </div>
+          </div>
+          <div class="company-score">${Number(c.openOrders || 0)}</div>
+        </div>
+      `;
+    }).join("");
+}
+
+function renderExecutiveAlerts(alerts) {
+  document.getElementById("ownerAlerts").innerHTML =
+    alerts.map(function(a) {
+      return `
+        <div class="alert-row ${escapeHtmlMain(a.tone || "")}">
+          <div>
+            <div class="company-name">${escapeHtmlMain(a.label || "")}</div>
+            <div class="company-meta">${escapeHtmlMain(getAlertSubtitle(a.tone))}</div>
+          </div>
+          <div class="alert-value">${escapeHtmlMain(a.value)}</div>
+        </div>
+      `;
+    }).join("");
+}
+
+function getAlertSubtitle(tone) {
+  if (tone === "danger") return "Revisar de inmediato";
+  if (tone === "warning") return "Dar seguimiento";
+  if (tone === "info") return "Indicador operacional";
+  return "Saludable";
+}
+
+function formatMoneyDashboard(value) {
+  const n = Number(value || 0);
+  if (Math.abs(n) >= 1000000) return "$" + (n / 1000000).toFixed(1) + "M";
+  if (Math.abs(n) >= 1000) return "$" + (n / 1000).toFixed(1) + "K";
+  return "$" + n.toFixed(0);
+}
+
+function escapeHtmlMain(value) {
+  return String(value === undefined || value === null ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 function openModule(url) {
