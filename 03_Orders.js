@@ -236,9 +236,6 @@ function dispatchRowToTech_(sh, row) {
   const techEmail = getTechEmails_(technician);
 
   const publicBaseUrl = getWebAppBaseUrl_(companyId);
-  const startJobLink = buildWorkOrderActionLink_(publicBaseUrl, companyId, obj.WO_NUMBER, "START");
-  const waitingPartsLink = buildWorkOrderActionLink_(publicBaseUrl, companyId, obj.WO_NUMBER, "WAITING");
-  const completedLink = buildWorkOrderActionLink_(publicBaseUrl, companyId, obj.WO_NUMBER, "COMPLETED");
 
   if (isTechEmailTestMode_()) {
     Logger.log("TEST MODE: Email NO enviado. Técnicos: " + technician + " / " + techEmail);
@@ -260,11 +257,10 @@ function dispatchRowToTech_(sh, row) {
         "<hr>" +
         "<p><b>Dirección:</b> " + (obj.STORE_ADDRESS || "") + "</p>" +
         "<p><b>Problema:</b><br>" + obj.REPORTED_PROBLEM_ES + "</p>" +
-        "<br>" +
-        "<a href='" + startJobLink + "' style='background:#2563eb;color:white;padding:12px 20px;text-decoration:none;border-radius:8px;font-weight:bold;display:inline-block;margin-right:10px;'>START JOB / IN PROGRESS</a>" +
-        "<a href='" + waitingPartsLink + "' style='background:#f59e0b;color:white;padding:12px 20px;text-decoration:none;border-radius:8px;font-weight:bold;display:inline-block;margin-right:10px;'>PARTS IN TRANSIT / PIEZAS EN ENVÍO</a>" +
-        "<a href='" + completedLink + "' style='background:#16a34a;color:white;padding:12px 20px;text-decoration:none;border-radius:8px;font-weight:bold;display:inline-block;'>COMPLETED / TERMINADO</a>" +
-        "<br><br><p>Order details are included in this email / Los detalles están incluidos en este correo.</p>"
+        "<hr>" +
+        "<p><b>Portal tecnico:</b> <a href='" + publicBaseUrl + "'>" + publicBaseUrl + "</a></p>" +
+        "<p>Actualice los estados solamente desde la Web App / Update statuses only from the Web App.</p>" +
+        "<p>Order details are included in this email / Los detalles estan incluidos en este correo.</p>"
     });
   }
 
@@ -316,53 +312,10 @@ function isTechEmailTestMode_() {
 }
 
 function handleWorkOrderAction_(e) {
-  const params = e && e.parameter ? e.parameter : {};
-  const action = String(params.action || "").trim().toUpperCase();
-  const woNumber = String(params.wo || "").trim();
-  const companyId = String(params.companyId || CFG.DEFAULT_COMPANY_ID).trim().toUpperCase();
-  const actionToken = String(params.token || "").trim();
-
-  const statusMap = {
-    START: "IN PROGRESS",
-    WAITING: "PARTS IN TRANSIT",
-    COMPLETED: "COMPLETED"
-  };
-
-  if (!woNumber || !statusMap[action]) {
-    return HtmlService.createHtmlOutput("<h2>Accion invalida.</h2>");
-  }
-
-  if (!verifyWorkOrderActionToken_(companyId, woNumber, action, actionToken)) {
-    return HtmlService.createHtmlOutput("<h2>Link expirado o no autorizado.</h2>");
-  }
-
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sh = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
-  if (!sh) return HtmlService.createHtmlOutput("<h2>No existe WORK_ORDERS.</h2>");
-
-  const data = sh.getDataRange().getValues();
-  if (data.length < 2) return HtmlService.createHtmlOutput("<h2>No hay ordenes.</h2>");
-
-  const headers = data[0].map(String);
-  const idxWO = headers.indexOf("WO_NUMBER");
-  const idxCompany = headers.indexOf("COMPANY_ID");
-
-  for (let i = 1; i < data.length; i++) {
-    const rowWO = String(data[i][idxWO] || "").trim();
-    const rowCompany = idxCompany >= 0
-      ? String(data[i][idxCompany] || "").trim().toUpperCase()
-      : companyId;
-
-    if (rowWO === woNumber && rowCompany === companyId) {
-      updateTechOrderStatus(i + 1, statusMap[action]);
-      return HtmlService.createHtmlOutput(
-        "<h2>Orden actualizada</h2>" +
-        "<p>WO " + woNumber + " ahora esta en " + statusMap[action] + ".</p>"
-      );
-    }
-  }
-
-  return HtmlService.createHtmlOutput("<h2>No se encontro la orden " + woNumber + ".</h2>");
+  return HtmlService.createHtmlOutput(
+    "<h2>Acciones por email desactivadas</h2>" +
+    "<p>Por seguridad, los estados de las ordenes se actualizan solamente desde la Web App.</p>"
+  );
 }
 
 function buildWorkOrderActionLink_(publicBaseUrl, companyId, woNumber, action) {
