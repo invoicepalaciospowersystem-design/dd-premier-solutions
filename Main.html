@@ -23,81 +23,114 @@
 
     body.login-mode {
       padding:0;
-      background:
-        radial-gradient(circle at 18% 20%, rgba(220,38,38,.18), transparent 28%),
-        linear-gradient(135deg, #111827 0%, #27272a 54%, #7f1d1d 100%);
+      overflow-x:hidden;
+      background:#111214;
+      position:relative;
+    }
+
+    body.login-mode::before {
+      content:"";
+      position:fixed;
+      inset:0 46% 0 0;
+      background:#17181c;
+      border-right:8px solid var(--brand-primary);
+      z-index:0;
     }
 
     body.login-mode.has-login-bg {
       background-image:
-        linear-gradient(90deg, rgba(17,24,39,.88), rgba(17,24,39,.58), rgba(17,24,39,.18)),
+        linear-gradient(90deg, rgba(10,10,12,.92), rgba(10,10,12,.66), rgba(10,10,12,.28)),
         var(--login-bg-image);
       background-size:cover;
       background-position:center;
       background-attachment:fixed;
     }
 
+    body.login-mode.has-login-bg::before {
+      background:rgba(17,18,20,.72);
+      backdrop-filter:blur(2px);
+    }
+
     .login-shell {
       min-height:100vh;
-      display:flex;
+      display:grid;
+      grid-template-columns:minmax(320px, 1.08fr) minmax(320px, 430px);
       align-items:center;
       justify-content:center;
-      gap:42px;
-      padding:28px;
+      gap:clamp(28px, 5vw, 76px);
+      padding:clamp(26px, 5vw, 68px);
       box-sizing:border-box;
+      position:relative;
+      z-index:1;
     }
 
     .login-brand {
-      width:min(520px, 100%);
+      max-width:620px;
       color:white;
-      text-shadow:0 2px 12px rgba(0,0,0,.28);
+      text-shadow:0 2px 14px rgba(0,0,0,.34);
     }
 
     .brand-logo {
       display:none;
-      max-width:min(360px, 82vw);
-      max-height:210px;
+      max-width:min(460px, 82vw);
+      max-height:270px;
       object-fit:contain;
-      margin:0 0 18px;
-      filter:drop-shadow(0 18px 28px rgba(0,0,0,.35));
+      margin:0 0 22px;
+      background:rgba(255,255,255,.96);
+      border:1px solid rgba(255,255,255,.72);
+      border-radius:18px;
+      padding:18px;
+      box-sizing:border-box;
+      filter:drop-shadow(0 22px 34px rgba(0,0,0,.34));
     }
 
     .login-kicker {
       display:inline-block;
-      background:rgba(255,255,255,.14);
-      border:1px solid rgba(255,255,255,.24);
-      padding:7px 10px;
+      background:var(--brand-primary);
+      border:1px solid rgba(255,255,255,.18);
+      padding:8px 11px;
       border-radius:999px;
       font-size:12px;
       font-weight:bold;
       text-transform:uppercase;
       letter-spacing:0;
-      margin-bottom:14px;
+      margin-bottom:16px;
     }
 
     .login-brand h1 {
       margin:0;
-      font-size:42px;
+      font-size:clamp(36px, 5vw, 62px);
       line-height:1.05;
       letter-spacing:0;
+      max-width:640px;
     }
 
     .login-brand p {
-      font-size:18px;
+      font-size:clamp(17px, 1.8vw, 22px);
       line-height:1.45;
-      margin:14px 0 0;
-      color:rgba(255,255,255,.86);
+      margin:16px 0 0;
+      color:rgba(255,255,255,.84);
+      max-width:560px;
+    }
+
+    .brand-line {
+      width:92px;
+      height:5px;
+      background:var(--brand-primary);
+      border-radius:999px;
+      margin:22px 0 0;
     }
 
     .box {
       max-width:420px;
       width:100%;
-      background:rgba(255,255,255,.94);
-      padding:25px;
-      border-radius:16px;
-      box-shadow:0 24px 80px rgba(0,0,0,.28);
+      background:#ffffff;
+      padding:28px;
+      border-radius:18px;
+      border:1px solid rgba(17,24,39,.08);
+      border-top:7px solid var(--brand-primary);
+      box-shadow:0 28px 90px rgba(0,0,0,.30);
       box-sizing:border-box;
-      backdrop-filter:blur(8px);
     }
 
     .box h2 {
@@ -107,7 +140,7 @@
 
     .box-logo {
       display:none;
-      width:150px;
+      width:132px;
       max-width:70%;
       max-height:110px;
       object-fit:contain;
@@ -141,16 +174,22 @@
     input, button {
       width:100%;
       box-sizing:border-box;
-      padding:13px;
+      padding:14px;
       margin:8px 0;
       border-radius:10px;
       border:1px solid #d1d5db;
       font-size:15px;
     }
 
+    input {
+      background:#f9fafb;
+      height:48px;
+    }
+
     input:focus {
-      outline:2px solid color-mix(in srgb, var(--brand-primary), white 62%);
+      outline:3px solid rgba(37,99,235,.15);
       border-color:var(--brand-primary);
+      background:white;
     }
 
     button {
@@ -159,6 +198,8 @@
       border:none;
       font-weight:bold;
       cursor:pointer;
+      min-height:49px;
+      box-shadow:0 10px 22px rgba(0,0,0,.16);
     }
 
     button:hover {
@@ -205,21 +246,50 @@
       font-weight:bold;
     }
 
+    .login-footnote {
+      border-top:1px solid #e5e7eb;
+      margin-top:16px;
+      padding-top:14px;
+      color:#6b7280;
+      font-size:12px;
+      line-height:1.35;
+    }
+
     .logout {
       background:#dc2626;
       max-width:180px;
     }
 
     @media (max-width: 800px) {
+      body.login-mode::before {
+        inset:0;
+        border-right:none;
+        border-bottom:6px solid var(--brand-primary);
+      }
+
       .login-shell {
         align-items:stretch;
-        flex-direction:column;
+        grid-template-columns:1fr;
         justify-content:center;
         gap:22px;
+        padding:22px;
       }
 
       .login-brand h1 {
         font-size:32px;
+      }
+
+      .login-brand p {
+        font-size:16px;
+      }
+
+      .brand-logo {
+        max-height:170px;
+        padding:12px;
+      }
+
+      .box {
+        max-width:none;
       }
     }
   </style>
@@ -233,6 +303,7 @@
     <div class="login-kicker" id="loginKicker">Company Login</div>
     <h1 id="heroTitle">D&D Premier Solutions Corp</h1>
     <p id="heroSubtitle">Sistema de ordenes y operaciones</p>
+    <div class="brand-line"></div>
   </section>
 
   <div id="loginBox" class="box">
@@ -245,6 +316,7 @@
 
     <button id="loginButton" onclick="login()">Entrar</button>
     <div id="error"></div>
+    <div class="login-footnote" id="loginFootnote">Powered by D&D Premier Solutions Corp</div>
   </div>
 </div>
 
@@ -371,6 +443,10 @@ function applyBranding(branding) {
     CURRENT_BRANDING.loginSubtitle || "Login de acceso";
   document.getElementById("ownerTitle").innerText =
     CURRENT_BRANDING.ownerName || "D&D Premier Solutions Corp";
+  document.getElementById("loginKicker").innerText =
+    (CURRENT_BRANDING.companyId ? CURRENT_BRANDING.companyId + " Login" : "System Login");
+  document.getElementById("loginFootnote").innerText =
+    "Powered by " + (CURRENT_BRANDING.ownerName || "D&D Premier Solutions Corp");
 
   applyLogo(CURRENT_BRANDING.logoImageUrl);
 
