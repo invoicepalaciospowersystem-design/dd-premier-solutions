@@ -3280,6 +3280,7 @@ function openModule(url) {
   }
 
   finalUrl = appendCompanyParam(finalUrl, companyId);
+  finalUrl = appendOwnerPortalParam(finalUrl);
   TOP_NAV.href = finalUrl;
 }
 
@@ -3299,6 +3300,18 @@ function appendCompanyParam(url, companyId) {
 
   return url + (url.indexOf("?") === -1 ? "?" : "&") +
     "companyId=" + encodeURIComponent(companyId);
+}
+
+function shouldKeepOwnerPortalUrl() {
+  const role = String(CURRENT_USER && CURRENT_USER.role || "").trim().toUpperCase();
+  return role === "OWNER" && (OWNER_ONLY_LOGIN || !LOGIN_COMPANY_ID);
+}
+
+function appendOwnerPortalParam(url) {
+  if (!shouldKeepOwnerPortalUrl()) return url;
+  if (/[?&](ownerOnly|portal)=/.test(url)) return url;
+
+  return url + (url.indexOf("?") === -1 ? "?" : "&") + "ownerOnly=1";
 }
 
 function updateHeaderCompany(companyId) {

@@ -6,7 +6,8 @@ function doGet(e) {
   try {
     e = e || { parameter: {} };
     const p = e.parameter || {};
-    const baseUrl = getWebAppBaseUrl_(p.companyId);
+    const ownerPortal = isOwnerPortalRequest_(p);
+    const baseUrl = getWebAppBaseUrl_(p.companyId, ownerPortal);
 
     if (p.action && p.wo) {
       return handleWorkOrderAction_(e);
@@ -40,6 +41,7 @@ function doGet(e) {
       applyTemplateDefaults_(template, p, baseUrl);
       template.baseUrl = baseUrl;
       template.companyId = p.companyId || "";
+      template.ownerOnly = ownerPortal ? "true" : "";
 
       return template.evaluate()
         .setTitle("Admin Technician Portal")
@@ -51,6 +53,7 @@ function doGet(e) {
       applyTemplateDefaults_(template, p, baseUrl);
       template.baseUrl = baseUrl;
       template.companyId = p.companyId || "";
+      template.ownerOnly = ownerPortal ? "true" : "";
 
       return template.evaluate()
         .setTitle("Admin Supervisor Portal")
@@ -62,6 +65,7 @@ function doGet(e) {
       applyTemplateDefaults_(template, p, baseUrl);
       template.baseUrl = baseUrl;
       template.companyId = p.companyId || "";
+      template.ownerOnly = ownerPortal ? "true" : "";
 
       return template.evaluate()
         .setTitle("Work Orders")
@@ -72,6 +76,8 @@ function doGet(e) {
       const template = HtmlService.createTemplateFromFile("Economy");
       applyTemplateDefaults_(template, p, baseUrl);
       template.baseUrl = baseUrl;
+      template.companyId = p.companyId || "";
+      template.ownerOnly = ownerPortal ? "true" : "";
 
       return template.evaluate()
         .setTitle("Economy")
@@ -82,6 +88,8 @@ function doGet(e) {
       const template = HtmlService.createTemplateFromFile("Stores");
       applyTemplateDefaults_(template, p, baseUrl);
       template.baseUrl = baseUrl;
+      template.companyId = p.companyId || "";
+      template.ownerOnly = ownerPortal ? "true" : "";
 
       return template.evaluate()
         .setTitle("Stores")
@@ -102,6 +110,8 @@ function doGet(e) {
       const template = HtmlService.createTemplateFromFile("Users");
       applyTemplateDefaults_(template, p, baseUrl);
       template.baseUrl = baseUrl;
+      template.companyId = p.companyId || "";
+      template.ownerOnly = ownerPortal ? "true" : "";
 
       return template.evaluate()
         .setTitle("Users")
@@ -165,7 +175,7 @@ function doGet(e) {
     applyTemplateDefaults_(template, p, baseUrl);
     template.baseUrl = baseUrl;
     template.companyId = p.companyId || "";
-    template.ownerOnly = (p.ownerOnly === "1" || p.ownerOnly === "true" || p.portal === "owner") ? "true" : "";
+    template.ownerOnly = ownerPortal ? "true" : "";
     template.unitedRefrigerationAccount = CFG.UNITED_REFRIGERATION_ACCOUNT || "";
 
     return template.evaluate()
@@ -183,8 +193,23 @@ function doGet(e) {
   }
 }
 
-function getWebAppBaseUrl_(companyId) {
+function isOwnerPortalRequest_(params) {
+  params = params || {};
+  return params.ownerOnly === "1" ||
+    params.ownerOnly === "true" ||
+    params.portal === "owner";
+}
+
+function getWebAppBaseUrl_(companyId, ownerPortal) {
+  if (ownerPortal && CFG.OWNER_WEB_APP_URL) {
+    return CFG.OWNER_WEB_APP_URL;
+  }
+
   companyId = String(companyId || "").trim().toUpperCase();
+
+  if (!companyId && CFG.OWNER_WEB_APP_URL) {
+    return CFG.OWNER_WEB_APP_URL;
+  }
 
   if (companyId && CFG.PUBLIC_WEB_APP_URLS && CFG.PUBLIC_WEB_APP_URLS[companyId]) {
     return CFG.PUBLIC_WEB_APP_URLS[companyId];

@@ -99,25 +99,64 @@ const TOP_NAV = {
   }
 };
 
+const BASE_URL = "<?= baseUrl ?>";
+const COMPANY_ID_FROM_URL = String("<?= companyId ?>").trim().toUpperCase();
+const OWNER_PORTAL = String("<?= ownerOnly ?>").trim().toLowerCase() === "true";
 
-  function requireLogin() {
+function redirectToLogin() {
+  localStorage.removeItem("pps_user");
+  TOP_NAV.href = OWNER_PORTAL ? BASE_URL + "?ownerOnly=1" : BASE_URL;
+}
+
+function getErrorMessage(err) {
+  return String((err && err.message) || err || "Error desconocido");
+}
+
+function isSessionExpiredError(err) {
+  const message = getErrorMessage(err).toLowerCase();
+  return message.includes("sesion expirada") || message.includes("session expired");
+}
+
+function alertServerError(err) {
+  if (isSessionExpiredError(err)) {
+    alert("Sesion expirada. Inicie sesion nuevamente.");
+    redirectToLogin();
+    return;
+  }
+  alert(getErrorMessage(err));
+}
+
+function renderServerError(err, elementId, prefix) {
+  if (isSessionExpiredError(err)) {
+    alert("Sesion expirada. Inicie sesion nuevamente.");
+    redirectToLogin();
+    return;
+  }
+  document.getElementById(elementId).innerHTML = prefix + getErrorMessage(err);
+}
+
+function requireLogin() {
   const user = localStorage.getItem("pps_user");
 
   if (!user) {
-    TOP_NAV.href = "<?= baseUrl ?>";
+    TOP_NAV.href = OWNER_PORTAL ? BASE_URL + "?ownerOnly=1" : BASE_URL;
     return false;
   }
 
   try {
     const parsed = JSON.parse(user);
     if ((!parsed.role && !parsed.ROLE) || (!parsed.sessionToken && !parsed.SESSION_TOKEN)) {
-      localStorage.removeItem("pps_user");
-      TOP_NAV.href = "<?= baseUrl ?>";
+      redirectToLogin();
+      return false;
+    }
+
+    const expiresAt = Number(parsed.sessionExpiresAt || parsed.SESSION_EXPIRES_AT || 0);
+    if (expiresAt && expiresAt <= Date.now()) {
+      redirectToLogin();
       return false;
     }
   } catch (e) {
-    localStorage.removeItem("pps_user");
-    TOP_NAV.href = "<?= baseUrl ?>";
+    redirectToLogin();
     return false;
   }
 
@@ -161,8 +200,9 @@ function updateHeaderCompany(companyId) {
 
 function load() {
   const u = getUser();
+  const selectedCompany = getSelectedCompanyId();
 
-  updateHeaderCompany(u.companyId);
+  updateHeaderCompany(selectedCompany || u.companyId);
 
   google.script.run
     .withSuccessHandler(function(res) {
@@ -170,9 +210,14 @@ function load() {
       render();
     })
     .withFailureHandler(function(err) {
-      document.getElementById("users").innerHTML = "ERROR: " + err.message;
+      renderServerError(err, "users", "ERROR: ");
     })
-    .getUsers(u.companyId, u.role, getSessionToken());
+    .getUsers(u.role === "OWNER" ? "" : u.companyId, u.role, getSessionToken());
+}
+
+function getSelectedCompanyId() {
+  const select = document.getElementById("companyFilter");
+  return String(select && select.value || "").toUpperCase();
 }
 
 function render() {
@@ -255,7 +300,7 @@ function saveUser() {
       load();
     })
     .withFailureHandler(function(err) {
-      alert(err.message);
+      alertServerError(err);
     })
     .saveUser(CURRENT_ROW, data, getSessionToken());
 }
@@ -268,7 +313,7 @@ function del(row) {
       load();
     })
     .withFailureHandler(function(err) {
-      alert(err.message);
+      alertServerError(err);
     })
     .deleteUser(row, getSessionToken());
 }
@@ -285,7 +330,7 @@ function toggleActive(row, current) {
       load();
     })
     .withFailureHandler(function(err) {
-      alert(err.message);
+      alertServerError(err);
     })
     .saveUser(row, user, getSessionToken());
 }
@@ -321,6 +366,15 @@ function loadCompanyFilter() {
             </option>
           `;
         }).join("");
+
+      if (COMPANY_ID_FROM_URL) {
+        select.value = COMPANY_ID_FROM_URL;
+        updateHeaderCompany(COMPANY_ID_FROM_URL);
+        render();
+      }
+    })
+    .withFailureHandler(function(err) {
+      renderServerError(err, "users", "ERROR companies: ");
     })
     .getCompaniesForUser(u.companyId, u.role, getSessionToken());
 }

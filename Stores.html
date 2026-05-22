@@ -134,9 +134,10 @@ if (!requireLogin()) {
 }
 let STORES = [];
 let EDIT_ROW = "";
-let ACTIVE_COMPANY_ID = "";
+let ACTIVE_COMPANY_ID = String("<?= companyId ?>").trim().toUpperCase();
 
 const BASE_URL = "<?= baseUrl ?>";
+const OWNER_PORTAL = String("<?= ownerOnly ?>").trim().toLowerCase() === "true";
 
 function getCurrentUser() {
   try {
@@ -182,11 +183,27 @@ function load() {
     return;
   }
 
-  document.getElementById("companyTitle").innerText = "Company: Seleccione empresa";
+  if (ACTIVE_COMPANY_ID) {
+    updateHeaderCompany(ACTIVE_COMPANY_ID);
+    loadCompanyOptions(true);
+    loadStoresForCompany();
+    return;
+  }
 
+  document.getElementById("companyTitle").innerText = "Company: Seleccione empresa";
+  loadCompanyOptions(false);
+}
+
+function loadCompanyOptions(keepStores) {
+  const user = getCurrentUser();
   google.script.run
     .withSuccessHandler(function(companies) {
       renderCompanySelector(companies || []);
+      if (ACTIVE_COMPANY_ID) {
+        const select = document.getElementById("companySelect");
+        if (select) select.value = ACTIVE_COMPANY_ID;
+      }
+      if (keepStores) return;
     })
     .withFailureHandler(function(err) {
       document.getElementById("stores").innerHTML = "ERROR: " + err.message;
@@ -297,7 +314,7 @@ function cancelEdit() {
 }
 
 function goHome() {
-  TOP_NAV.href = BASE_URL;
+  TOP_NAV.href = BASE_URL + (OWNER_PORTAL ? "?ownerOnly=1" : "");
 }
 
 function renderCompanySelector(companies) {
@@ -321,8 +338,10 @@ function renderCompanySelector(companies) {
     <button onclick="activateCompany()">Activar Empresa</button>
   `;
 
-  document.getElementById("stores").innerHTML =
-    "Seleccione una empresa para ver sus tiendas.";
+  if (!ACTIVE_COMPANY_ID) {
+    document.getElementById("stores").innerHTML =
+      "Seleccione una empresa para ver sus tiendas.";
+  }
 }
 
 function activateCompany() {

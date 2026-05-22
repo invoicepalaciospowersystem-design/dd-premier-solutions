@@ -193,6 +193,7 @@
 <div class="topbar">
   <button id="regularBtn" class="mode-active" onclick="setMode('REGULAR')">Economy Regular</button>
   <button id="pmBtn" onclick="setMode('PM')">PM Economy</button>
+  <select id="companySelect" onchange="activateCompany()" style="display:none;min-width:240px;"></select>
 
   <input id="search" placeholder="Buscar..." oninput="render()">
 
@@ -282,8 +283,10 @@ const TOP_NAV = {
 };
 
 const BASE_URL = "<?= baseUrl ?>";
+const COMPANY_ID_FROM_URL = String("<?= companyId ?>").trim().toUpperCase();
+const OWNER_PORTAL = String("<?= ownerOnly ?>").trim().toLowerCase() === "true";
 let ECONOMY = [];
-let ACTIVE_COMPANY_ID = "";
+let ACTIVE_COMPANY_ID = COMPANY_ID_FROM_URL;
 let CURRENT_PERIOD_LABEL = "";
 let VIEW_MODE = "REGULAR";
 let ECONOMY_METRIC_FILTER = "all";
@@ -301,14 +304,42 @@ function getSessionToken() {
   return user.sessionToken || user.SESSION_TOKEN || "";
 }
 
+function getErrorMessage(err) {
+  return String((err && err.message) || err || "Error desconocido");
+}
+
+function isSessionExpiredError(err) {
+  const message = getErrorMessage(err).toLowerCase();
+  return message.includes("sesion expirada") || message.includes("session expired");
+}
+
+function handleSessionFailure(err) {
+  if (!isSessionExpiredError(err)) return false;
+  localStorage.removeItem("pps_user");
+  alert("Sesion expirada. Inicie sesion nuevamente.");
+  TOP_NAV.href = OWNER_PORTAL ? BASE_URL + "?ownerOnly=1" : BASE_URL;
+  return true;
+}
+
+function alertServerError(err) {
+  if (handleSessionFailure(err)) return;
+  alert(getErrorMessage(err));
+}
+
+function renderServerError(err, elementId, prefix) {
+  if (handleSessionFailure(err)) return;
+  document.getElementById(elementId).innerHTML = prefix + getErrorMessage(err);
+}
+
 function requireEconomyLogin() {
   const user = getCurrentUser();
   const role = String(user.role || user.ROLE || "").toUpperCase();
   const token = getSessionToken();
+  const expiresAt = Number(user.sessionExpiresAt || user.SESSION_EXPIRES_AT || 0);
 
-  if (!token || ["OWNER", "ADMIN", "ECONOMIA"].indexOf(role) === -1) {
+  if (!token || (expiresAt && expiresAt <= Date.now()) || ["OWNER", "ADMIN", "ECONOMIA"].indexOf(role) === -1) {
     localStorage.removeItem("pps_user");
-    TOP_NAV.href = BASE_URL;
+    TOP_NAV.href = OWNER_PORTAL ? BASE_URL + "?ownerOnly=1" : BASE_URL;
     return false;
   }
 
@@ -428,9 +459,12 @@ function renderTechSummary(rows) {
 function load() {
   const user = getCurrentUser();
 
-  if (user.role === "OWNER" && !ACTIVE_COMPANY_ID) {
+  if (String(user.role || "").toUpperCase() === "OWNER") {
     loadCompanySelector();
-    return;
+
+    if (!ACTIVE_COMPANY_ID) {
+      return;
+    }
   }
 
   if (!ACTIVE_COMPANY_ID) {
@@ -454,7 +488,7 @@ function load() {
         render();
       })
       .withFailureHandler(function(err) {
-        document.getElementById("cards").innerHTML = "ERROR PM_ECONOMY: " + err.message;
+        renderServerError(err, "cards", "ERROR PM_ECONOMY: ");
       })
       .getPMEconomyData(ACTIVE_COMPANY_ID, user.role, getSessionToken());
 
@@ -468,7 +502,7 @@ function load() {
       render();
     })
     .withFailureHandler(function(err) {
-      document.getElementById("cards").innerHTML = "ERROR: " + err.message;
+      renderServerError(err, "cards", "ERROR: ");
     })
     .getEconomyData(ACTIVE_COMPANY_ID, user.role, getSessionToken());
 }
@@ -1025,7 +1059,7 @@ function save(row, btn) {
     .withFailureHandler(function(err) {
       btn.innerText = "Error";
       btn.disabled = false;
-      alert(err.message);
+      alertServerError(err);
     });
 
   if (isPM) {
@@ -1037,30 +1071,35 @@ function save(row, btn) {
 
 function loadCompanySelector() {
   const user = getCurrentUser();
+  const select = document.getElementById("companySelect");
 
-  document.getElementById("companyTitle").innerText = "Company: Seleccione empresa";
-  clearEconomyMetrics();
+  if (!ACTIVE_COMPANY_ID) {
+    document.getElementById("companyTitle").innerText = "Company: Seleccione empresa";
+    clearEconomyMetrics();
+  }
 
   google.script.run
     .withSuccessHandler(function(companies) {
-      document.getElementById("cards").innerHTML = `
-        <div class="box">
-          <h3>Seleccionar Empresa</h3>
-          <select id="companySelect">
-            ${(companies || []).map(function(c) {
-              return `
-                <option value="${c.COMPANY_ID}">
-                  ${c.COMPANY_ID} - ${c.COMPANY_NAME || ""}
-                </option>
-              `;
-            }).join("")}
-          </select>
-          <button onclick="activateCompany()">Activar Empresa</button>
-        </div>
-      `;
+      select.style.display = "inline-block";
+      select.innerHTML = (companies || []).map(function(c) {
+        return `
+          <option value="${c.COMPANY_ID}">
+            ${c.COMPANY_ID} - ${c.COMPANY_NAME || ""}
+          </option>
+        `;
+      }).join("");
+
+      if (ACTIVE_COMPANY_ID) {
+        select.value = ACTIVE_COMPANY_ID;
+      }
+
+      if (!ACTIVE_COMPANY_ID) {
+        document.getElementById("cards").innerHTML =
+          '<div class="box"><h3>Seleccionar Empresa</h3><p>Seleccione una empresa arriba para ver Economia.</p></div>';
+      }
     })
     .withFailureHandler(function(err) {
-      document.getElementById("cards").innerHTML = "ERROR companies: " + err.message;
+      renderServerError(err, "cards", "ERROR companies: ");
     })
     .getCompaniesForUser(user.companyId, user.role, getSessionToken());
 }
@@ -1091,7 +1130,7 @@ function syncInvoices() {
       load();
     })
     .withFailureHandler(function(err) {
-      alert(err.message);
+      alertServerError(err);
     })
     .syncInvoicesToEconomy(ACTIVE_COMPANY_ID, getSessionToken());
 }

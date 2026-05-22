@@ -161,6 +161,7 @@ const TOP_NAV = {
 
 const BASE_URL = "<?= baseUrl ?>";
 const URL_COMPANY_ID = String("<?= companyId ?>").trim().toUpperCase();
+const OWNER_PORTAL = String("<?= ownerOnly ?>").trim().toLowerCase() === "true";
 
 function clearStoredSession() {
   localStorage.removeItem("pps_user");
@@ -169,7 +170,7 @@ function clearStoredSession() {
 function redirectToLogin(message) {
   clearStoredSession();
   if (message) alert(message);
-  TOP_NAV.href = BASE_URL;
+  TOP_NAV.href = OWNER_PORTAL ? BASE_URL + "?ownerOnly=1" : BASE_URL;
 }
 
 function getErrorMessage(err) {
@@ -280,6 +281,7 @@ function openQuote(row, woNumber, companyId) {
     "&row=" + encodeURIComponent(row) +
     "&wo=" + encodeURIComponent(woNumber || "") +
     "&companyId=" + encodeURIComponent(companyId || ACTIVE_COMPANY_ID) +
+    ownerPortalParam() +
     "&returnTo=" + encodeURIComponent(getOrdersReturnUrl(companyId || ACTIVE_COMPANY_ID));
 }
 
@@ -290,7 +292,13 @@ function getOrdersReturnUrl(companyId) {
     url += "&companyId=" + encodeURIComponent(companyId);
   }
 
+  url += ownerPortalParam();
+
   return url;
+}
+
+function ownerPortalParam() {
+  return OWNER_PORTAL ? "&ownerOnly=1" : "";
 }
 
 function updateHeaderCompany(companyId) {
@@ -320,7 +328,7 @@ function newOrder() {
   }
 
   TOP_NAV.href =
-    BASE_URL + "?view=createOrder&companyId=" + encodeURIComponent(ACTIVE_COMPANY_ID);
+    BASE_URL + "?view=createOrder&companyId=" + encodeURIComponent(ACTIVE_COMPANY_ID) + ownerPortalParam();
 }
 
 function load() {

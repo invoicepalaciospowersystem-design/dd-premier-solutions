@@ -101,6 +101,7 @@ const TOP_NAV = {
 
 const BASE_URL = "<?= baseUrl ?>";
 const COMPANY_ID_FROM_URL = String("<?= companyId ?>").trim().toUpperCase();
+const OWNER_PORTAL = String("<?= ownerOnly ?>").trim().toLowerCase() === "true";
 
 let DATA = { supervisors: [], totals: {}, unassignedStores: [] };
 let SELECTED = {};
@@ -169,6 +170,9 @@ function loadCompanyOptions() {
       }).join("");
 
       if (getCompanyId()) select.value = getCompanyId();
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById("summary").innerHTML = "ERROR companies: " + (err.message || err);
     })
     .getCompaniesForUser(user.companyId, role, getSessionToken());
 }
@@ -334,19 +338,23 @@ function saveAssignment() {
 function openSupervisorPortal(name) {
   TOP_NAV.href =
     BASE_URL + "?view=customer&supervisor=" + encodeURIComponent(name) +
-    "&companyId=" + encodeURIComponent(getCompanyId());
+    "&companyId=" + encodeURIComponent(getCompanyId()) + ownerPortalParam();
 }
 
 function openStores() {
-  TOP_NAV.href = BASE_URL + "?view=stores&companyId=" + encodeURIComponent(getCompanyId());
+  TOP_NAV.href = BASE_URL + "?view=stores&companyId=" + encodeURIComponent(getCompanyId()) + ownerPortalParam();
 }
 
 function openUsers() {
-  TOP_NAV.href = BASE_URL + "?view=users&companyId=" + encodeURIComponent(getCompanyId());
+  TOP_NAV.href = BASE_URL + "?view=users&companyId=" + encodeURIComponent(getCompanyId()) + ownerPortalParam();
 }
 
 function goHome() {
-  TOP_NAV.href = BASE_URL + "?companyId=" + encodeURIComponent(getCompanyId());
+  TOP_NAV.href = BASE_URL + "?companyId=" + encodeURIComponent(getCompanyId()) + ownerPortalParam();
+}
+
+function ownerPortalParam() {
+  return OWNER_PORTAL ? "&ownerOnly=1" : "";
 }
 
 function esc(value) {
