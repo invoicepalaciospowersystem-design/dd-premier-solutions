@@ -99,6 +99,80 @@
     .mode-active {
       background:#2563eb !important;
     }
+
+    .economy-metrics {
+      display:grid;
+      grid-template-columns:repeat(auto-fill, minmax(170px, 1fr));
+      gap:12px;
+      margin-bottom:15px;
+    }
+
+    .metric {
+      min-height:104px;
+      background:#ffffff;
+      border:1px solid #e5e7eb;
+      border-left:5px solid #2563eb;
+      border-radius:12px;
+      padding:13px;
+      box-shadow:0 3px 10px rgba(0,0,0,0.08);
+      box-sizing:border-box;
+      text-align:left;
+      color:#111827;
+    }
+
+    .metric-button {
+      width:100%;
+      cursor:pointer;
+      transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+    }
+
+    .metric-button:hover {
+      transform:translateY(-2px);
+      border-color:#cbd5e1;
+      box-shadow:0 10px 22px rgba(15,23,42,.12);
+    }
+
+    .metric-button.active {
+      outline:3px solid rgba(37,99,235,.16);
+      border-color:#2563eb;
+    }
+
+    .metric.success { border-left-color:#16a34a; }
+    .metric.warning { border-left-color:#f59e0b; }
+    .metric.danger { border-left-color:#dc2626; }
+    .metric.neutral { border-left-color:#64748b; }
+
+    .metric-label {
+      font-size:12px;
+      color:#6b7280;
+      margin-bottom:6px;
+    }
+
+    .metric-value {
+      font-size:25px;
+      font-weight:bold;
+      line-height:1.1;
+      color:#111827;
+      overflow-wrap:anywhere;
+    }
+
+    .metric-note {
+      margin-top:7px;
+      font-size:12px;
+      color:#4b5563;
+      line-height:1.3;
+    }
+
+    .metric-info {
+      display:none;
+      background:#ffffff;
+      border:1px solid #e5e7eb;
+      border-radius:12px;
+      padding:12px 14px;
+      margin-bottom:15px;
+      color:#4b5563;
+      box-shadow:0 3px 10px rgba(0,0,0,0.06);
+    }
   </style>
   <?!= include("AppWatermark"); ?>
 </head>
@@ -171,6 +245,8 @@
 
 <div id="techSummaryBox" class="box" style="display:none;"></div>
 <div id="oldDDSummaryBox" class="box" style="display:none;"></div>
+<div id="economyMetrics" class="economy-metrics"></div>
+<div id="economyMetricInfo" class="metric-info"></div>
 <div id="cards" class="grid">Loading...</div>
 
 <script>
@@ -210,6 +286,7 @@ let ECONOMY = [];
 let ACTIVE_COMPANY_ID = "";
 let CURRENT_PERIOD_LABEL = "";
 let VIEW_MODE = "REGULAR";
+let ECONOMY_METRIC_FILTER = "all";
 
 function getCurrentUser() {
   try {
@@ -240,6 +317,7 @@ function requireEconomyLogin() {
 
 function setMode(mode) {
   VIEW_MODE = mode;
+  ECONOMY_METRIC_FILTER = "all";
 
   document.getElementById("regularBtn").classList.toggle("mode-active", mode === "REGULAR");
   document.getElementById("pmBtn").classList.toggle("mode-active", mode === "PM");
@@ -361,6 +439,7 @@ function load() {
 
   if (!ACTIVE_COMPANY_ID) {
     document.getElementById("cards").innerHTML = "No hay compañía asignada.";
+    clearEconomyMetrics();
     return;
   }
 
@@ -399,7 +478,7 @@ function render() {
   const status = document.getElementById("statusFilter").value;
   const period = document.getElementById("periodFilter").value;
 
-  const filtered = ECONOMY.filter(function(o) {
+  const baseFiltered = ECONOMY.filter(function(o) {
     const text = JSON.stringify(o).toLowerCase();
 
     return (!search || text.includes(search)) &&
@@ -407,10 +486,188 @@ function render() {
            (!period || String(o.PERIOD_LABEL || "") === period);
   });
 
+  renderEconomyMetrics(baseFiltered);
+  const filtered = applyEconomyMetricFilter(baseFiltered);
+
   document.getElementById("cards").innerHTML =
     filtered.length
       ? filtered.map(card).join("")
       : "No economy records found.";
+}
+
+function clearEconomyMetrics() {
+  const metrics = document.getElementById("economyMetrics");
+  const info = document.getElementById("economyMetricInfo");
+  if (metrics) metrics.innerHTML = "";
+  if (info) {
+    info.style.display = "none";
+    info.innerHTML = "";
+  }
+}
+
+function renderEconomyMetrics(rows) {
+  const metrics = calculateEconomyMetrics(rows);
+  const cards = getEconomyMetricCards(metrics);
+
+  document.getElementById("economyMetrics").innerHTML =
+    cards.map(renderEconomyMetricButton).join("");
+
+  const active = cards.find(function(card) {
+    return card.key === ECONOMY_METRIC_FILTER;
+  }) || cards[0];
+
+  const filtered = applyEconomyMetricFilter(rows);
+  const info = document.getElementById("economyMetricInfo");
+  info.style.display = "block";
+  info.innerHTML =
+    "<b>" + (active ? active.label : "All Records") + ":</b> " +
+    filtered.length + " records shown after filters.";
+}
+
+function renderEconomyMetricButton(card) {
+  const active = card.key === ECONOMY_METRIC_FILTER ? " active" : "";
+  return `
+    <button type="button" class="metric metric-button ${card.tone || "neutral"}${active}"
+      onclick="filterEconomyMetric('${card.key}')">
+      <div class="metric-label">${card.label}</div>
+      <div class="metric-value">${card.value}</div>
+      <div class="metric-note">${card.note || ""} | View records</div>
+    </button>
+  `;
+}
+
+function filterEconomyMetric(key) {
+  ECONOMY_METRIC_FILTER = String(key || "all");
+  render();
+}
+
+function getEconomyMetricCards(m) {
+  if (VIEW_MODE === "PM") {
+    return [
+      { key:"all", label:"PM Records", value:m.count, note:"All PM economy rows", tone:"info" },
+      { key:"pending", label:"Pending", value:m.pending, note:"Not invoiced or paid", tone:m.pending ? "danger" : "success" },
+      { key:"invoiced", label:"Invoiced", value:m.invoiced, note:"Ready for payment", tone:"warning" },
+      { key:"paid", label:"Paid", value:m.paid, note:"Closed payments", tone:"success" },
+      { key:"amount", label:"Paid to D&D", value:formatMoney(m.amount), note:"Total PM amount", tone:"info" },
+      { key:"techPay", label:"Tech Pay", value:formatMoney(m.techPay), note:"PM technician pay", tone:"warning" },
+      { key:"profit", label:"D&D Profit", value:formatMoney(m.profit), note:"Amount - cost", tone:m.profit >= 0 ? "success" : "danger" },
+      { key:"hours", label:"Hours", value:m.hours.toFixed(2), note:"Registered hours", tone:"neutral" }
+    ];
+  }
+
+  return [
+    { key:"all", label:"Economy Records", value:m.count, note:"Rows in selected view", tone:"info" },
+    { key:"pending", label:"Pending", value:m.pending, note:"Need billing/payment action", tone:m.pending ? "danger" : "success" },
+    { key:"invoiced", label:"Invoiced", value:m.invoiced, note:"Invoices sent", tone:"warning" },
+    { key:"paid", label:"Paid", value:m.paid, note:"Collected invoices", tone:"success" },
+    { key:"amount", label:"Total Billed", value:formatMoney(m.amount), note:"Invoice total amount", tone:"info" },
+    { key:"tax", label:"Tax", value:formatMoney(m.tax), note:"Tax collected", tone:"neutral" },
+    { key:"billedParts", label:"Billed Parts", value:formatMoney(m.billedParts), note:"Estimated parts charge", tone:"info" },
+    { key:"laborBilled", label:"Billed Labor", value:formatMoney(m.laborBilled), note:m.hours.toFixed(2) + " hours", tone:"info" },
+    { key:"cost", label:"Real Parts Cost", value:formatMoney(m.cost), note:"Registered material cost", tone:m.cost ? "warning" : "success" },
+    { key:"techPay", label:"Tech Pay", value:formatMoney(m.techPay), note:"Labor paid to techs", tone:"warning" },
+    { key:"profit", label:"Profit", value:formatMoney(m.profit), note:"Saved profit field", tone:m.profit >= 0 ? "success" : "danger" },
+    { key:"david", label:"David Parts", value:formatMoney(m.david), note:"Investor parts split", tone:"info" },
+    { key:"yoel", label:"Yoel Parts", value:formatMoney(m.yoel), note:"Investor parts split", tone:"info" }
+  ];
+}
+
+function calculateEconomyMetrics(rows) {
+  const totals = {
+    count: rows.length,
+    pending: 0,
+    invoiced: 0,
+    paid: 0,
+    amount: 0,
+    tax: 0,
+    cost: 0,
+    profit: 0,
+    techPay: 0,
+    hours: 0,
+    laborBilled: 0,
+    billedParts: 0,
+    david: 0,
+    yoel: 0
+  };
+
+  rows.forEach(function(o) {
+    const status = String(o.STATUS || "PENDING").toUpperCase();
+    const amount = parseEconomyNumber(o.AMOUNT);
+    const tax = parseEconomyNumber(o.TAX);
+    const cost = parseEconomyNumber(o.COST);
+    const profit = parseEconomyNumber(o.PROFIT);
+    const techPay = parseEconomyNumber(o.TECH_LABOR_COST || o.TECH_LABOR_PAY);
+    const hours = parseEconomyNumber(o.HORAS || o.LABOR_HOURS);
+    const laborBilled = calculateEconomyLaborCharge(hours);
+    const billedParts = Math.max(0, amount - tax - laborBilled);
+    const split = getInvestmentSplitValues(o.INV_SOURCE, cost);
+
+    if (!status || status === "PENDING") totals.pending++;
+    if (status === "INVOICED") totals.invoiced++;
+    if (status === "PAID") totals.paid++;
+
+    totals.amount += amount;
+    totals.tax += tax;
+    totals.cost += cost;
+    totals.profit += profit;
+    totals.techPay += techPay;
+    totals.hours += hours;
+    totals.laborBilled += laborBilled;
+    totals.billedParts += billedParts;
+    totals.david += split.david;
+    totals.yoel += split.yoel;
+  });
+
+  return totals;
+}
+
+function applyEconomyMetricFilter(rows) {
+  const key = String(ECONOMY_METRIC_FILTER || "all");
+
+  if (key === "all") return rows;
+
+  return rows.filter(function(o) {
+    const status = String(o.STATUS || "PENDING").toUpperCase();
+    const amount = parseEconomyNumber(o.AMOUNT);
+    const tax = parseEconomyNumber(o.TAX);
+    const cost = parseEconomyNumber(o.COST);
+    const profit = parseEconomyNumber(o.PROFIT);
+    const techPay = parseEconomyNumber(o.TECH_LABOR_COST || o.TECH_LABOR_PAY);
+    const hours = parseEconomyNumber(o.HORAS || o.LABOR_HOURS);
+    const laborBilled = calculateEconomyLaborCharge(hours);
+    const billedParts = Math.max(0, amount - tax - laborBilled);
+    const split = getInvestmentSplitValues(o.INV_SOURCE, cost);
+
+    if (key === "pending") return !status || status === "PENDING";
+    if (key === "invoiced") return status === "INVOICED";
+    if (key === "paid") return status === "PAID";
+    if (key === "amount") return amount > 0;
+    if (key === "tax") return tax > 0;
+    if (key === "billedParts") return billedParts > 0;
+    if (key === "laborBilled") return laborBilled > 0;
+    if (key === "cost") return cost > 0;
+    if (key === "techPay") return techPay > 0;
+    if (key === "profit") return profit !== 0;
+    if (key === "hours") return hours > 0;
+    if (key === "david") return split.david > 0;
+    if (key === "yoel") return split.yoel > 0;
+    return true;
+  });
+}
+
+function parseEconomyNumber(value) {
+  const cleaned = String(value || "")
+    .replace(/[$,\s]/g, "")
+    .replace(/[^\d.-]/g, "");
+  const n = Number(cleaned);
+  return isNaN(n) ? 0 : n;
+}
+
+function calculateEconomyLaborCharge(hours) {
+  hours = Number(hours || 0);
+  if (hours <= 0) return 0;
+  if (hours <= 1) return 200;
+  return 200 + ((hours - 1) * 130);
 }
 
 function parseTechPayDetail(o) {
@@ -761,6 +1018,7 @@ function loadCompanySelector() {
   const user = getCurrentUser();
 
   document.getElementById("companyTitle").innerText = "Company: Seleccione empresa";
+  clearEconomyMetrics();
 
   google.script.run
     .withSuccessHandler(function(companies) {
@@ -788,6 +1046,7 @@ function loadCompanySelector() {
 
 function activateCompany() {
   ACTIVE_COMPANY_ID = document.getElementById("companySelect").value;
+  ECONOMY_METRIC_FILTER = "all";
 
   if (!ACTIVE_COMPANY_ID) {
     alert("Seleccione una empresa.");
