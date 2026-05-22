@@ -559,6 +559,20 @@
         #090b0f;
     }
 
+    body.app-mode.login-dd {
+      background:
+        linear-gradient(180deg, #f8fafc 0%, #eef2f7 46%, #e5e7eb 100%);
+    }
+
+    body.app-mode.login-dd::before {
+      background-image:var(--company-watermark-logo);
+      background-repeat:repeat;
+      background-position:center;
+      background-size:260px auto;
+      opacity:.035;
+      filter:grayscale(100%);
+    }
+
     .panel {
       max-width:1180px;
       margin:0 auto 30px;
