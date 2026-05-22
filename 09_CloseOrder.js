@@ -240,24 +240,6 @@ function saveCloseOrder_(data) {
   };
 
   try {
-    const pdfs = generateInvoicePDFs_(invoiceRow);
-
-    invoiceRow.PDF_EN_URL = pdfs.pdfEnUrl;
-    invoiceRow.PDF_ES_URL = pdfs.pdfEsUrl;
-    invoiceRow.DOC_EN_URL = pdfs.docEnUrl;
-    invoiceRow.DOC_ES_URL = pdfs.docEsUrl;
-  } catch (pdfErr) {
-    Logger.log("ERROR generando PDF invoice: " + pdfErr);
-    notifySystemError_("INVOICE_PDF_ERROR", pdfErr, {
-      module: "INVOICE",
-      companyId: companyId,
-      woNumber: woNumber,
-      invoiceNumber: invoiceNumber,
-      generator: "generateInvoicePDFs_"
-    });
-  }
-
-  try {
     const pdfLinks = generatePdfFromCloseOrder_(invoiceRow);
     invoiceRow.PDF_ES_URL = pdfLinks.PDF_ES_URL;
     invoiceRow.PDF_EN_URL = pdfLinks.PDF_EN_URL;
