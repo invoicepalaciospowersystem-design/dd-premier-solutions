@@ -559,6 +559,261 @@
         #090b0f;
     }
 
+    body.login-dd .login-shell {
+      min-height:calc(100vh - clamp(40px, 6vw, 88px));
+      grid-template-columns:minmax(520px, 1.18fr) minmax(420px, .82fr);
+      border-radius:24px;
+      border-color:rgba(226,232,240,.24);
+      box-shadow:
+        0 30px 80px rgba(0,0,0,.58),
+        0 0 0 1px rgba(255,255,255,.035) inset;
+    }
+
+    body.login-dd .login-shell::before {
+      content:"";
+      position:absolute;
+      inset:-1px;
+      background:
+        radial-gradient(circle at 10% 7%, rgba(220,38,38,.18), transparent 24%),
+        radial-gradient(circle at 90% 92%, rgba(220,38,38,.14), transparent 24%);
+      pointer-events:none;
+      z-index:0;
+    }
+
+    body.login-dd .login-shell > :not(.login-language) {
+      position:relative;
+      z-index:1;
+    }
+
+    body.login-dd .login-shell > .login-language {
+      position:absolute;
+      z-index:4;
+    }
+
+    .login-language {
+      position:absolute;
+      top:32px;
+      right:38px;
+      z-index:4;
+      display:flex;
+      align-items:center;
+      gap:9px;
+      min-height:42px;
+      padding:0 15px;
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:8px;
+      background:rgba(4,6,9,.72);
+      color:#f8fafc;
+      font-size:15px;
+      font-weight:bold;
+      box-shadow:0 12px 26px rgba(0,0,0,.28);
+      backdrop-filter:blur(10px);
+    }
+
+    .login-language svg {
+      width:20px;
+      height:20px;
+      flex:0 0 auto;
+    }
+
+    body.login-dd .login-brand {
+      min-height:720px;
+      justify-content:flex-start;
+      padding:clamp(48px, 6vw, 78px) clamp(44px, 6vw, 88px) 118px;
+      background:
+        linear-gradient(180deg, rgba(0,0,0,0) 62%, rgba(0,0,0,.82) 100%),
+        radial-gradient(circle at 43% 21%, rgba(220,38,38,.46), transparent 28%),
+        radial-gradient(circle at 10% 0%, rgba(127,29,29,.34), transparent 35%),
+        linear-gradient(135deg, rgba(25,8,8,.95), rgba(5,8,12,.98) 60%, rgba(3,4,7,.98));
+    }
+
+    body.login-dd .login-brand::before {
+      background:
+        linear-gradient(135deg, transparent 0 66%, rgba(220,38,38,.24) 66% 68%, transparent 68%),
+        linear-gradient(145deg, rgba(255,255,255,.05), transparent 24%),
+        repeating-linear-gradient(25deg, rgba(220,38,38,.12) 0 1px, transparent 1px 76px);
+      opacity:.94;
+    }
+
+    body.login-dd .login-brand::after {
+      height:230px;
+      background:
+        linear-gradient(to top, rgba(0,0,0,.88), rgba(0,0,0,.22) 62%, rgba(0,0,0,0)),
+        linear-gradient(90deg,
+          transparent 0 2%,
+          rgba(255,255,255,.18) 2% 4%,
+          transparent 4% 8%,
+          rgba(255,255,255,.28) 8% 10%,
+          transparent 10% 15%,
+          rgba(255,255,255,.14) 15% 18%,
+          transparent 18% 23%,
+          rgba(255,255,255,.22) 23% 27%,
+          transparent 27% 33%,
+          rgba(255,255,255,.16) 33% 36%,
+          transparent 36% 43%,
+          rgba(255,255,255,.26) 43% 45%,
+          transparent 45% 51%,
+          rgba(255,255,255,.13) 51% 56%,
+          transparent 56% 63%,
+          rgba(255,255,255,.23) 63% 66%,
+          transparent 66% 72%,
+          rgba(255,255,255,.16) 72% 75%,
+          transparent 75% 100%);
+      clip-path:polygon(0 42%, 4% 31%, 7% 55%, 10% 28%, 14% 52%, 18% 36%, 22% 58%, 27% 24%, 31% 52%, 35% 34%, 40% 58%, 44% 29%, 48% 50%, 53% 37%, 58% 60%, 62% 22%, 67% 49%, 72% 34%, 78% 60%, 83% 26%, 88% 50%, 94% 38%, 100% 44%, 100% 100%, 0 100%);
+      opacity:.72;
+    }
+
+    body.login-dd .brand-logo {
+      width:min(760px, 96%);
+      max-height:360px;
+      margin:8px auto 0;
+      filter:
+        drop-shadow(0 28px 34px rgba(0,0,0,.62))
+        drop-shadow(0 0 16px rgba(220,38,38,.18));
+    }
+
+    body.login-dd .dd-showcase {
+      margin-top:24px;
+    }
+
+    body.login-dd .dd-slogan {
+      max-width:700px;
+      font-size:clamp(21px, 2vw, 29px);
+      line-height:1.24;
+      margin-bottom:28px;
+    }
+
+    body.login-dd .dd-feature-grid {
+      gap:10px;
+      max-width:690px;
+      margin:0 auto;
+    }
+
+    body.login-dd .dd-feature {
+      min-height:150px;
+      border-color:rgba(255,255,255,.13);
+      border-bottom-color:rgba(220,38,38,.78);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,.34)),
+        rgba(5,7,10,.62);
+      box-shadow:
+        0 18px 34px rgba(0,0,0,.32),
+        0 0 0 1px rgba(255,255,255,.025) inset;
+    }
+
+    body.login-dd .dd-feature-icon {
+      width:66px;
+      height:66px;
+      background:
+        radial-gradient(circle at 35% 24%, rgba(255,255,255,.20), transparent 36%),
+        linear-gradient(180deg, #db1515, #750707);
+      box-shadow:0 0 26px rgba(220,38,38,.34);
+    }
+
+    body.login-dd .box {
+      min-height:720px;
+      align-items:center;
+      justify-content:center;
+      padding:92px clamp(38px, 5vw, 78px) 104px;
+      background:
+        radial-gradient(circle at 45% 48%, rgba(255,255,255,.05), transparent 36%),
+        linear-gradient(135deg, rgba(255,255,255,.035), rgba(255,255,255,.01)),
+        #07090d;
+    }
+
+    body.login-dd .box::before {
+      background:
+        linear-gradient(120deg, rgba(255,255,255,.05), transparent 34%),
+        repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,.025) 0 1px, transparent 1px 12px);
+      opacity:.70;
+    }
+
+    body.login-dd .login-card {
+      max-width:520px;
+      padding:clamp(42px, 5vw, 64px);
+      border-radius:16px;
+      border-color:rgba(255,255,255,.16);
+      background:
+        linear-gradient(180deg, rgba(18,22,27,.88), rgba(6,8,11,.90)),
+        rgba(9,11,15,.92);
+      box-shadow:
+        0 30px 86px rgba(0,0,0,.54),
+        0 0 0 1px rgba(255,255,255,.03) inset;
+      backdrop-filter:blur(12px);
+    }
+
+    body.login-dd .login-company {
+      display:none;
+    }
+
+    body.login-dd .box h2 {
+      font-size:clamp(31px, 3.1vw, 42px);
+      margin-bottom:10px;
+    }
+
+    body.login-dd .login-card .muted {
+      max-width:380px;
+      font-size:20px;
+      color:#aeb5bf;
+      margin-bottom:32px;
+    }
+
+    body.login-dd .field-shell {
+      min-height:58px;
+      margin-bottom:24px;
+      border-radius:8px;
+      border-color:rgba(255,255,255,.20);
+      background:rgba(7,9,12,.50);
+    }
+
+    body.login-dd .field-shell input {
+      height:56px;
+      font-size:16px;
+    }
+
+    .login-options {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:14px;
+      margin:-2px 0 28px;
+      color:#f8fafc;
+      font-size:14px;
+    }
+
+    .remember-me {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      white-space:nowrap;
+    }
+
+    .remember-me input {
+      width:20px;
+      height:20px;
+      accent-color:#dc2626;
+      margin:0;
+    }
+
+    .forgot-link {
+      color:#ff2b2b;
+      font-weight:bold;
+      text-decoration:none;
+      white-space:nowrap;
+    }
+
+    .forgot-link:hover {
+      text-decoration:underline;
+    }
+
+    body.login-dd .login-submit {
+      min-height:60px;
+      font-size:17px;
+      box-shadow:
+        0 16px 30px rgba(220,38,38,.34),
+        0 0 0 1px rgba(255,255,255,.05) inset;
+    }
+
     .panel {
       max-width:1180px;
       margin:0 auto 30px;
@@ -1300,6 +1555,14 @@
         inset:0;
       }
 
+      .login-language {
+        top:18px;
+        right:18px;
+        min-height:36px;
+        padding:0 11px;
+        font-size:13px;
+      }
+
       .login-shell {
         align-items:stretch;
         grid-template-columns:1fr;
@@ -1320,7 +1583,12 @@
       }
 
       body.login-dd .login-brand {
-        padding-bottom:32px;
+        min-height:auto;
+        padding:62px 18px 24px;
+      }
+
+      body.login-dd .login-shell {
+        min-height:auto;
       }
 
       .brand-logo {
@@ -1329,9 +1597,11 @@
       }
 
       body.login-dd .brand-logo {
-        width:min(300px, 84vw);
+        width:min(250px, 74vw);
         max-width:100%;
-        max-height:210px;
+        max-height:185px;
+        align-self:center;
+        margin:8px 0 0;
       }
 
       .login-brand::before {
@@ -1365,6 +1635,25 @@
         grid-template-columns:1fr;
       }
 
+      body.login-dd .dd-showcase {
+        margin-top:12px;
+      }
+
+      body.login-dd .dd-slogan {
+        max-width:306px;
+        margin-bottom:0;
+        font-size:20px;
+      }
+
+      body.login-dd .dd-feature-grid {
+        display:none;
+      }
+
+      body.login-dd .login-brand::after {
+        height:120px;
+        opacity:.35;
+      }
+
       .dd-feature {
         padding:12px 6px;
         min-height:116px;
@@ -1374,14 +1663,31 @@
         padding:24px 18px 64px;
       }
 
+      body.login-dd .box {
+        min-height:auto;
+        padding:24px 18px 74px;
+      }
+
       .login-card {
         max-width:336px;
         width:calc(100vw - 84px);
         padding:26px 20px;
       }
 
+      body.login-dd .login-card {
+        max-width:360px;
+        width:calc(100vw - 70px);
+        padding:30px 22px;
+      }
+
       .box h2 {
         font-size:28px;
+      }
+
+      .login-options {
+        align-items:flex-start;
+        flex-direction:column;
+        gap:12px;
       }
 
       .metric-grid,
@@ -1419,6 +1725,14 @@
 <body class="login-mode login-dd">
 
 <div id="loginShell" class="login-shell">
+  <div class="login-language" aria-label="Language">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
+      <path d="M3.6 9h16.8M3.6 15h16.8M12 3c2.1 2.4 3.2 5.4 3.2 9S14.1 18.6 12 21M12 3c-2.1 2.4-3.2 5.4-3.2 9s1.1 6.6 3.2 9" fill="none" stroke="currentColor" stroke-width="1.8"></path>
+    </svg>
+    English
+  </div>
+
   <section id="loginBrand" class="login-brand">
     <img id="brandLogo" class="brand-logo" alt="">
     <div class="brand-copy">
@@ -1500,6 +1814,14 @@
               <circle cx="12" cy="12" r="2.7" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
             </svg>
           </button>
+        </div>
+
+        <div class="login-options">
+          <label class="remember-me" for="rememberEmail">
+            <input id="rememberEmail" type="checkbox">
+            Remember me
+          </label>
+          <a class="forgot-link" href="mailto:ddpremiersolutions.corp@gmail.com?subject=Password%20reset%20request">Forgot password?</a>
         </div>
 
         <button id="loginButton" class="login-submit" onclick="login()">SIGN IN</button>
@@ -1706,6 +2028,7 @@ const TOP_NAV = {
 const BASE_URL = "<?= baseUrl ?>";
 const LOGIN_COMPANY_ID = String("<?= companyId ?>").trim().toUpperCase();
 const OWNER_ONLY_LOGIN = String("<?= ownerOnly ?>").trim().toLowerCase() === "true";
+const REMEMBER_EMAIL_KEY = "pps_remembered_email_" + (LOGIN_COMPANY_ID || "OWNER");
 const UNITED_REFRIGERATION_ACCOUNT =
   String("<?= unitedRefrigerationAccount ?>").trim() || "11437479";
 
@@ -1917,6 +2240,7 @@ function login() {
       CURRENT_USER = normalizeUser(user || {});
       localStorage.setItem("pps_user", JSON.stringify(CURRENT_USER));
       localStorage.setItem("pps_login_company", LOGIN_COMPANY_ID || "");
+      updateRememberedEmail(email);
       showPanel();
     })
     .withFailureHandler(function(err) {
@@ -1925,6 +2249,45 @@ function login() {
       document.getElementById("loginButton").innerText = "SIGN IN";
     })
     .loginUserForCompany(email, password, LOGIN_COMPANY_ID, OWNER_ONLY_LOGIN);
+}
+
+function restoreRememberedEmail() {
+  const input = document.getElementById("email");
+  const checkbox = document.getElementById("rememberEmail");
+  if (!input || !checkbox) return;
+
+  const savedEmail = localStorage.getItem(REMEMBER_EMAIL_KEY) || "";
+  if (!savedEmail) return;
+
+  input.value = savedEmail;
+  checkbox.checked = true;
+
+  const password = document.getElementById("password");
+  if (password) password.focus();
+}
+
+function updateRememberedEmail(email) {
+  const checkbox = document.getElementById("rememberEmail");
+  if (!checkbox || !checkbox.checked) {
+    localStorage.removeItem(REMEMBER_EMAIL_KEY);
+    return;
+  }
+
+  localStorage.setItem(REMEMBER_EMAIL_KEY, String(email || "").trim());
+}
+
+function bindLoginKeyboard() {
+  ["email", "password"].forEach(function(id) {
+    const input = document.getElementById(id);
+    if (!input) return;
+
+    input.addEventListener("keydown", function(event) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        login();
+      }
+    });
+  });
 }
 
 function togglePassword() {
@@ -3393,6 +3756,8 @@ function safeImageUrl(value) {
 
 window.onload = function() {
   loadLoginBranding();
+  restoreRememberedEmail();
+  bindLoginKeyboard();
 
   const saved = localStorage.getItem("pps_user");
 
