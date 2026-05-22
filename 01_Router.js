@@ -16,6 +16,7 @@ function doGet(e) {
       const template = HtmlService.createTemplateFromFile("Tech");
       template.techName = p.tech || "";
       template.baseUrl = baseUrl;
+      template.unitedRefrigerationAccount = CFG.UNITED_REFRIGERATION_ACCOUNT || "";
 
       return template.evaluate()
         .setTitle("Technician Work Orders")
@@ -151,6 +152,7 @@ function doGet(e) {
     template.baseUrl = baseUrl;
     template.companyId = p.companyId || "";
     template.ownerOnly = (p.ownerOnly === "1" || p.ownerOnly === "true" || p.portal === "owner") ? "true" : "";
+    template.unitedRefrigerationAccount = CFG.UNITED_REFRIGERATION_ACCOUNT || "";
 
     return template.evaluate()
       .setTitle(CFG.APP_NAME)

@@ -46,6 +46,45 @@
       margin-bottom:15px;
     }
 
+    .supplier-account-banner {
+      display:none;
+      align-items:center;
+      justify-content:space-between;
+      gap:14px;
+      background:#eff6ff;
+      border:1px solid #bfdbfe;
+      border-left:6px solid #2563eb;
+      border-radius:12px;
+      padding:14px 16px;
+      margin-bottom:15px;
+      box-shadow:0 3px 10px rgba(0,0,0,0.08);
+    }
+
+    .supplier-account-title {
+      color:#1e3a8a;
+      font-size:16px;
+      font-weight:bold;
+      margin-bottom:4px;
+    }
+
+    .supplier-account-note {
+      color:#475569;
+      font-size:13px;
+    }
+
+    .supplier-account-number {
+      min-width:148px;
+      padding:10px 14px;
+      border-radius:9px;
+      background:#ffffff;
+      border:1px solid #93c5fd;
+      color:#111827;
+      font-size:24px;
+      font-weight:bold;
+      text-align:center;
+      letter-spacing:0;
+    }
+
     button {
       padding:10px 14px;
       border-radius:10px;
@@ -151,6 +190,14 @@
 
     @media (max-width:420px) {
       .grid { grid-template-columns:1fr; }
+      .supplier-account-banner {
+        align-items:flex-start;
+        flex-direction:column;
+      }
+      .supplier-account-number {
+        width:100%;
+        box-sizing:border-box;
+      }
     }
   </style>
 </head>
@@ -166,6 +213,14 @@
     <div style="font-size:16px; font-weight:bold;">D&D Premier Solutions Corp</div>
     <div style="font-size:13px; color:#6b7280;">Sistema de Órdenes</div>
   </div>
+</div>
+
+<div id="supplierAccountBanner" class="supplier-account-banner">
+  <div>
+    <div class="supplier-account-title">United Refrigeration</div>
+    <div class="supplier-account-note">Cuenta para compras de piezas</div>
+  </div>
+  <div id="unitedAccountNumber" class="supplier-account-number">11437479</div>
 </div>
 
 <div class="topbar">
@@ -237,6 +292,8 @@ if (!requireLogin()) {
 
 const TECH_NAME = "<?= techName ?>";
 const BASE_URL = "<?= baseUrl ?>";
+const UNITED_REFRIGERATION_ACCOUNT =
+  String("<?= unitedRefrigerationAccount ?>").trim() || "11437479";
 
 function getCurrentUser() {
   try {
@@ -254,6 +311,20 @@ function getCurrentCompanyId() {
 function getSessionToken() {
   const user = getCurrentUser();
   return user.sessionToken || user.SESSION_TOKEN || "";
+}
+
+function loadSupplierAccountBanner() {
+  const banner = document.getElementById("supplierAccountBanner");
+  const numberBox = document.getElementById("unitedAccountNumber");
+  if (!banner || !numberBox) return;
+
+  if (!UNITED_REFRIGERATION_ACCOUNT) {
+    banner.style.display = "none";
+    return;
+  }
+
+  numberBox.innerText = UNITED_REFRIGERATION_ACCOUNT;
+  banner.style.display = "flex";
 }
 
 function loadHeader() {
@@ -650,6 +721,7 @@ function formatMoneyTech(v) {
 }
 
 document.addEventListener("DOMContentLoaded", function() {
+  loadSupplierAccountBanner();
   loadHeader();
   initMySummaryDate();
   loadMyTechSummary();

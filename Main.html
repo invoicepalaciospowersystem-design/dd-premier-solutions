@@ -695,6 +695,44 @@
       cursor:not-allowed;
     }
 
+    .tech-account-banner {
+      display:none;
+      align-items:center;
+      justify-content:space-between;
+      gap:14px;
+      margin-top:16px;
+      padding:14px 16px;
+      border:1px solid #bfdbfe;
+      border-left:6px solid #2563eb;
+      border-radius:10px;
+      background:#eff6ff;
+    }
+
+    .tech-account-label {
+      font-size:16px;
+      font-weight:bold;
+      color:#1e3a8a;
+      margin-bottom:4px;
+    }
+
+    .tech-account-help {
+      font-size:13px;
+      color:#475569;
+    }
+
+    .tech-account-number {
+      min-width:148px;
+      padding:10px 14px;
+      border-radius:9px;
+      background:#ffffff;
+      border:1px solid #93c5fd;
+      color:#111827;
+      font-size:24px;
+      font-weight:bold;
+      text-align:center;
+      letter-spacing:0;
+    }
+
     .owner-dashboard {
       display:none;
       margin-bottom:18px;
@@ -969,6 +1007,16 @@
       .owner-company-control {
         grid-template-columns:1fr;
       }
+
+      .tech-account-banner {
+        align-items:flex-start;
+        flex-direction:column;
+      }
+
+      .tech-account-number {
+        width:100%;
+        box-sizing:border-box;
+      }
     }
   </style>
 </head>
@@ -1100,6 +1148,14 @@
         </select>
       </div>
     </div>
+
+    <div id="techUnitedAccount" class="tech-account-banner">
+      <div>
+        <div class="tech-account-label">United Refrigeration</div>
+        <div class="tech-account-help">Cuenta para compras de piezas</div>
+      </div>
+      <div id="mainUnitedAccountNumber" class="tech-account-number">11437479</div>
+    </div>
   </div>
 
   <div id="ownerDashboard" class="owner-dashboard">
@@ -1136,6 +1192,8 @@
 const BASE_URL = "<?= baseUrl ?>";
 const LOGIN_COMPANY_ID = String("<?= companyId ?>").trim().toUpperCase();
 const OWNER_ONLY_LOGIN = String("<?= ownerOnly ?>").trim().toLowerCase() === "true";
+const UNITED_REFRIGERATION_ACCOUNT =
+  String("<?= unitedRefrigerationAccount ?>").trim() || "11437479";
 
 let CURRENT_USER = null;
 let CURRENT_BRANDING = {
@@ -1348,6 +1406,7 @@ function showPanel() {
     CURRENT_USER.name + " | " + CURRENT_USER.role + " | Company: " + (getActiveCompanyId() || "ALL");
 
   renderModules();
+  updateTechAccountBanner();
   loadOwnerCompanySelector();
 }
 
@@ -1381,6 +1440,21 @@ function renderModules() {
         </div>
       `;
     }).join("");
+}
+
+function updateTechAccountBanner() {
+  const banner = document.getElementById("techUnitedAccount");
+  const numberBox = document.getElementById("mainUnitedAccountNumber");
+  if (!banner || !numberBox) return;
+
+  const role = String(CURRENT_USER && CURRENT_USER.role || "").trim().toUpperCase();
+  if (role !== "TECH" || !UNITED_REFRIGERATION_ACCOUNT) {
+    banner.style.display = "none";
+    return;
+  }
+
+  numberBox.innerText = UNITED_REFRIGERATION_ACCOUNT;
+  banner.style.display = "flex";
 }
 
 function getInitialOwnerCompanySelection() {
