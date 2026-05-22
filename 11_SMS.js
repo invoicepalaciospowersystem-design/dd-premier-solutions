@@ -28,14 +28,24 @@ function sendSMS_(to, message) {
       headers: { Authorization: "Basic " + Utilities.base64Encode(ACCOUNT_SID + ":" + AUTH_TOKEN) },
       muteHttpExceptions: true
     });
+    const responseText = response.getContentText();
+    const parsed = parseTwilioResponse_(responseText);
+
+    if (parsed && parsed.sid) {
+      props.setProperty("LAST_SMS_SID", parsed.sid);
+    }
 
     Logger.log("SMS CODE: " + response.getResponseCode());
-    Logger.log("SMS RESPONSE: " + response.getContentText());
+    Logger.log("SMS RESPONSE: " + responseText);
 
     return {
       phone: to,
+      sid: parsed && parsed.sid ? parsed.sid : "",
+      status: parsed && parsed.status ? parsed.status : "",
+      errorCode: parsed && parsed.error_code ? parsed.error_code : "",
+      errorMessage: parsed && parsed.error_message ? parsed.error_message : "",
       code: response.getResponseCode(),
-      body: response.getContentText()
+      body: responseText
     };
 
   } catch (err) {
@@ -127,4 +137,62 @@ function normalizeSmsPhone_(phone) {
 
 function testSMS() {
   sendSMS_("+17869674478", "TEST SMS funcionando");
+}
+
+function checkLastSMSStatus() {
+  const props = PropertiesService.getScriptProperties();
+  const sid = props.getProperty("LAST_SMS_SID");
+
+  if (!sid) {
+    Logger.log("No hay LAST_SMS_SID guardado todavia.");
+    return null;
+  }
+
+  return checkSMSStatus_(sid);
+}
+
+function checkSMSStatus_(messageSid) {
+  const props = PropertiesService.getScriptProperties();
+  const ACCOUNT_SID = props.getProperty("TWILIO_SID");
+  const AUTH_TOKEN = props.getProperty("TWILIO_TOKEN");
+  const sid = String(messageSid || "").trim();
+
+  if (!ACCOUNT_SID || !AUTH_TOKEN) {
+    throw new Error("Faltan TWILIO_SID o TWILIO_TOKEN en Script Properties.");
+  }
+
+  if (!sid) {
+    throw new Error("Falta el Message SID del SMS.");
+  }
+
+  const url = "https://api.twilio.com/2010-04-01/Accounts/" +
+    ACCOUNT_SID + "/Messages/" + encodeURIComponent(sid) + ".json";
+
+  const response = UrlFetchApp.fetch(url, {
+    method: "get",
+    headers: { Authorization: "Basic " + Utilities.base64Encode(ACCOUNT_SID + ":" + AUTH_TOKEN) },
+    muteHttpExceptions: true
+  });
+
+  const responseText = response.getContentText();
+  const parsed = parseTwilioResponse_(responseText) || {};
+
+  Logger.log("SMS STATUS CODE: " + response.getResponseCode());
+  Logger.log("SMS SID: " + (parsed.sid || sid));
+  Logger.log("SMS STATUS: " + (parsed.status || ""));
+  Logger.log("SMS ERROR CODE: " + (parsed.error_code || ""));
+  Logger.log("SMS ERROR MESSAGE: " + (parsed.error_message || ""));
+  Logger.log("SMS TO: " + (parsed.to || ""));
+  Logger.log("SMS FROM: " + (parsed.from || ""));
+  Logger.log("SMS FULL RESPONSE: " + responseText);
+
+  return parsed;
+}
+
+function parseTwilioResponse_(responseText) {
+  try {
+    return JSON.parse(responseText || "{}");
+  } catch (err) {
+    return null;
+  }
 }
