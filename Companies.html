@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial; background:#f3f4f6; margin:0; padding:20px; color:#111827; }
+    .header, .box, .card { background:white; padding:18px; border-radius:8px; margin-bottom:15px; box-shadow:0 3px 10px rgba(0,0,0,.08); }
+    .topbar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+    .actions { display:flex; gap:8px; flex-wrap:wrap; }
+    input, select, textarea { width:100%; padding:10px; border-radius:8px; border:1px solid #d1d5db; box-sizing:border-box; }
+    textarea { min-height:70px; resize:vertical; }
+    label { display:block; font-size:12px; font-weight:bold; color:#374151; margin:0 0 4px; }
+    button { padding:10px 13px; background:#111827; color:white; border:none; cursor:pointer; border-radius:8px; font-weight:bold; }
+    button.secondary { background:#4b5563; }
+    button.warn { background:#f59e0b; }
+    button.danger { background:#dc2626; }
+    button.blue { background:#2563eb; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:14px; }
+    .form-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+    .full { grid-column:1 / -1; }
+    .card { border-left:6px solid #2563eb; }
+    .inactive { border-left-color:#dc2626; opacity:.72; }
+    .muted { color:#6b7280; font-size:13px; }
+    .line { margin:5px 0; font-size:14px; overflow-wrap:anywhere; }
+    .section-title { margin:18px 0 8px; font-size:15px; font-weight:bold; color:#111827; grid-column:1 / -1; border-top:1px solid #e5e7eb; padding-top:14px; }
+    .denied { max-width:680px; margin:80px auto; text-align:center; }
+    @media (max-width: 850px) {
+      .form-grid { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+
+<body>
+
+<div id="app" style="display:none;">
+  <div class="header topbar">
+    <div>
+      <div style="font-size:22px; font-weight:bold;">Empresas</div>
+      <div class="muted">Administracion de companias, datos operativos y login personalizado</div>
+    </div>
+
+    <div class="actions">
+      <button class="blue" onclick="newCompany()">Nueva Empresa</button>
+      <button class="secondary" onclick="load()">Actualizar</button>
+      <button class="secondary" onclick="goHome()">Volver</button>
+    </div>
+  </div>
+
+  <div class="box">
+    <input id="search" placeholder="Buscar por COMPANY_ID, nombre, email, telefono, dominio..." oninput="render()">
+  </div>
+
+  <div id="formBox" class="box" style="display:none;">
+    <h3 id="formTitle">Nueva Empresa</h3>
+
+    <div class="form-grid">
+      <div>
+        <label>COMPANY_ID</label>
+        <input id="COMPANY_ID" placeholder="PPS">
+      </div>
+      <div>
+        <label>COMPANY_NAME</label>
+        <input id="COMPANY_NAME" placeholder="Palacios Power Systems Corp">
+      </div>
+      <div>
+        <label>ACTIVE</label>
+        <select id="ACTIVE">
+          <option value="YES">YES</option>
+          <option value="NO">NO</option>
+        </select>
+      </div>
+
+      <div>
+        <label>LEGAL_NAME</label>
+        <input id="LEGAL_NAME" placeholder="Legal business name">
+      </div>
+      <div>
+        <label>EIN</label>
+        <input id="EIN" placeholder="XX-XXXXXXX">
+      </div>
+      <div>
+        <label>WEBSITE_URL</label>
+        <input id="WEBSITE_URL" placeholder="https://app.palaciospowersystems.com">
+      </div>
+
+      <div>
+        <label>MAIN_EMAIL</label>
+        <input id="MAIN_EMAIL" placeholder="company@email.com">
+      </div>
+      <div>
+        <label>PHONE</label>
+        <input id="PHONE" placeholder="+17869674478">
+      </div>
+      <div>
+        <label>SMS_ENABLED</label>
+        <select id="SMS_ENABLED">
+          <option value="YES">YES</option>
+          <option value="NO">NO</option>
+        </select>
+      </div>
+
+      <div>
+        <label>ADDRESS</label>
+        <input id="ADDRESS" placeholder="Address">
+      </div>
+      <div>
+        <label>CITY</label>
+        <input id="CITY" placeholder="City">
+      </div>
+      <div>
+        <label>STATE</label>
+        <input id="STATE" placeholder="FL">
+      </div>
+      <div>
+        <label>ZIP</label>
+        <input id="ZIP" placeholder="33055">
+      </div>
+      <div>
+        <label>TWILIO_FROM</label>
+        <input id="TWILIO_FROM" placeholder="+17279149164">
+      </div>
+
+      <div class="section-title">Login y marca</div>
+
+      <div>
+        <label>LOGIN_TITLE</label>
+        <input id="LOGIN_TITLE" placeholder="Palacios Power Systems Corp">
+      </div>
+      <div>
+        <label>LOGIN_SUBTITLE</label>
+        <input id="LOGIN_SUBTITLE" placeholder="Electrical - HVAC & Restaurant Equipment">
+      </div>
+      <div>
+        <label>LOGIN_OWNER_NAME</label>
+        <input id="LOGIN_OWNER_NAME" placeholder="D&D Premier Solutions Corp">
+      </div>
+
+      <div>
+        <label>LOGIN_PRIMARY_COLOR</label>
+        <input id="LOGIN_PRIMARY_COLOR" placeholder="#b91c1c">
+      </div>
+      <div>
+        <label>LOGIN_ACCENT_COLOR</label>
+        <input id="LOGIN_ACCENT_COLOR" placeholder="#111827">
+      </div>
+      <div>
+        <label>LOGIN_LOGO_FILE_ID</label>
+        <input id="LOGIN_LOGO_FILE_ID" placeholder="Drive file ID">
+      </div>
+
+      <div>
+        <label>LOGIN_LOGO_URL</label>
+        <input id="LOGIN_LOGO_URL" placeholder="https://...">
+      </div>
+      <div>
+        <label>LOGIN_BACKGROUND_FILE_ID</label>
+        <input id="LOGIN_BACKGROUND_FILE_ID" placeholder="Drive file ID">
+      </div>
+      <div>
+        <label>LOGIN_BACKGROUND_URL</label>
+        <input id="LOGIN_BACKGROUND_URL" placeholder="https://...">
+      </div>
+
+      <div class="full">
+        <label>NOTES</label>
+        <textarea id="NOTES" placeholder="Notas internas"></textarea>
+      </div>
+    </div>
+
+    <div class="actions" style="margin-top:14px;">
+      <button class="blue" onclick="save()">Guardar</button>
+      <button class="secondary" onclick="cancelEdit()">Cancelar</button>
+    </div>
+  </div>
+
+  <div id="companies" class="grid">Loading...</div>
+</div>
+
+<div id="denied" class="box denied" style="display:none;">
+  <h2>Acceso denegado</h2>
+  <p>Solo OWNER puede administrar el modulo Empresas.</p>
+  <button onclick="goHome()">Volver</button>
+</div>
+
+<script>
+const BASE_URL = "<?= baseUrl ?>";
+const COMPANY_FIELDS = [
+  "COMPANY_ID", "COMPANY_NAME", "LEGAL_NAME", "EIN", "WEBSITE_URL",
+  "MAIN_EMAIL", "PHONE", "ADDRESS", "CITY", "STATE", "ZIP",
+  "TWILIO_FROM", "SMS_ENABLED", "LOGIN_TITLE", "LOGIN_SUBTITLE",
+  "LOGIN_OWNER_NAME", "LOGIN_PRIMARY_COLOR", "LOGIN_ACCENT_COLOR",
+  "LOGIN_LOGO_FILE_ID", "LOGIN_LOGO_URL", "LOGIN_BACKGROUND_FILE_ID",
+  "LOGIN_BACKGROUND_URL", "NOTES", "ACTIVE"
+];
+
+let COMPANIES = [];
+let EDIT_ROW = "";
+
+function getCurrentUser() {
+  try {
+    return JSON.parse(localStorage.getItem("pps_user") || "{}");
+  } catch(e) {
+    return {};
+  }
+}
+
+function requireOwner() {
+  const user = getCurrentUser();
+  const role = String(user.role || user.ROLE || "").toUpperCase();
+
+  if (!role) {
+    window.top.location.href = BASE_URL;
+    return false;
+  }
+
+  if (role !== "OWNER") {
+    document.getElementById("denied").style.display = "block";
+    return false;
+  }
+
+  document.getElementById("app").style.display = "block";
+  return true;
+}
+
+function load() {
+  const user = getCurrentUser();
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      COMPANIES = res || [];
+      render();
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById("companies").innerHTML = "ERROR: " + err.message;
+    })
+    .getCompaniesAdmin(user.role || user.ROLE);
+}
+
+function render() {
+  const q = String(document.getElementById("search").value || "").toLowerCase();
+  const list = COMPANIES.filter(function(company) {
+    return !q || JSON.stringify(company).toLowerCase().includes(q);
+  });
+
+  document.getElementById("companies").innerHTML = list.length
+    ? list.map(card).join("")
+    : "No hay empresas.";
+}
+
+function card(company) {
+  const inactive = String(company.ACTIVE || "").toUpperCase() === "NO" ? "inactive" : "";
+  const activeLabel = String(company.ACTIVE || "").toUpperCase() === "YES" ? "Desactivar" : "Activar";
+
+  return `
+    <div class="card ${inactive}">
+      <h3>${escapeHtml(company.COMPANY_ID || "")} - ${escapeHtml(company.COMPANY_NAME || "")}</h3>
+      <div class="line"><b>Legal:</b> ${escapeHtml(company.LEGAL_NAME || "")}</div>
+      <div class="line"><b>Website:</b> ${escapeHtml(company.WEBSITE_URL || "")}</div>
+      <div class="line"><b>Email:</b> ${escapeHtml(company.MAIN_EMAIL || "")}</div>
+      <div class="line"><b>Phone:</b> ${escapeHtml(company.PHONE || "")}</div>
+      <div class="line"><b>SMS:</b> ${escapeHtml(company.SMS_ENABLED || "")} ${company.TWILIO_FROM ? "/ " + escapeHtml(company.TWILIO_FROM) : ""}</div>
+      <div class="line"><b>Login:</b> ${escapeHtml(company.LOGIN_TITLE || "")}</div>
+      <div class="line"><b>Active:</b> ${escapeHtml(company.ACTIVE || "")}</div>
+      <div class="actions" style="margin-top:12px;">
+        <button onclick="editCompany(${Number(company.ROW_NUMBER || 0)})">Editar</button>
+        <button class="warn" onclick="toggleActive(${Number(company.ROW_NUMBER || 0)})">${activeLabel}</button>
+      </div>
+    </div>
+  `;
+}
+
+function newCompany() {
+  EDIT_ROW = "";
+  clearForm();
+  document.getElementById("formTitle").innerText = "Nueva Empresa";
+  document.getElementById("formBox").style.display = "block";
+  document.getElementById("COMPANY_ID").focus();
+}
+
+function editCompany(rowNumber) {
+  const company = COMPANIES.find(function(c) {
+    return Number(c.ROW_NUMBER) === Number(rowNumber);
+  });
+
+  if (!company) return;
+
+  EDIT_ROW = rowNumber;
+  COMPANY_FIELDS.forEach(function(field) {
+    const el = document.getElementById(field);
+    if (el) el.value = company[field] || "";
+  });
+
+  document.getElementById("formTitle").innerText = "Editar Empresa";
+  document.getElementById("formBox").style.display = "block";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function save() {
+  const user = getCurrentUser();
+  const data = {};
+
+  COMPANY_FIELDS.forEach(function(field) {
+    const el = document.getElementById(field);
+    data[field] = el ? el.value.trim() : "";
+  });
+
+  data.COMPANY_ID = String(data.COMPANY_ID || "").toUpperCase();
+  data.ACTIVE = String(data.ACTIVE || "YES").toUpperCase();
+  data.SMS_ENABLED = String(data.SMS_ENABLED || "YES").toUpperCase();
+
+  if (!data.COMPANY_ID || !data.COMPANY_NAME) {
+    alert("COMPANY_ID y COMPANY_NAME son obligatorios.");
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function() {
+      cancelEdit();
+      load();
+    })
+    .withFailureHandler(function(err) {
+      alert(err.message);
+    })
+    .saveCompanyAdmin(EDIT_ROW, data, user.role || user.ROLE);
+}
+
+function toggleActive(rowNumber) {
+  const user = getCurrentUser();
+  if (!rowNumber) return;
+
+  google.script.run
+    .withSuccessHandler(load)
+    .withFailureHandler(function(err) {
+      alert(err.message);
+    })
+    .toggleCompanyActiveAdmin(rowNumber, user.role || user.ROLE);
+}
+
+function clearForm() {
+  COMPANY_FIELDS.forEach(function(field) {
+    const el = document.getElementById(field);
+    if (el) el.value = "";
+  });
+
+  document.getElementById("ACTIVE").value = "YES";
+  document.getElementById("SMS_ENABLED").value = "YES";
+}
+
+function cancelEdit() {
+  EDIT_ROW = "";
+  clearForm();
+  document.getElementById("formBox").style.display = "none";
+}
+
+function goHome() {
+  window.top.location.href = BASE_URL;
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+if (requireOwner()) {
+  load();
+}
+</script>
+
+</body>
+</html>

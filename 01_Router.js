@@ -81,8 +81,10 @@ function doGet(e) {
     }
 
     if (p.view === "companies") {
-      return HtmlService
-        .createHtmlOutput("<h2>Companies module coming soon</h2>")
+      const template = HtmlService.createTemplateFromFile("Companies");
+      template.baseUrl = baseUrl;
+
+      return template.evaluate()
         .setTitle("Companies")
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
