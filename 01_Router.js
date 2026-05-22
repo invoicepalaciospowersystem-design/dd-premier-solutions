@@ -200,6 +200,9 @@ function applyTemplateDefaults_(template, params, baseUrl) {
 }
 
 function getCompanyWatermarkLogoCss_(companyId) {
+  companyId = String(companyId || "").trim().toUpperCase();
+  if (!companyId) return "none";
+
   const branding = getCompanyBranding(companyId || "");
   const logoUrl = String(branding.logoImageUrl || "").trim();
 
