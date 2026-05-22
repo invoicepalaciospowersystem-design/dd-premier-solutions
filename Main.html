@@ -22,19 +22,22 @@
     }
 
     body.login-mode {
-      padding:0;
+      padding:clamp(14px, 2vw, 30px);
       overflow-x:hidden;
-      background:#111214;
+      background:
+        linear-gradient(135deg, #f8fafc 0%, #d7dce3 48%, #f6f7f9 100%);
       position:relative;
     }
 
     body.login-mode::before {
       content:"";
       position:fixed;
-      inset:0 46% 0 0;
-      background:#17181c;
-      border-right:8px solid var(--brand-primary);
+      inset:0;
+      background:
+        linear-gradient(115deg, rgba(255,255,255,.78) 0 32%, rgba(255,255,255,0) 32%),
+        linear-gradient(145deg, rgba(17,24,39,.08), rgba(255,255,255,0) 54%);
       z-index:0;
+      pointer-events:none;
     }
 
     body.login-mode.has-login-bg {
@@ -52,36 +55,84 @@
     }
 
     .login-shell {
-      min-height:100vh;
+      width:min(1480px, 100%);
+      min-height:calc(100vh - clamp(28px, 4vw, 60px));
+      margin:0 auto;
       display:grid;
-      grid-template-columns:minmax(320px, 1.08fr) minmax(320px, 430px);
-      align-items:center;
-      justify-content:center;
-      gap:clamp(28px, 5vw, 76px);
-      padding:clamp(26px, 5vw, 68px);
+      grid-template-columns:minmax(430px, 1.18fr) minmax(380px, .82fr);
+      align-items:stretch;
       box-sizing:border-box;
       position:relative;
       z-index:1;
+      overflow:hidden;
+      background:#0b0d10;
+      border:1px solid rgba(17,24,39,.22);
+      border-radius:22px;
+      box-shadow:0 22px 60px rgba(0,0,0,.30);
     }
 
     .login-brand {
-      max-width:620px;
-      color:white;
-      text-shadow:0 2px 14px rgba(0,0,0,.34);
+      min-height:720px;
+      padding:clamp(34px, 6vw, 78px);
+      box-sizing:border-box;
+      position:relative;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      color:#111827;
+      overflow:hidden;
+      background:
+        linear-gradient(145deg, rgba(255,255,255,.95), rgba(238,241,245,.88)),
+        linear-gradient(90deg, #ffffff, #d8dde4);
+      text-shadow:none;
+    }
+
+    .login-brand::before {
+      content:"";
+      position:absolute;
+      top:-18%;
+      right:-24%;
+      width:62%;
+      height:142%;
+      border-radius:50%;
+      background:
+        linear-gradient(90deg, #d40000 0 9%, #f8fafc 9% 14%, #111214 14% 58%, rgba(17,18,20,0) 58%);
+      box-shadow:-18px 0 0 rgba(153,27,27,.96);
+      z-index:1;
+    }
+
+    .login-brand::after {
+      content:"";
+      position:absolute;
+      left:0;
+      right:34%;
+      bottom:0;
+      height:190px;
+      background:
+        linear-gradient(to top, rgba(17,24,39,.42), rgba(17,24,39,0)),
+        repeating-linear-gradient(90deg,
+          rgba(17,24,39,.18) 0 18px,
+          rgba(17,24,39,.05) 18px 28px,
+          transparent 28px 42px);
+      opacity:.52;
+      clip-path:polygon(0 42%, 5% 28%, 9% 50%, 14% 20%, 19% 48%, 25% 32%, 31% 54%, 37% 24%, 43% 52%, 48% 34%, 54% 55%, 60% 25%, 66% 48%, 72% 35%, 78% 58%, 84% 24%, 91% 48%, 100% 39%, 100% 100%, 0 100%);
+      z-index:0;
     }
 
     .brand-logo {
       display:none;
-      max-width:min(460px, 82vw);
-      max-height:270px;
+      width:min(700px, 92%);
+      max-height:560px;
       object-fit:contain;
-      margin:0 0 22px;
-      background:rgba(255,255,255,.96);
-      border:1px solid rgba(255,255,255,.72);
-      border-radius:18px;
-      padding:18px;
+      margin:0;
+      background:transparent;
+      border:0;
+      border-radius:0;
+      padding:0;
       box-sizing:border-box;
-      filter:drop-shadow(0 22px 34px rgba(0,0,0,.34));
+      filter:drop-shadow(0 24px 28px rgba(0,0,0,.28));
+      position:relative;
+      z-index:2;
     }
 
     .login-kicker {
@@ -96,6 +147,8 @@
       text-transform:uppercase;
       letter-spacing:0;
       margin-bottom:16px;
+      position:relative;
+      z-index:2;
     }
 
     .login-brand h1 {
@@ -109,6 +162,8 @@
       -webkit-background-clip:text;
       background-clip:text;
       -webkit-text-fill-color:transparent;
+      position:relative;
+      z-index:2;
     }
 
     .login-brand p {
@@ -117,6 +172,8 @@
       margin:16px 0 0;
       color:#dbe2ea;
       max-width:560px;
+      position:relative;
+      z-index:2;
     }
 
     .brand-line {
@@ -125,23 +182,84 @@
       background:var(--brand-primary);
       border-radius:999px;
       margin:22px 0 0;
+      position:relative;
+      z-index:2;
+    }
+
+    .login-brand.has-logo .brand-copy {
+      display:none;
     }
 
     .box {
-      max-width:420px;
       width:100%;
-      background:#ffffff;
-      padding:28px;
-      border-radius:18px;
-      border:1px solid rgba(17,24,39,.08);
-      border-top:7px solid var(--brand-primary);
-      box-shadow:0 28px 90px rgba(0,0,0,.30);
+      min-height:720px;
+      max-width:none;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.045), rgba(255,255,255,.015)),
+        #0b0d10;
+      padding:clamp(42px, 7vw, 92px) clamp(34px, 5vw, 78px);
+      border-radius:0;
+      border:0;
+      box-shadow:none;
       box-sizing:border-box;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      position:relative;
+      overflow:hidden;
+    }
+
+    .box::before {
+      content:"";
+      position:absolute;
+      inset:0;
+      background:
+        linear-gradient(120deg, rgba(255,255,255,.055), rgba(255,255,255,0) 34%),
+        repeating-linear-gradient(45deg, rgba(255,255,255,.025) 0 1px, transparent 1px 12px);
+      opacity:.75;
+      pointer-events:none;
+    }
+
+    .login-card {
+      width:100%;
+      max-width:430px;
+      padding:clamp(28px, 4vw, 42px);
+      border:1px solid rgba(255,255,255,.15);
+      border-radius:14px;
+      background:linear-gradient(180deg, rgba(19,22,26,.94), rgba(8,10,12,.93));
+      box-shadow:0 30px 78px rgba(0,0,0,.42);
+      box-sizing:border-box;
+      position:relative;
+      z-index:1;
     }
 
     .box h2 {
-      margin:0 0 6px;
-      color:#111827;
+      margin:0;
+      color:#f8fafc;
+      font-size:34px;
+      line-height:1.15;
+      letter-spacing:0;
+    }
+
+    .box h2 span {
+      color:#e60000;
+    }
+
+    .login-company {
+      margin-bottom:12px;
+      color:#cbd5e1;
+      font-size:13px;
+      font-weight:bold;
+      text-transform:uppercase;
+      letter-spacing:0;
+    }
+
+    .login-card .muted {
+      margin-top:12px;
+      color:#a6adb7;
+      font-size:18px;
+      line-height:1.45;
+      max-width:340px;
     }
 
     .box-logo {
@@ -151,6 +269,126 @@
       max-height:110px;
       object-fit:contain;
       margin:0 auto 14px;
+    }
+
+    .login-form {
+      margin-top:28px;
+    }
+
+    .login-label {
+      display:block;
+      color:#f3f4f6;
+      font-size:14px;
+      margin:0 0 8px;
+    }
+
+    .field-shell {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      min-height:54px;
+      margin:0 0 22px;
+      padding:0 14px;
+      border:1px solid rgba(255,255,255,.22);
+      border-radius:8px;
+      background:rgba(255,255,255,.03);
+      box-sizing:border-box;
+    }
+
+    .field-icon {
+      width:21px;
+      height:21px;
+      color:#9ca3af;
+      flex:0 0 auto;
+    }
+
+    .field-shell input {
+      flex:1 1 auto;
+      width:0;
+      min-width:0;
+      height:52px;
+      margin:0;
+      padding:0;
+      border:0;
+      border-radius:0;
+      background:transparent;
+      color:#f9fafb;
+      font-size:15px;
+    }
+
+    .field-shell input::placeholder {
+      color:#8f98a3;
+    }
+
+    .field-shell input:focus {
+      outline:0;
+      border-color:transparent;
+      background:transparent;
+    }
+
+    .field-shell:focus-within {
+      border-color:rgba(220,38,38,.78);
+      box-shadow:0 0 0 3px rgba(220,38,38,.16);
+    }
+
+    .password-toggle {
+      width:32px;
+      min-height:32px;
+      height:32px;
+      margin:0;
+      padding:0;
+      border:0;
+      background:transparent;
+      box-shadow:none;
+      color:#b7bec8;
+      display:grid;
+      place-items:center;
+      cursor:pointer;
+    }
+
+    .password-toggle:hover {
+      filter:none;
+      color:#ffffff;
+    }
+
+    .login-submit {
+      margin-top:6px;
+      min-height:58px;
+      border-radius:8px;
+      background:linear-gradient(180deg, #ff1b1b 0%, #d70000 100%);
+      border:1px solid rgba(255,255,255,.12);
+      box-shadow:0 16px 28px rgba(220,38,38,.28);
+      font-size:16px;
+      text-transform:uppercase;
+      letter-spacing:0;
+    }
+
+    .login-help {
+      margin-top:22px;
+      color:#a6adb7;
+      font-size:14px;
+      text-align:center;
+    }
+
+    .login-help a {
+      color:#ff2b2b;
+      font-weight:bold;
+      text-decoration:underline;
+    }
+
+    .login-footer {
+      position:absolute;
+      left:0;
+      right:0;
+      bottom:0;
+      z-index:3;
+      padding:14px 20px;
+      background:rgba(8,10,12,.88);
+      border-top:1px solid rgba(255,255,255,.08);
+      color:#c4c8cf;
+      font-size:13px;
+      text-align:center;
+      box-sizing:border-box;
     }
 
     .panel {
@@ -267,35 +505,56 @@
     }
 
     @media (max-width: 800px) {
+      body.login-mode {
+        padding:14px;
+      }
+
       body.login-mode::before {
         inset:0;
-        border-right:none;
-        border-bottom:6px solid var(--brand-primary);
       }
 
       .login-shell {
         align-items:stretch;
         grid-template-columns:1fr;
-        justify-content:center;
-        gap:22px;
-        padding:22px;
+        width:calc(100vw - 28px);
+        max-width:calc(100vw - 28px);
+        min-height:auto;
+        border-radius:16px;
       }
 
-      .login-brand h1 {
-        font-size:32px;
+      .login-brand,
+      .box {
+        min-height:auto;
       }
 
-      .login-brand p {
-        font-size:16px;
+      .login-brand {
+        padding:34px 22px 24px;
+        align-items:center;
       }
 
       .brand-logo {
-        max-height:170px;
-        padding:12px;
+        width:min(330px, 88%);
+        max-height:330px;
+      }
+
+      .login-brand::before {
+        right:-50%;
+        width:80%;
+        opacity:.55;
       }
 
       .box {
-        max-width:none;
+        padding:24px 18px 64px;
+      }
+
+      .login-card {
+        max-width:336px;
+        width:calc(100vw - 84px);
+        padding:26px 20px;
+      }
+
+      .box h2 {
+        font-size:28px;
       }
     }
   </style>
@@ -304,26 +563,56 @@
 <body class="login-mode">
 
 <div id="loginShell" class="login-shell">
-  <section class="login-brand">
+  <section id="loginBrand" class="login-brand">
     <img id="brandLogo" class="brand-logo" alt="">
-    <div class="login-kicker" id="loginKicker">Company Login</div>
-    <h1 id="heroTitle">D&D Premier Solutions Corp</h1>
-    <p id="heroSubtitle">Sistema de ordenes y operaciones</p>
-    <div class="brand-line"></div>
+    <div class="brand-copy">
+      <div class="login-kicker" id="loginKicker">Company Login</div>
+      <h1 id="heroTitle">D&D Premier Solutions Corp</h1>
+      <p id="heroSubtitle">Sistema de ordenes y operaciones</p>
+      <div class="brand-line"></div>
+    </div>
   </section>
 
-  <div id="loginBox" class="box">
-    <img id="loginLogo" class="box-logo" alt="">
-    <h2 id="loginTitle">D&D Premier Solutions Corp</h2>
-    <div class="muted" id="loginSubtitle">Login de acceso</div>
+  <section id="loginBox" class="box">
+    <div class="login-card">
+      <div class="login-company" id="loginTitle">D&D Premier Solutions Corp</div>
+      <h2><span>Bienvenido</span> de nuevo</h2>
+      <div class="muted" id="loginSubtitle">Inicia sesion para continuar en tu plataforma</div>
 
-    <input id="email" type="email" placeholder="Email" autocomplete="username">
-    <input id="password" type="password" placeholder="Password" autocomplete="current-password">
+      <div class="login-form">
+        <label class="login-label" for="email">Correo electr&oacute;nico</label>
+        <div class="field-shell">
+          <svg class="field-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 6h16v12H4z" fill="none" stroke="currentColor" stroke-width="1.8"></path>
+            <path d="m4.5 7 7.5 6 7.5-6" fill="none" stroke="currentColor" stroke-width="1.8"></path>
+          </svg>
+          <input id="email" type="email" placeholder="ejemplo@empresa.com" autocomplete="username">
+        </div>
 
-    <button id="loginButton" onclick="login()">Entrar</button>
-    <div id="error"></div>
-    <div class="login-footnote" id="loginFootnote">Powered by D&D Premier Solutions Corp</div>
-  </div>
+        <label class="login-label" for="password">Contrase&ntilde;a</label>
+        <div class="field-shell">
+          <svg class="field-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="5" y="10" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"></rect>
+            <path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.8"></path>
+          </svg>
+          <input id="password" type="password" placeholder="Ingresa tu contrase&ntilde;a" autocomplete="current-password">
+          <button class="password-toggle" type="button" onclick="togglePassword()" aria-label="Mostrar contrasena">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+              <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" fill="none" stroke="currentColor" stroke-width="1.8"></path>
+              <circle cx="12" cy="12" r="2.7" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
+            </svg>
+          </button>
+        </div>
+
+        <button id="loginButton" class="login-submit" onclick="login()">INICIAR SESION</button>
+        <div id="error"></div>
+      </div>
+
+      <div class="login-help">Necesitas acceso? <a href="mailto:ddpremiersolutions.corp@gmail.com">Contactanos</a></div>
+    </div>
+  </section>
+
+  <footer class="login-footer">&copy; 2026 D&amp;D PREMIER SOLUTIONS CORP. Todos los derechos reservados.</footer>
 </div>
 
 <div id="globalHeader" class="global-header">
@@ -446,13 +735,11 @@ function applyBranding(branding) {
   document.getElementById("loginTitle").innerText =
     CURRENT_BRANDING.loginTitle || CURRENT_BRANDING.companyName || "D&D Premier Solutions Corp";
   document.getElementById("loginSubtitle").innerText =
-    CURRENT_BRANDING.loginSubtitle || "Login de acceso";
+    "Inicia sesion para continuar en tu plataforma";
   document.getElementById("ownerTitle").innerText =
     CURRENT_BRANDING.ownerName || "D&D Premier Solutions Corp";
   document.getElementById("loginKicker").innerText =
     (CURRENT_BRANDING.companyId ? CURRENT_BRANDING.companyId + " Login" : "System Login");
-  document.getElementById("loginFootnote").innerText =
-    "Powered by " + (CURRENT_BRANDING.ownerName || "D&D Premier Solutions Corp");
 
   applyLogo(CURRENT_BRANDING.logoImageUrl);
 
@@ -469,18 +756,21 @@ function applyBranding(branding) {
 function applyLogo(url) {
   url = safeImageUrl(url);
 
-  ["brandLogo", "loginLogo"].forEach(function(id) {
-    const img = document.getElementById(id);
+  const img = document.getElementById("brandLogo");
+  const brand = document.getElementById("loginBrand");
 
-    if (!url) {
-      img.style.display = "none";
-      img.removeAttribute("src");
-      return;
-    }
+  if (!img) return;
 
-    img.src = url;
-    img.style.display = "block";
-  });
+  if (!url) {
+    img.style.display = "none";
+    img.removeAttribute("src");
+    if (brand) brand.classList.remove("has-logo");
+    return;
+  }
+
+  img.src = url;
+  img.style.display = "block";
+  if (brand) brand.classList.add("has-logo");
 }
 
 function login() {
@@ -489,7 +779,7 @@ function login() {
 
   document.getElementById("error").innerText = "";
   document.getElementById("loginButton").disabled = true;
-  document.getElementById("loginButton").innerText = "Entrando...";
+  document.getElementById("loginButton").innerText = "ENTRANDO...";
 
   google.script.run
     .withSuccessHandler(function(user) {
@@ -501,9 +791,16 @@ function login() {
     .withFailureHandler(function(err) {
       document.getElementById("error").innerText = err.message || err;
       document.getElementById("loginButton").disabled = false;
-      document.getElementById("loginButton").innerText = "Entrar";
+      document.getElementById("loginButton").innerText = "INICIAR SESION";
     })
     .loginUserForCompany(email, password, LOGIN_COMPANY_ID);
+}
+
+function togglePassword() {
+  const input = document.getElementById("password");
+  if (!input) return;
+
+  input.type = input.type === "password" ? "text" : "password";
 }
 
 function normalizeUser(user) {
@@ -627,10 +924,10 @@ function logout() {
   document.body.classList.add("login-mode");
   document.getElementById("globalHeader").style.display = "none";
   document.getElementById("mainPanel").style.display = "none";
-  document.getElementById("loginShell").style.display = "flex";
+  document.getElementById("loginShell").style.display = "grid";
   document.getElementById("password").value = "";
   document.getElementById("loginButton").disabled = false;
-  document.getElementById("loginButton").innerText = "Entrar";
+  document.getElementById("loginButton").innerText = "INICIAR SESION";
 }
 
 function canUseSavedUser(user) {
