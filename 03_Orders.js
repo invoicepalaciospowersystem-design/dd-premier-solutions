@@ -264,6 +264,18 @@ function dispatchRowToTech_(sh, row) {
     );
   });
 
+  try {
+    const smsMessage = buildTechAssignedSmsMessage_(obj, publicBaseUrl);
+    sendSMSToTechnicians_(technician, smsMessage, companyId);
+  } catch (smsErr) {
+    notifySystemError_("TECH_SMS_ASSIGNMENT_ERROR", smsErr, {
+      module: "ORDERS",
+      companyId: companyId,
+      woNumber: obj.WO_NUMBER,
+      technicians: technician
+    });
+  }
+
   addLog_(
     companyId,
     obj.WO_NUMBER,
@@ -273,6 +285,15 @@ function dispatchRowToTech_(sh, row) {
     Session.getActiveUser().getEmail() || "Dashboard",
     technician + " / " + techEmail
   );
+}
+
+function buildTechAssignedSmsMessage_(order, publicBaseUrl) {
+  return [
+    "PPS: Nueva orden " + (order.WO_NUMBER || ""),
+    "NSN " + (order.NSN || ""),
+    "Cliente " + (order.CLIENT || ""),
+    "Revise portal tecnico: " + publicBaseUrl
+  ].join(" / ");
 }
 
 function generateWONumber_(companyId) {
