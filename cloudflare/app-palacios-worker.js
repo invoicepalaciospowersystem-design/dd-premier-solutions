@@ -7,7 +7,8 @@ export default {
     const params = new URLSearchParams(requestUrl.search);
     const host = requestUrl.hostname.toLowerCase();
     const isPalacios = host === "app.palaciospowersystems.com";
-    const isDdPremier = host === "ddpremiersolutionscorp.com" ||
+    const isDdPremier = host === "app.ddpremiersolutionscorp.com" ||
+      host === "ddpremiersolutionscorp.com" ||
       host === "www.ddpremiersolutionscorp.com";
 
     if (isPalacios) {
@@ -88,6 +89,7 @@ function renderAppShell(iframeUrl, title) {
 
         var allowedHosts = {
           "app.palaciospowersystems.com": true,
+          "app.ddpremiersolutionscorp.com": true,
           "ddpremiersolutionscorp.com": true,
           "www.ddpremiersolutionscorp.com": true
         };
