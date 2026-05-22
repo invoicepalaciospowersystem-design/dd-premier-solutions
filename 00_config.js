@@ -90,7 +90,8 @@ PM_REPORT_TEMPLATE_ID: "1wuLdLD_W4IAb4MoA8IHf0birHG6f1rJ0O7Umf5ahbMg",
 };
 
 const SUPERVISORS = {
-  "Ivana Jaime": ["1155", "4801", "10571", "11242", "11472", "4143"]
+  "Ivana Jaime": ["1155", "4801", "10571", "11242", "11472", "4143"],
+  "Zuelem Santiago": ["1155", "4801", "10571", "11242", "11472", "4143"]
 };
 
 const TECH_PHONES = {
