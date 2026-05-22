@@ -580,7 +580,7 @@
       z-index:0;
     }
 
-    body.login-dd .login-shell > :not(.login-language) {
+    body.login-dd .login-shell > :not(.login-language):not(.login-footer) {
       position:relative;
       z-index:1;
     }
@@ -816,10 +816,14 @@
     }
 
     body.login-dd .login-shell {
+      aspect-ratio:1535 / 1024;
+      width:min(1535px, calc(100vw - clamp(28px, 4vw, 60px)));
+      min-height:0;
+      max-height:calc(100vh - clamp(28px, 4vw, 60px));
       background:
         var(--dd-login-reference-bg),
         linear-gradient(120deg, #090b0f 0%, #0d1015 50%, #060709 100%);
-      background-size:cover;
+      background-size:100% 100%;
       background-position:center;
     }
 
@@ -851,10 +855,15 @@
     }
 
     body.login-dd .login-footer {
+      position:absolute;
+      left:0;
+      right:0;
+      z-index:4;
       background:transparent;
       border-top:0;
       color:#f8fafc;
       text-shadow:0 2px 10px rgba(0,0,0,.88);
+      bottom:0;
     }
 
     .panel {
@@ -1632,6 +1641,12 @@
 
       body.login-dd .login-shell {
         min-height:auto;
+        width:calc(100vw - 28px);
+        max-width:calc(100vw - 28px);
+        max-height:none;
+        aspect-ratio:auto;
+        background-size:cover;
+        background-position:32% center;
       }
 
       .brand-logo {
