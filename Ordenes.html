@@ -156,7 +156,8 @@ if (!requireLogin()) {
 }
 
 let data = [];
-let ACTIVE_COMPANY_ID = "<?= companyId ?>";
+const URL_COMPANY_ID = String("<?= companyId ?>").trim().toUpperCase();
+let ACTIVE_COMPANY_ID = URL_COMPANY_ID;
 
 const BASE_URL = "<?= baseUrl ?>";
 
@@ -253,14 +254,16 @@ function newOrder() {
 
 function load() {
   const user = getCurrentUser();
+  const role = normalizeRole(user.role || user.ROLE);
 
-  if (!ACTIVE_COMPANY_ID) {
-    if (normalizeRole(user.role || user.ROLE) === "OWNER") {
-      loadCompanySelector();
+  if (role === "OWNER") {
+    loadCompanySelector(!!ACTIVE_COMPANY_ID);
+
+    if (!ACTIVE_COMPANY_ID) {
       return;
-    } else {
-      ACTIVE_COMPANY_ID = String(user.companyId || "").toUpperCase();
     }
+  } else if (!ACTIVE_COMPANY_ID) {
+    ACTIVE_COMPANY_ID = String(user.companyId || "").toUpperCase();
   }
 
   updateHeaderCompany(ACTIVE_COMPANY_ID);
@@ -286,14 +289,16 @@ function load() {
     .getDashboardData(ACTIVE_COMPANY_ID, user.role || user.ROLE, getSessionToken());
 }
 
-function loadCompanySelector() {
+function loadCompanySelector(keepCurrentCards) {
   const user = getCurrentUser();
 
-  document.getElementById("companyTitle").innerText = "Company: Seleccione empresa";
+  if (!ACTIVE_COMPANY_ID) {
+    document.getElementById("companyTitle").innerText = "Company: Seleccione empresa";
+  }
 
   google.script.run
     .withSuccessHandler(function(companies) {
-      renderCompanySelector(companies || []);
+      renderCompanySelector(companies || [], keepCurrentCards);
     })
     .withFailureHandler(function(err) {
       document.getElementById("cards").innerHTML = "ERROR companies: " + err.message;
@@ -301,7 +306,7 @@ function loadCompanySelector() {
     .getCompaniesForUser(user.companyId, user.role || user.ROLE, getSessionToken());
 }
 
-function renderCompanySelector(companies) {
+function renderCompanySelector(companies, keepCurrentCards) {
   const box = document.getElementById("companyBox");
   box.style.display = "block";
 
@@ -324,6 +329,13 @@ function renderCompanySelector(companies) {
     <button onclick="activateCompany()">Activar Empresa</button>
   `;
 
+  if (ACTIVE_COMPANY_ID) {
+    const select = document.getElementById("companySelect");
+    if (select) select.value = ACTIVE_COMPANY_ID;
+  }
+
+  if (keepCurrentCards) return;
+
   document.getElementById("cards").innerHTML =
     "Seleccione una empresa para ver sus órdenes.";
 }
@@ -336,7 +348,6 @@ function activateCompany() {
     return;
   }
 
-  document.getElementById("companyBox").style.display = "none";
   updateHeaderCompany(ACTIVE_COMPANY_ID);
   load();
 }
