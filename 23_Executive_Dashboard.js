@@ -36,7 +36,8 @@ function getOwnerExecutiveDashboard(sessionToken, companyId) {
       unreadNotifications: 0
     },
     companies: [],
-    alerts: []
+    alerts: [],
+    recentActivity: []
   };
 
   const perCompany = {};
@@ -49,6 +50,7 @@ function getOwnerExecutiveDashboard(sessionToken, companyId) {
   collectExecutiveInvoices_(ss, dashboard, perCompany, companyMap, requestedCompany, woCompanyMap);
   collectExecutiveEconomy_(ss, dashboard, perCompany, companyMap, requestedCompany);
   collectExecutiveNotifications_(ss, dashboard, requestedCompany);
+  dashboard.recentActivity = collectExecutiveRecentActivity_(ss, companyMap, requestedCompany, 12);
 
   dashboard.companies = Object.keys(perCompany)
     .map(function(key) { return perCompany[key]; })
@@ -236,6 +238,156 @@ function collectExecutiveNotifications_(ss, dashboard, requestedCompany) {
       dashboard.totals.unreadNotifications++;
     }
   }
+}
+
+function collectExecutiveRecentActivity_(ss, companyMap, requestedCompany, maxItems) {
+  const items = [];
+  collectExecutiveAuditActivity_(ss, companyMap, requestedCompany, items);
+  collectExecutiveWorkOrderLogActivity_(ss, companyMap, requestedCompany, items);
+
+  return items
+    .filter(function(item) { return item.sortTime; })
+    .sort(function(a, b) { return b.sortTime - a.sortTime; })
+    .slice(0, maxItems || 12)
+    .map(function(item) {
+      delete item.sortTime;
+      return item;
+    });
+}
+
+function collectExecutiveAuditActivity_(ss, companyMap, requestedCompany, items) {
+  const sh = ss.getSheetByName(CFG.SHEET_AUDIT_LOGS || "AUDIT_LOGS");
+  if (!sh || sh.getLastRow() < 2) return;
+
+  const data = sh.getDataRange().getValues();
+  const headers = data[0].map(function(h) { return String(h || "").trim(); });
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const action = String(getExecutiveValue_(row, headers, ["ACTION"]) || "").trim();
+    if (!action || action === "OWNER_EXECUTIVE_DASHBOARD_VIEWED") continue;
+
+    const companyId = String(getExecutiveValue_(row, headers, ["COMPANY_ID"]) || CFG.DEFAULT_COMPANY_ID).trim().toUpperCase();
+    if (requestedCompany && companyId !== requestedCompany) continue;
+
+    const timestamp = parseExecutiveDate_(getExecutiveValue_(row, headers, ["TIMESTAMP"]));
+    if (!timestamp) continue;
+
+    const entityType = String(getExecutiveValue_(row, headers, ["ENTITY_TYPE"]) || "").trim();
+    const entityId = String(getExecutiveValue_(row, headers, ["ENTITY_ID"]) || "").trim();
+    const actorName = String(getExecutiveValue_(row, headers, ["ACTOR_NAME"]) || "").trim();
+    const actorEmail = String(getExecutiveValue_(row, headers, ["ACTOR_EMAIL"]) || "").trim();
+    const moduleName = String(getExecutiveValue_(row, headers, ["MODULE"]) || "").trim();
+
+    items.push({
+      timestamp: formatExecutiveActivityDate_(timestamp),
+      companyId: companyId,
+      companyName: companyMap[companyId] || companyId || "ALL",
+      title: formatExecutiveActionLabel_(action),
+      meta: buildExecutiveActivityMeta_(entityType, entityId, actorName || actorEmail, moduleName),
+      actor: actorName || actorEmail || "Sistema",
+      tone: getExecutiveActivityTone_(action, moduleName),
+      sortTime: timestamp.getTime()
+    });
+  }
+}
+
+function collectExecutiveWorkOrderLogActivity_(ss, companyMap, requestedCompany, items) {
+  const sh = ss.getSheetByName(CFG.SHEET_WO_LOG);
+  if (!sh || sh.getLastRow() < 1) return;
+
+  const data = sh.getDataRange().getValues();
+  if (!data.length) return;
+
+  const firstRow = data[0].map(function(h) { return String(h || "").trim().toUpperCase(); });
+  const hasHeaders = firstRow.indexOf("TIMESTAMP") !== -1 || firstRow.indexOf("ACTION") !== -1;
+  const startIndex = hasHeaders ? 1 : 0;
+  const headers = hasHeaders ? data[0].map(function(h) { return String(h || "").trim(); }) : [];
+
+  for (let i = startIndex; i < data.length; i++) {
+    const row = data[i];
+    const rowCompany = hasHeaders ? getExecutiveValue_(row, headers, ["COMPANY_ID"]) : row[0];
+    const companyId = String(rowCompany || CFG.DEFAULT_COMPANY_ID).trim().toUpperCase();
+    if (requestedCompany && companyId !== requestedCompany) continue;
+
+    const timestamp = parseExecutiveDate_(hasHeaders ? getExecutiveValue_(row, headers, ["TIMESTAMP"]) : row[1]);
+    if (!timestamp) continue;
+
+    const woNumber = String(hasHeaders ? getExecutiveValue_(row, headers, ["WO_NUMBER"]) : row[2] || "").trim();
+    const action = String(hasHeaders ? getExecutiveValue_(row, headers, ["ACTION"]) : row[3] || "").trim();
+    if (!action) continue;
+
+    const oldStatus = String(hasHeaders ? getExecutiveValue_(row, headers, ["OLD_STATUS"]) : row[4] || "").trim();
+    const newStatus = String(hasHeaders ? getExecutiveValue_(row, headers, ["NEW_STATUS"]) : row[5] || "").trim();
+    const actor = String(hasHeaders ? getExecutiveValue_(row, headers, ["USER", "ACTOR"]) : row[6] || "").trim();
+
+    items.push({
+      timestamp: formatExecutiveActivityDate_(timestamp),
+      companyId: companyId,
+      companyName: companyMap[companyId] || companyId,
+      title: formatExecutiveActionLabel_(action),
+      meta: buildExecutiveWorkOrderActivityMeta_(woNumber, oldStatus, newStatus, actor),
+      actor: actor || "Sistema",
+      tone: getExecutiveActivityTone_(action, "WO_LOG"),
+      sortTime: timestamp.getTime()
+    });
+  }
+}
+
+function buildExecutiveActivityMeta_(entityType, entityId, actor, moduleName) {
+  const parts = [];
+  if (entityType || entityId) parts.push([entityType, entityId].filter(Boolean).join(" "));
+  if (actor) parts.push("por " + actor);
+  if (moduleName) parts.push(moduleName);
+  return parts.join(" | ");
+}
+
+function buildExecutiveWorkOrderActivityMeta_(woNumber, oldStatus, newStatus, actor) {
+  const parts = [];
+  if (woNumber) parts.push("WO " + woNumber);
+  if (oldStatus || newStatus) parts.push([oldStatus || "-", newStatus || "-"].join(" -> "));
+  if (actor) parts.push("por " + actor);
+  return parts.join(" | ");
+}
+
+function formatExecutiveActionLabel_(action) {
+  const key = String(action || "").trim().toUpperCase();
+  const labels = {
+    USER_CREATED: "Usuario creado",
+    USER_UPDATED: "Usuario actualizado",
+    USER_SOFT_DELETED: "Usuario desactivado",
+    STORE_CREATED: "Tienda creada",
+    STORE_UPDATED: "Tienda actualizada",
+    SUPERVISOR_STORES_ASSIGNED: "Tiendas asignadas a supervisor",
+    WORK_ORDER_UPDATED: "Orden actualizada",
+    WORK_ORDER_SENT_TO_TECH: "Orden enviada a tecnico",
+    WORK_ORDER_SOFT_DELETED: "Orden desactivada",
+    STATUS_UPDATED_FROM_TECH_APP: "Estado actualizado por tecnico",
+    ORDER_CREATED: "Orden creada",
+    ORDER_CREATED_FROM_APP: "Orden creada desde app",
+    PM_REPORT_GENERATED: "Reporte PM generado",
+    COMPANY_CREATED: "Empresa creada",
+    COMPANY_UPDATED: "Empresa actualizada"
+  };
+
+  if (labels[key]) return labels[key];
+
+  return key
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+}
+
+function getExecutiveActivityTone_(action, moduleName) {
+  const text = String(action || moduleName || "").toUpperCase();
+  if (text.indexOf("DELETE") !== -1 || text.indexOf("DELETED") !== -1 || text.indexOf("ERROR") !== -1) return "danger";
+  if (text.indexOf("COMPLETED") !== -1 || text.indexOf("GENERATED") !== -1 || text.indexOf("CREATED") !== -1) return "success";
+  if (text.indexOf("SENT") !== -1 || text.indexOf("ASSIGNED") !== -1 || text.indexOf("UPDATED") !== -1) return "info";
+  return "neutral";
+}
+
+function formatExecutiveActivityDate_(dateValue) {
+  return Utilities.formatDate(dateValue, CFG.TIMEZONE, "MM/dd/yyyy hh:mm a");
 }
 
 function getExecutiveCompanies_(ss) {

@@ -835,6 +835,59 @@
       letter-spacing:0;
     }
 
+    .activity-section {
+      grid-column:1 / -1;
+    }
+
+    .activity-row {
+      display:grid;
+      grid-template-columns:auto 1fr auto;
+      gap:12px;
+      padding:12px 0;
+      border-top:1px solid #f3f4f6;
+      align-items:flex-start;
+    }
+
+    .activity-row:first-of-type {
+      border-top:0;
+      padding-top:0;
+    }
+
+    .activity-dot {
+      width:11px;
+      height:11px;
+      border-radius:999px;
+      margin-top:4px;
+      background:#94a3b8;
+      box-shadow:0 0 0 4px #f1f5f9;
+    }
+
+    .activity-row.success .activity-dot { background:#16a34a; box-shadow:0 0 0 4px #dcfce7; }
+    .activity-row.info .activity-dot { background:#2563eb; box-shadow:0 0 0 4px #dbeafe; }
+    .activity-row.warning .activity-dot { background:#d97706; box-shadow:0 0 0 4px #fef3c7; }
+    .activity-row.danger .activity-dot { background:#dc2626; box-shadow:0 0 0 4px #fee2e2; }
+
+    .activity-title {
+      font-weight:bold;
+      color:#111827;
+      line-height:1.25;
+    }
+
+    .activity-meta {
+      margin-top:4px;
+      color:#6b7280;
+      font-size:12px;
+      line-height:1.35;
+      overflow-wrap:anywhere;
+    }
+
+    .activity-time {
+      color:#6b7280;
+      font-size:12px;
+      white-space:nowrap;
+      text-align:right;
+    }
+
     .company-row,
     .alert-row {
       display:grid;
@@ -1006,6 +1059,16 @@
 
       .owner-company-control {
         grid-template-columns:1fr;
+      }
+
+      .activity-row {
+        grid-template-columns:auto 1fr;
+      }
+
+      .activity-time {
+        grid-column:2;
+        text-align:left;
+        white-space:normal;
       }
 
       .tech-account-banner {
@@ -1180,6 +1243,11 @@
       <div class="dash-section">
         <h3>Prioridades</h3>
         <div id="ownerAlerts"></div>
+      </div>
+
+      <div class="dash-section activity-section">
+        <h3>Actividad Reciente</h3>
+        <div id="ownerRecentActivity"></div>
       </div>
     </div>
   </div>
@@ -1608,6 +1676,7 @@ function loadOwnerDashboard() {
   document.getElementById("ownerMetrics").innerHTML = renderMetricSkeletons();
   document.getElementById("ownerCompanyBreakdown").innerHTML = "<div class='muted'>Cargando empresas...</div>";
   document.getElementById("ownerAlerts").innerHTML = "<div class='muted'>Cargando prioridades...</div>";
+  document.getElementById("ownerRecentActivity").innerHTML = "<div class='muted'>Cargando actividad...</div>";
 
   google.script.run
     .withSuccessHandler(function(data) {
@@ -1619,6 +1688,7 @@ function loadOwnerDashboard() {
       document.getElementById("ownerMetrics").innerHTML = "";
       document.getElementById("ownerCompanyBreakdown").innerHTML = "";
       document.getElementById("ownerAlerts").innerHTML = "";
+      document.getElementById("ownerRecentActivity").innerHTML = "";
     })
     .getOwnerExecutiveDashboard(getSessionToken(), getDashboardCompanyScope());
 }
@@ -1690,6 +1760,7 @@ function renderOwnerDashboard(data) {
 
   renderCompanyBreakdown(data.companies || []);
   renderExecutiveAlerts(data.alerts || []);
+  renderRecentActivity(data.recentActivity || []);
 }
 
 function renderMetricSkeletons() {
@@ -1755,6 +1826,32 @@ function renderExecutiveAlerts(alerts) {
         </div>
       `;
     }).join("");
+}
+
+function renderRecentActivity(items) {
+  const box = document.getElementById("ownerRecentActivity");
+  if (!box) return;
+
+  if (!items.length) {
+    box.innerHTML = "<div class='muted'>Todavia no hay actividad reciente.</div>";
+    return;
+  }
+
+  box.innerHTML = items.map(function(item) {
+    return `
+      <div class="activity-row ${escapeHtmlMain(item.tone || "")}">
+        <div class="activity-dot"></div>
+        <div>
+          <div class="activity-title">${escapeHtmlMain(item.title || "")}</div>
+          <div class="activity-meta">
+            ${escapeHtmlMain(item.companyName || item.companyId || "")}
+            ${item.meta ? " | " + escapeHtmlMain(item.meta) : ""}
+          </div>
+        </div>
+        <div class="activity-time">${escapeHtmlMain(item.timestamp || "")}</div>
+      </div>
+    `;
+  }).join("");
 }
 
 function getAlertSubtitle(tone) {
