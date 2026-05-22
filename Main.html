@@ -934,6 +934,25 @@
       font-size:13px;
     }
 
+    .admin-period-select,
+    .admin-period-input {
+      width:auto;
+      min-height:38px;
+      height:38px;
+      padding:8px 10px;
+      margin:0;
+      border-radius:8px;
+      border:1px solid #cbd5e1;
+      background:#ffffff;
+      color:#111827;
+      font-size:13px;
+      box-shadow:none;
+    }
+
+    .admin-period-input {
+      max-width:94px;
+    }
+
     .metric-grid {
       display:grid;
       grid-template-columns:repeat(4, minmax(160px, 1fr));
@@ -1574,6 +1593,26 @@
         <div class="muted" id="adminDashboardScope">Loading...</div>
       </div>
       <div class="dash-actions">
+        <select id="adminPeriodMode" class="admin-period-select" onchange="onAdminPeriodModeChange()">
+          <option value="monthly">Mensual</option>
+          <option value="annual">Anual</option>
+          <option value="all">Todos</option>
+        </select>
+        <select id="adminPeriodMonth" class="admin-period-select" onchange="loadAdminDashboard()">
+          <option value="1">Ene</option>
+          <option value="2">Feb</option>
+          <option value="3">Mar</option>
+          <option value="4">Abr</option>
+          <option value="5">May</option>
+          <option value="6">Jun</option>
+          <option value="7">Jul</option>
+          <option value="8">Ago</option>
+          <option value="9">Sep</option>
+          <option value="10">Oct</option>
+          <option value="11">Nov</option>
+          <option value="12">Dic</option>
+        </select>
+        <input id="adminPeriodYear" class="admin-period-input" type="number" min="2020" max="2100" step="1" onchange="loadAdminDashboard()">
         <button class="dash-refresh" onclick="loadAdminDashboard()">Actualizar</button>
         <button class="dash-refresh" onclick="openModule('?view=orders')">Ordenes</button>
         <button class="dash-refresh" onclick="openModule('?view=economy')">Economia</button>
@@ -1668,6 +1707,7 @@ let OWNER_COMPANIES = [];
 let SELECTED_OWNER_COMPANY_ID = "";
 let SUPERVISOR_DASHBOARD_ORDERS = [];
 let SUPERVISOR_DASHBOARD_FILTER = "open";
+let ADMIN_PERIOD_INITIALIZED = false;
 
 setLoginTheme(LOGIN_COMPANY_ID);
 
@@ -2155,11 +2195,15 @@ function loadAdminDashboard() {
     return;
   }
 
+  initAdminPeriodControls();
+
   box.style.display = "block";
   document.getElementById("adminDashboardScope").innerText = "Cargando metricas de compania...";
   document.getElementById("adminMetrics").innerHTML = renderMetricSkeletons();
   document.getElementById("adminEconomyBreakdown").innerHTML = "<div class='muted'>Cargando economia...</div>";
   document.getElementById("adminInvestorBreakdown").innerHTML = "<div class='muted'>Cargando inversionistas...</div>";
+
+  const period = getAdminPeriodSelection();
 
   google.script.run
     .withSuccessHandler(function(data) {
@@ -2172,14 +2216,66 @@ function loadAdminDashboard() {
       document.getElementById("adminEconomyBreakdown").innerHTML = "";
       document.getElementById("adminInvestorBreakdown").innerHTML = "";
     })
-    .getAdminCompanyDashboard(getSessionToken(), getActiveCompanyId());
+    .getAdminCompanyDashboard(
+      getSessionToken(),
+      getActiveCompanyId(),
+      period.mode,
+      period.year,
+      period.month
+    );
+}
+
+function initAdminPeriodControls() {
+  if (ADMIN_PERIOD_INITIALIZED) {
+    syncAdminPeriodControlVisibility();
+    return;
+  }
+
+  const now = new Date();
+  const yearInput = document.getElementById("adminPeriodYear");
+  const monthSelect = document.getElementById("adminPeriodMonth");
+
+  if (yearInput && !yearInput.value) yearInput.value = now.getFullYear();
+  if (monthSelect) monthSelect.value = String(now.getMonth() + 1);
+
+  ADMIN_PERIOD_INITIALIZED = true;
+  syncAdminPeriodControlVisibility();
+}
+
+function getAdminPeriodSelection() {
+  initAdminPeriodControls();
+
+  const mode = String(document.getElementById("adminPeriodMode").value || "monthly");
+  const year = Number(document.getElementById("adminPeriodYear").value || new Date().getFullYear());
+  const month = Number(document.getElementById("adminPeriodMonth").value || (new Date().getMonth() + 1));
+
+  return {
+    mode: mode,
+    year: year,
+    month: month
+  };
+}
+
+function onAdminPeriodModeChange() {
+  syncAdminPeriodControlVisibility();
+  loadAdminDashboard();
+}
+
+function syncAdminPeriodControlVisibility() {
+  const modeEl = document.getElementById("adminPeriodMode");
+  const monthEl = document.getElementById("adminPeriodMonth");
+  const yearEl = document.getElementById("adminPeriodYear");
+  const mode = String(modeEl && modeEl.value || "monthly");
+
+  if (monthEl) monthEl.style.display = mode === "monthly" ? "" : "none";
+  if (yearEl) yearEl.style.display = mode === "all" ? "none" : "";
 }
 
 function renderAdminDashboard(data) {
   const totals = data.totals || {};
   const investors = data.investors || {};
   const generated = data.generatedAt ? " | Actualizado " + data.generatedAt : "";
-  const period = data.periodLabel ? " | Periodo " + data.periodLabel : "";
+  const period = data.periodLabel ? " | " + data.periodLabel : "";
 
   document.getElementById("adminDashboardScope").innerText =
     (data.companyName || data.companyId || getActiveCompanyId() || "Compania") + period + generated;
@@ -2204,8 +2300,8 @@ function renderAdminDashboard(data) {
       tone: totals.emergencyOrders ? "danger" : "success"
     },
     {
-      label: "Invoices Periodo",
-      value: totals.economyRows || totals.invoicesCreated || 0,
+      label: "Invoices Seleccion",
+      value: totals.economyRows || 0,
       note: (totals.economyPaid || 0) + " paid / " + (totals.economyInvoiced || 0) + " invoiced",
       tone: "info"
     },

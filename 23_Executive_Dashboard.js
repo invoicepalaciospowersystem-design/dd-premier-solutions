@@ -72,7 +72,7 @@ function getOwnerExecutiveDashboard(sessionToken, companyId) {
   return dashboard;
 }
 
-function getAdminCompanyDashboard(sessionToken, companyId) {
+function getAdminCompanyDashboard(sessionToken, companyId, periodMode, periodYear, periodMonth) {
   const session = requireSession_(sessionToken, ["OWNER", "ADMIN"], companyId);
   const role = String(session.role || "").trim().toUpperCase();
   const requestedCompany = String(companyId || session.companyId || CFG.DEFAULT_COMPANY_ID).trim().toUpperCase();
@@ -85,6 +85,7 @@ function getAdminCompanyDashboard(sessionToken, companyId) {
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const periodScope = buildAdminPeriodScope_(periodMode, periodYear, periodMonth);
   const companies = getExecutiveCompanies_(ss);
   const companyMap = {};
 
@@ -96,7 +97,10 @@ function getAdminCompanyDashboard(sessionToken, companyId) {
     generatedAt: Utilities.formatDate(new Date(), CFG.TIMEZONE, "MM/dd/yyyy hh:mm a"),
     companyId: companyScope,
     companyName: companyMap[companyScope] || getCompanyName(companyScope) || companyScope,
-    periodLabel: "",
+    periodMode: periodScope.mode,
+    periodYear: periodScope.year,
+    periodMonth: periodScope.month,
+    periodLabel: periodScope.label,
     totals: {
       activeCompanies: 1,
       totalOrders: 0,
@@ -134,9 +138,9 @@ function getAdminCompanyDashboard(sessionToken, companyId) {
   const perCompany = {};
   ensureExecutiveCompanySummary_(perCompany, companyScope, dashboard.companyName);
 
-  const woCompanyMap = collectExecutiveWorkOrders_(ss, dashboard, perCompany, companyMap, companyScope);
+  const woCompanyMap = collectExecutiveWorkOrders_(ss, dashboard, perCompany, companyMap, companyScope, periodScope);
   collectExecutiveInvoices_(ss, dashboard, perCompany, companyMap, companyScope, woCompanyMap);
-  collectAdminEconomyFinancials_(ss, dashboard, companyScope);
+  collectAdminEconomyFinancials_(ss, dashboard, companyScope, periodScope);
 
   addAuditLog_("DASHBOARD", "ADMIN_COMPANY_DASHBOARD_VIEWED", companyScope, "DASHBOARD", companyScope, session, {
     periodLabel: dashboard.periodLabel
@@ -145,7 +149,64 @@ function getAdminCompanyDashboard(sessionToken, companyId) {
   return dashboard;
 }
 
-function collectAdminEconomyFinancials_(ss, dashboard, companyId) {
+function buildAdminPeriodScope_(periodMode, periodYear, periodMonth) {
+  let currentPeriod = null;
+
+  try {
+    currentPeriod = getCurrentEconomyPeriod();
+  } catch (err) {
+    currentPeriod = null;
+  }
+
+  const now = new Date();
+  const mode = String(periodMode || "monthly").trim().toLowerCase();
+  const normalizedMode = (mode === "annual" || mode === "yearly")
+    ? "annual"
+    : (mode === "all" ? "all" : "monthly");
+
+  const defaultYear = currentPeriod && currentPeriod.year
+    ? Number(currentPeriod.year)
+    : now.getFullYear();
+  const defaultMonth = currentPeriod && currentPeriod.month
+    ? Number(currentPeriod.month)
+    : now.getMonth() + 1;
+
+  let year = Number(periodYear);
+  if (!year || isNaN(year)) year = defaultYear;
+
+  let month = Number(periodMonth);
+  if (!month || isNaN(month)) month = defaultMonth;
+  month = Math.min(Math.max(month, 1), 12);
+  const monthText = String(month).padStart(2, "0");
+
+  if (normalizedMode === "all") {
+    return {
+      mode: "all",
+      year: year,
+      month: month,
+      label: "Todos los periodos"
+    };
+  }
+
+  if (normalizedMode === "annual") {
+    return {
+      mode: "annual",
+      year: year,
+      month: month,
+      label: "Anual " + year
+    };
+  }
+
+  return {
+    mode: "monthly",
+    year: year,
+    month: month,
+    label: "Mensual " + year + "-" + monthText,
+    periodLabel: year + "-" + monthText
+  };
+}
+
+function collectAdminEconomyFinancials_(ss, dashboard, companyId, periodScope) {
   const sh = ss.getSheetByName(CFG.SHEET_ECONOMY);
   if (!sh || sh.getLastRow() < 2) return;
 
@@ -163,25 +224,9 @@ function collectAdminEconomyFinancials_(ss, dashboard, companyId) {
     companyRows.push(row);
   }
 
-  let currentPeriod = "";
-  try {
-    const period = getCurrentEconomyPeriod();
-    currentPeriod = period && period.label ? String(period.label || "").trim() : "";
-  } catch (err) {
-    currentPeriod = "";
-  }
-
-  const hasPeriodRows = companyRows.some(function(row) {
-    return String(getExecutiveValue_(row, headers, ["PERIOD_LABEL"]) || "").trim();
+  const rows = companyRows.filter(function(row) {
+    return adminEconomyRowMatchesScope_(row, headers, periodScope);
   });
-
-  const rows = hasPeriodRows && currentPeriod
-    ? companyRows.filter(function(row) {
-        return String(getExecutiveValue_(row, headers, ["PERIOD_LABEL"]) || "").trim() === currentPeriod;
-      })
-    : companyRows;
-
-  dashboard.periodLabel = hasPeriodRows && currentPeriod ? currentPeriod : "All Periods";
 
   rows.forEach(function(row) {
     const status = String(getExecutiveValue_(row, headers, ["STATUS"]) || "").trim().toUpperCase();
@@ -218,6 +263,47 @@ function collectAdminEconomyFinancials_(ss, dashboard, companyId) {
     dashboard.totals.taxTotal -
     dashboard.totals.partsCost -
     dashboard.totals.techLaborCost;
+}
+
+function adminEconomyRowMatchesScope_(row, headers, periodScope) {
+  periodScope = periodScope || { mode: "monthly" };
+  if (periodScope.mode === "all") return true;
+
+  const periodYear = Number(getExecutiveValue_(row, headers, ["PERIOD_YEAR"]) || 0);
+  const periodMonth = Number(getExecutiveValue_(row, headers, ["PERIOD_MONTH"]) || 0);
+  const periodLabel = String(getExecutiveValue_(row, headers, ["PERIOD_LABEL"]) || "").trim();
+
+  if (periodScope.mode === "monthly") {
+    if (periodLabel) return periodLabel === periodScope.periodLabel;
+    if (periodYear && periodMonth) {
+      return periodYear === Number(periodScope.year) && periodMonth === Number(periodScope.month);
+    }
+  }
+
+  if (periodScope.mode === "annual") {
+    if (periodYear) return periodYear === Number(periodScope.year);
+    if (periodLabel && periodLabel.indexOf(String(periodScope.year)) === 0) return true;
+  }
+
+  const rowDate = parseExecutiveDate_(
+    getExecutiveValue_(row, headers, ["DATE_INVOICE", "DATE_COMPLETED", "DATE_PAID"])
+  );
+
+  return adminDateMatchesScope_(rowDate, periodScope);
+}
+
+function adminDateMatchesScope_(dateValue, periodScope) {
+  if (!periodScope || periodScope.mode === "all") return true;
+  if (!dateValue) return false;
+
+  const year = dateValue.getFullYear();
+  const month = dateValue.getMonth() + 1;
+
+  if (periodScope.mode === "annual") {
+    return year === Number(periodScope.year);
+  }
+
+  return year === Number(periodScope.year) && month === Number(periodScope.month);
 }
 
 function getAdminLaborBilled_(row, headers, hours) {
@@ -273,7 +359,7 @@ function getAdminInvestorSplit_(source, cost) {
   return { david: 0, yoel: 0, unassigned: cost };
 }
 
-function collectExecutiveWorkOrders_(ss, dashboard, perCompany, companyMap, requestedCompany) {
+function collectExecutiveWorkOrders_(ss, dashboard, perCompany, companyMap, requestedCompany, periodScope) {
   const sh = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
   const woCompanyMap = {};
   if (!sh || sh.getLastRow() < 2) return woCompanyMap;
@@ -297,6 +383,9 @@ function collectExecutiveWorkOrders_(ss, dashboard, perCompany, companyMap, requ
     const status = String(getExecutiveValue_(row, headers, ["STATUS"]) || "").trim().toUpperCase();
     const priority = String(getExecutiveValue_(row, headers, ["ORDER_PRIORITY", "PRIORITY"]) || "").trim().toUpperCase();
     const createdAt = parseExecutiveDate_(getExecutiveValue_(row, headers, ["DATE_CREATED", "CREATED_AT"]));
+
+    if (periodScope && !adminDateMatchesScope_(createdAt, periodScope)) continue;
+
     const quoteStatus = String(getExecutiveValue_(row, headers, ["QUOTE_STATUS"]) || "").trim().toUpperCase();
     const quoteUrl = String(getExecutiveValue_(row, headers, ["QUOTE_EN_URL", "QUOTE_ES_URL"]) || "").trim();
     const pmStatus = String(getExecutiveValue_(row, headers, ["PM_REPORT_STATUS"]) || "").trim().toUpperCase();
