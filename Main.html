@@ -894,7 +894,8 @@
       letter-spacing:0;
     }
 
-    .owner-dashboard {
+    .owner-dashboard,
+    .supervisor-dashboard {
       display:none;
       margin-bottom:18px;
     }
@@ -1459,6 +1460,21 @@
     </div>
   </div>
 
+  <div id="supervisorDashboard" class="supervisor-dashboard">
+    <div class="dash-head">
+      <div>
+        <h2>Resumen Supervisor</h2>
+        <div class="muted" id="supervisorDashboardScope">Loading...</div>
+      </div>
+      <div class="dash-actions">
+        <button class="dash-refresh" onclick="loadSupervisorDashboard()">Actualizar</button>
+        <button class="dash-refresh" onclick="openModule('?view=customer&supervisor=')">Abrir Portal</button>
+      </div>
+    </div>
+
+    <div id="supervisorMetrics" class="metric-grid"></div>
+  </div>
+
   <h2 class="module-heading">Modulos</h2>
   <div id="modules" class="grid"></div>
 </div>
@@ -1738,6 +1754,7 @@ function showPanel() {
 
   renderModules();
   updateTechAccountBanner();
+  loadSupervisorDashboard();
   loadOwnerCompanySelector();
 }
 
@@ -1974,6 +1991,155 @@ function loadOwnerDashboard() {
       document.getElementById("ownerRecentActivity").innerHTML = "";
     })
     .getOwnerExecutiveDashboard(getSessionToken(), getDashboardCompanyScope());
+}
+
+function loadSupervisorDashboard() {
+  const role = String(CURRENT_USER && CURRENT_USER.role || "").trim().toUpperCase();
+  const box = document.getElementById("supervisorDashboard");
+
+  if (!box) return;
+
+  if (role !== "SUPERVISOR") {
+    box.style.display = "none";
+    return;
+  }
+
+  box.style.display = "block";
+  document.getElementById("supervisorDashboardScope").innerText = "Cargando ordenes asignadas...";
+  document.getElementById("supervisorMetrics").innerHTML = renderMetricSkeletons();
+
+  google.script.run
+    .withSuccessHandler(function(data) {
+      renderSupervisorDashboard(Array.isArray(data) ? data : []);
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById("supervisorDashboardScope").innerText =
+        "Error cargando metricas: " + (err && err.message ? err.message : err);
+      document.getElementById("supervisorMetrics").innerHTML = "";
+    })
+    .getCustomerOrdersBySupervisor(
+      CURRENT_USER.name || CURRENT_USER.NAME || "",
+      getSessionToken(),
+      getActiveCompanyId()
+    );
+}
+
+function renderSupervisorDashboard(data) {
+  const totals = getSupervisorDashboardTotals(data);
+  const company = getActiveCompanyId() || "ALL";
+  const updated = new Date().toLocaleString();
+
+  document.getElementById("supervisorDashboardScope").innerText =
+    "Company: " + company + " | " + totals.total + " ordenes asignadas | Actualizado " + updated;
+
+  const cards = [
+    {
+      label: "Total Orders",
+      value: totals.total,
+      note: totals.open + " abiertas",
+      tone: totals.emergency ? "danger" : "info"
+    },
+    {
+      label: "Completed / Closed",
+      value: totals.completed,
+      note: "Terminadas o cerradas",
+      tone: "success"
+    },
+    {
+      label: "Buying Parts",
+      value: totals.parts,
+      note: "Esperando piezas",
+      tone: totals.parts ? "warning" : "success"
+    },
+    {
+      label: "Invoiced",
+      value: totals.invoiced,
+      note: "Con invoice PDF",
+      tone: "info"
+    },
+    {
+      label: "Quotes",
+      value: totals.quotes,
+      note: "Quotes disponibles",
+      tone: totals.quotes ? "warning" : "info"
+    },
+    {
+      label: "PM Reports",
+      value: totals.pmReports,
+      note: "Reportes PM generados",
+      tone: "info"
+    },
+    {
+      label: "Emergency",
+      value: totals.emergency,
+      note: "Prioridad emergencia",
+      tone: totals.emergency ? "danger" : "success"
+    },
+    {
+      label: "Oldest Open",
+      value: totals.oldestOpenDays + "d",
+      note: "Orden abierta mas vieja",
+      tone: totals.oldestOpenDays > 7 ? "danger" : (totals.oldestOpenDays > 3 ? "warning" : "success")
+    }
+  ];
+
+  document.getElementById("supervisorMetrics").innerHTML =
+    cards.map(renderMetricCard).join("");
+}
+
+function getSupervisorDashboardTotals(data) {
+  const totals = {
+    total: data.length,
+    open: 0,
+    completed: 0,
+    parts: 0,
+    invoiced: 0,
+    quotes: 0,
+    pmReports: 0,
+    emergency: 0,
+    oldestOpenDays: 0
+  };
+
+  data.forEach(function(order) {
+    const status = normalizeDashboardStatus(order.STATUS);
+    const priority = String(order.ORDER_PRIORITY || "").toLowerCase();
+    const isClosed = status.includes("COMPLETED") ||
+      status.includes("CLOSED") ||
+      status.includes("INVOICED") ||
+      status.includes("FACTURADO");
+
+    if (isClosed) totals.completed++;
+    else {
+      totals.open++;
+      totals.oldestOpenDays = Math.max(totals.oldestOpenDays, getDashboardOrderAgeDays(order));
+    }
+
+    if (status.includes("PART")) totals.parts++;
+    if (String(order.HAS_INVOICE_PDF || "").toUpperCase() === "YES" || order.PDF_EN_URL || order.PDF_ES_URL) {
+      totals.invoiced++;
+    }
+    if (order.QUOTE_EN_URL || order.QUOTE_ES_URL) totals.quotes++;
+    if (String(order.HAS_PM_REPORT_PDF || "").toUpperCase() === "YES" ||
+        order.PM_REPORT_EN_URL || order.PM_REPORT_ES_URL) {
+      totals.pmReports++;
+    }
+    if (priority.includes("emergency") || priority.includes("urgent")) totals.emergency++;
+  });
+
+  return totals;
+}
+
+function normalizeDashboardStatus(value) {
+  return String(value || "")
+    .trim()
+    .replace(/_/g, " ")
+    .toUpperCase();
+}
+
+function getDashboardOrderAgeDays(order) {
+  const d = new Date(order.DATE_CREATED || "");
+  if (isNaN(d.getTime())) return 0;
+  return Math.max(0, Math.floor((new Date() - d) / 86400000));
 }
 
 function getDashboardCompanyScope() {
