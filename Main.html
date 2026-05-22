@@ -86,8 +86,9 @@
 
     .login-kicker {
       display:inline-block;
-      background:var(--brand-primary);
-      border:1px solid rgba(255,255,255,.18);
+      background:linear-gradient(135deg, #f8fafc 0%, #cbd5e1 48%, #ffffff 100%);
+      border:1px solid rgba(255,255,255,.58);
+      color:#111827;
       padding:8px 11px;
       border-radius:999px;
       font-size:12px;
@@ -103,13 +104,18 @@
       line-height:1.05;
       letter-spacing:0;
       max-width:640px;
+      color:#f8fafc;
+      background:linear-gradient(180deg, #ffffff 0%, #e5e7eb 42%, #a7b0bf 78%, #f8fafc 100%);
+      -webkit-background-clip:text;
+      background-clip:text;
+      -webkit-text-fill-color:transparent;
     }
 
     .login-brand p {
       font-size:clamp(17px, 1.8vw, 22px);
       line-height:1.45;
       margin:16px 0 0;
-      color:rgba(255,255,255,.84);
+      color:#dbe2ea;
       max-width:560px;
     }
 
