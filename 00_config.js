@@ -66,7 +66,7 @@ PM_REPORT_TEMPLATE_ID: "1wuLdLD_W4IAb4MoA8IHf0birHG6f1rJ0O7Umf5ahbMg",
       backgroundImageUrl: "",
       backgroundFileId: "",
       logoImageUrl: "",
-      logoFileId: "1UMXXSPDelny_QR-ANISgwfGCN49fW_Hf"
+      logoFileId: "1fgvNvOfimOPIgrN_dfM5uzHH-IpGIP6-"
     }
   },
 

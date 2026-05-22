@@ -212,7 +212,7 @@ function getCompanyBranding(companyId) {
   branding.primaryColor = branding.primaryColor || "#111827";
   branding.accentColor = branding.accentColor || "#dc2626";
   branding.backgroundImageUrl = branding.backgroundImageUrl || driveImageUrl_(branding.backgroundFileId, 1800);
-  branding.logoImageUrl = branding.logoImageUrl || getInlineCompanyLogo_(companyId) || driveImageDataUrl_(branding.logoFileId) || driveImageUrl_(branding.logoFileId, 600);
+  branding.logoImageUrl = branding.logoImageUrl || driveImageDataUrl_(branding.logoFileId) || getInlineCompanyLogo_(companyId) || driveImageUrl_(branding.logoFileId, 600);
 
   return branding;
 }
