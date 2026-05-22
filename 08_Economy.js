@@ -242,6 +242,8 @@ function syncInvoicesToEconomy(companyId) {
   const woClient = woHeaders.indexOf("CLIENT");
   const woNSN = woHeaders.indexOf("NSN");
   const woCompleted = woHeaders.indexOf("DATE_COMPLETED");
+  const woStatus = woHeaders.indexOf("STATUS");
+  const woClosed = woHeaders.indexOf("DATE_CLOSED");
 
   const userName = userHeaders.indexOf("NAME");
   const userCompany = userHeaders.indexOf("COMPANY_ID");
@@ -264,11 +266,14 @@ function syncInvoicesToEconomy(companyId) {
     if (!wo || comp !== companyId) continue;
 
     woMap[wo] = {
+      rowNumber: i + 1,
       companyId: comp,
       technician: String(woData[i][woTech] || "").trim(),
       client: woClient >= 0 ? woData[i][woClient] : "",
       nsn: woNSN >= 0 ? woData[i][woNSN] : "",
-      dateCompleted: woCompleted >= 0 ? woData[i][woCompleted] : ""
+      dateCompleted: woCompleted >= 0 ? woData[i][woCompleted] : "",
+      status: woStatus >= 0 ? String(woData[i][woStatus] || "").trim().toUpperCase() : "",
+      dateClosed: woClosed >= 0 ? woData[i][woClosed] : ""
     };
   }
 
@@ -385,6 +390,7 @@ if (invType === "PM") continue;
     setEcoValue_(shEco, targetRow, ecoHeaders, ["INVOICE_NUMBER"], invoiceNumber);
     setEcoValue_(shEco, targetRow, ecoHeaders, ["DATE_INVOICE"], invoiceDate);
     setEcoValue_(shEco, targetRow, ecoHeaders, ["STATUS"], "INVOICED");
+    closeWorkOrderAfterEconomyInvoiceSync_(shWO, woHeaders, woMap[wo], invoiceNumber, invoiceDate);
 
     setEcoValue_(shEco, targetRow, ecoHeaders, ["HORAS", "LABOR_HOURS"], horas);
     setEcoValue_(shEco, targetRow, ecoHeaders, ["TECHNICIANS"], techniciansText);
@@ -397,6 +403,41 @@ if (invType === "PM") continue;
   }
 
   return true;
+}
+
+function closeWorkOrderAfterEconomyInvoiceSync_(shWO, woHeaders, woInfo, invoiceNumber, invoiceDate) {
+  if (!shWO || !woInfo || !woInfo.rowNumber || !invoiceNumber) return;
+  if (woInfo.status === "CLOSED") return;
+
+  const now = new Date();
+  const closedDate = woInfo.dateClosed || invoiceDate || now;
+
+  setWorkOrderValueByHeader_(shWO, woInfo.rowNumber, woHeaders, "STATUS", "CLOSED");
+  setWorkOrderValueByHeader_(shWO, woInfo.rowNumber, woHeaders, "DATE_CLOSED", closedDate);
+  setWorkOrderValueByHeader_(shWO, woInfo.rowNumber, woHeaders, "INVOICE_NUMBER", invoiceNumber);
+  setWorkOrderValueByHeader_(shWO, woInfo.rowNumber, woHeaders, "DATE_INVOICE", invoiceDate || now);
+
+  addLog_(
+    woInfo.companyId,
+    woHeaders.indexOf("WO_NUMBER") >= 0
+      ? shWO.getRange(woInfo.rowNumber, woHeaders.indexOf("WO_NUMBER") + 1).getValue()
+      : "",
+    "ORDER CLOSED AFTER ECONOMY INVOICE SYNC",
+    woInfo.status || "",
+    "CLOSED",
+    Session.getActiveUser().getEmail() || "Economy Sync",
+    "Invoice " + invoiceNumber
+  );
+
+  woInfo.status = "CLOSED";
+  woInfo.dateClosed = closedDate;
+}
+
+function setWorkOrderValueByHeader_(sh, rowNumber, headers, headerName, value) {
+  const col = headers.indexOf(headerName) + 1;
+  if (col > 0) {
+    sh.getRange(rowNumber, col).setValue(value);
+  }
 }
 
 function setEcoValue_(sh, rowNumber, headers, possibleNames, value) {
