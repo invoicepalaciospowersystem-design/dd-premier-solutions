@@ -2,6 +2,10 @@
 // FILE: 99_Helpers.gs
 // =====================================================
 
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
 function addLog_(companyId, woNumber, action, oldStatus, newStatus, user, notes) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = ss.getSheetByName(CFG.SHEET_WO_LOG);

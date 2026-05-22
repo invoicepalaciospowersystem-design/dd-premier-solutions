@@ -14,9 +14,10 @@
     .cancel { background:#dc2626; }
     .muted { color:#6b7280; font-size:14px; }
   </style>
+  <?!= include("AppWatermark"); ?>
 </head>
 
-<body>
+<body class="app-watermark" style="--company-watermark-logo:<?!= watermarkLogoCss ?>;">
 
 <div class="header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
   <div id="companyTitle" style="font-size:22px; font-weight:bold;">

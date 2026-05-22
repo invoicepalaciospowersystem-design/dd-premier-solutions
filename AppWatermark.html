@@ -1,0 +1,36 @@
+<style>
+  :root {
+    --company-watermark-logo:none;
+  }
+
+  body.app-watermark {
+    position:relative;
+    overflow-x:hidden;
+  }
+
+  body.app-watermark::before {
+    content:"";
+    position:fixed;
+    inset:0;
+    background-image:var(--company-watermark-logo);
+    background-repeat:repeat;
+    background-position:center;
+    background-size:260px auto;
+    opacity:.035;
+    filter:grayscale(100%);
+    pointer-events:none;
+    z-index:0;
+  }
+
+  body.app-watermark > * {
+    position:relative;
+    z-index:1;
+  }
+
+  @media (max-width:800px) {
+    body.app-watermark::before {
+      background-size:190px auto;
+      opacity:.028;
+    }
+  }
+</style>

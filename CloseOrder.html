@@ -15,9 +15,10 @@
     .pm-note { background:#ede9fe; color:#4c1d95; padding:12px; border-radius:10px; margin:10px 0; font-weight:bold; }
     .return-btn { display:inline-block; width:100%; box-sizing:border-box; background:#111827; color:white; padding:11px; border-radius:9px; font-weight:bold; text-align:center; text-decoration:none; margin:6px 0; }
   </style>
+  <?!= include("AppWatermark"); ?>
 </head>
 
-<body>
+<body class="app-watermark" style="--company-watermark-logo:<?!= watermarkLogoCss ?>;">
 
 <div class="box">
   <h2>Cierre de Orden</h2>

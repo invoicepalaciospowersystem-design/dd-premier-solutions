@@ -29,9 +29,10 @@
       .form-grid { grid-template-columns:1fr; }
     }
   </style>
+  <?!= include("AppWatermark"); ?>
 </head>
 
-<body>
+<body class="app-watermark" style="--company-watermark-logo:<?!= watermarkLogoCss ?>;">
 
 <div id="app" style="display:none;">
   <div class="header topbar">

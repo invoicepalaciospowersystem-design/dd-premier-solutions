@@ -206,9 +206,10 @@
       .header { display:block; }
     }
   </style>
+  <?!= include("AppWatermark"); ?>
 </head>
 
-<body>
+<body class="app-watermark" style="--company-watermark-logo:<?!= watermarkLogoCss ?>;">
 
 <div class="header">
   <div id="companyTitle" style="font-size:20px; font-weight:bold;">

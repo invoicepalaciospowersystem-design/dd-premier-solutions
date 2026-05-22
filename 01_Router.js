@@ -14,6 +14,7 @@ function doGet(e) {
 
     if (p.view === "tech") {
       const template = HtmlService.createTemplateFromFile("Tech");
+      applyTemplateDefaults_(template, p, baseUrl);
       template.techName = p.tech || "";
       template.baseUrl = baseUrl;
       template.unitedRefrigerationAccount = CFG.UNITED_REFRIGERATION_ACCOUNT || "";
@@ -25,6 +26,7 @@ function doGet(e) {
 
     if (p.view === "customer") {
       const template = HtmlService.createTemplateFromFile("Customer");
+      applyTemplateDefaults_(template, p, baseUrl);
       template.supervisor = p.supervisor || "";
       template.baseUrl = baseUrl;
 
@@ -35,6 +37,7 @@ function doGet(e) {
 
     if (p.view === "techAdmin") {
       const template = HtmlService.createTemplateFromFile("TechAdmin");
+      applyTemplateDefaults_(template, p, baseUrl);
       template.baseUrl = baseUrl;
       template.companyId = p.companyId || "";
 
@@ -45,6 +48,7 @@ function doGet(e) {
 
     if (p.view === "supervisorAdmin") {
       const template = HtmlService.createTemplateFromFile("SupervisorAdmin");
+      applyTemplateDefaults_(template, p, baseUrl);
       template.baseUrl = baseUrl;
       template.companyId = p.companyId || "";
 
@@ -55,6 +59,7 @@ function doGet(e) {
 
     if (p.view === "orders") {
       const template = HtmlService.createTemplateFromFile("Ordenes");
+      applyTemplateDefaults_(template, p, baseUrl);
       template.baseUrl = baseUrl;
       template.companyId = p.companyId || "";
 
@@ -65,6 +70,7 @@ function doGet(e) {
 
     if (p.view === "economy") {
       const template = HtmlService.createTemplateFromFile("Economy");
+      applyTemplateDefaults_(template, p, baseUrl);
       template.baseUrl = baseUrl;
 
       return template.evaluate()
@@ -74,6 +80,7 @@ function doGet(e) {
 
     if (p.view === "stores") {
       const template = HtmlService.createTemplateFromFile("Stores");
+      applyTemplateDefaults_(template, p, baseUrl);
       template.baseUrl = baseUrl;
 
       return template.evaluate()
@@ -83,6 +90,7 @@ function doGet(e) {
 
     if (p.view === "companies") {
       const template = HtmlService.createTemplateFromFile("Companies");
+      applyTemplateDefaults_(template, p, baseUrl);
       template.baseUrl = baseUrl;
 
       return template.evaluate()
@@ -92,6 +100,7 @@ function doGet(e) {
 
     if (p.view === "users") {
       const template = HtmlService.createTemplateFromFile("Users");
+      applyTemplateDefaults_(template, p, baseUrl);
       template.baseUrl = baseUrl;
 
       return template.evaluate()
@@ -101,6 +110,7 @@ function doGet(e) {
 
     if (p.view === "close") {
       const template = HtmlService.createTemplateFromFile("CloseOrder");
+      applyTemplateDefaults_(template, p, baseUrl);
       template.row = p.row || "";
       template.wo = p.wo || "";
       template.techName = p.tech || "";
@@ -114,6 +124,7 @@ function doGet(e) {
 
         if (p.view === "pm_report") {
       const template = HtmlService.createTemplateFromFile("PM_Report");
+      applyTemplateDefaults_(template, p, baseUrl);
       template.row = p.row || "";
       template.wo = p.wo || "";
       template.techName = p.tech || "";
@@ -127,6 +138,7 @@ function doGet(e) {
 
     if (p.view === "createOrder") {
       const template = HtmlService.createTemplateFromFile("CreateOrder");
+      applyTemplateDefaults_(template, p, baseUrl);
       template.companyId = p.companyId || "";
       template.baseUrl = baseUrl;
 
@@ -137,6 +149,7 @@ function doGet(e) {
 
     if (p.view === "quote") {
   const template = HtmlService.createTemplateFromFile("Quote");
+  applyTemplateDefaults_(template, p, baseUrl);
   template.row = p.row || "";
   template.wo = p.wo || "";
   template.companyId = p.companyId || "";
@@ -149,6 +162,7 @@ function doGet(e) {
 }
 
     const template = HtmlService.createTemplateFromFile("Main");
+    applyTemplateDefaults_(template, p, baseUrl);
     template.baseUrl = baseUrl;
     template.companyId = p.companyId || "";
     template.ownerOnly = (p.ownerOnly === "1" || p.ownerOnly === "true" || p.portal === "owner") ? "true" : "";
@@ -177,6 +191,21 @@ function getWebAppBaseUrl_(companyId) {
   }
 
   return CFG.WEB_APP_URL;
+}
+
+function applyTemplateDefaults_(template, params, baseUrl) {
+  params = params || {};
+  template.baseUrl = baseUrl;
+  template.watermarkLogoCss = getCompanyWatermarkLogoCss_(params.companyId || "");
+}
+
+function getCompanyWatermarkLogoCss_(companyId) {
+  const branding = getCompanyBranding(companyId || "");
+  const logoUrl = String(branding.logoImageUrl || "").trim();
+
+  if (!logoUrl) return "none";
+
+  return "url('" + logoUrl.replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "')";
 }
 
 function onFormSubmit(e) {

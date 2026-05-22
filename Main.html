@@ -35,10 +35,10 @@
       position:fixed;
       inset:0;
       background-image:var(--company-watermark-logo);
-      background-repeat:no-repeat;
-      background-position:right 5vw center;
-      background-size:min(56vw, 720px);
-      opacity:.055;
+      background-repeat:repeat;
+      background-position:center;
+      background-size:260px auto;
+      opacity:.035;
       filter:grayscale(100%);
       pointer-events:none;
       z-index:0;
@@ -1133,9 +1133,8 @@
       }
 
       body.app-mode::before {
-        background-position:center 68%;
-        background-size:min(88vw, 420px);
-        opacity:.035;
+        background-size:190px auto;
+        opacity:.028;
       }
 
       .global-header {

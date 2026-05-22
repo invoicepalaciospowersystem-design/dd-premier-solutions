@@ -10,9 +10,10 @@
     .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:10px; }
     .filters { display:grid; grid-template-columns: 1fr 260px; gap:10px; }
   </style>
+  <?!= include("AppWatermark"); ?>
 </head>
 
-<body>
+<body class="app-watermark" style="--company-watermark-logo:<?!= watermarkLogoCss ?>;">
 
 <div class="header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
   <div id="companyTitle" style="font-size:22px; font-weight:bold;">

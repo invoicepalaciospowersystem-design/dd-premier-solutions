@@ -67,9 +67,10 @@
       font-size:14px;
     }
   </style>
+  <?!= include("AppWatermark"); ?>
 </head>
 
-<body>
+<body class="app-watermark" style="--company-watermark-logo:<?!= watermarkLogoCss ?>;">
 
 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; background:white; padding:15px; border-radius:12px; margin-bottom:15px; box-shadow:0 3px 10px rgba(0,0,0,0.08);">
   <div id="companyTitle" style="font-size:22px; font-weight:bold;">

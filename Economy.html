@@ -100,9 +100,10 @@
       background:#2563eb !important;
     }
   </style>
+  <?!= include("AppWatermark"); ?>
 </head>
 
-<body>
+<body class="app-watermark" style="--company-watermark-logo:<?!= watermarkLogoCss ?>;">
 
 <div class="header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
   <div id="companyTitle" style="font-size:22px; font-weight:bold;">
