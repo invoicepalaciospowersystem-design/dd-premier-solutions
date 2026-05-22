@@ -94,17 +94,19 @@ function localizeSupervisorOrderForEnglish_(obj) {
   obj.SUPERVISOR_PRIORITY_EN = normalizePriorityEn_(obj.ORDER_PRIORITY);
   obj.SUPERVISOR_WO_TYPE_EN = translateWorkOrderTypeForSupervisor_(obj.WO_TYPE);
   obj.SUPERVISOR_PM_TYPE_EN = translatePmTypeForSupervisor_(obj.PM_TYPE);
-  obj.SUPERVISOR_EQUIPMENT_EN =
+  obj.SUPERVISOR_EQUIPMENT_EN = translateSupervisorTextToEnglish_(
+    obj.REPORTED_EQUIPMENT ||
+    obj["REPORTED EQUIPMENT"] ||
     obj.REPORTED_EQUIPMENT_EN ||
-    translateSupervisorTextToEnglish_(obj.REPORTED_EQUIPMENT || obj["REPORTED EQUIPMENT"] || "");
-  obj.SUPERVISOR_PROBLEM_EN =
+    ""
+  );
+  obj.SUPERVISOR_PROBLEM_EN = translateSupervisorTextToEnglish_(
+    obj.REPORTED_PROBLEM_ORIGINAL ||
+    obj.REPORTED_PROBLEM_ES ||
+    obj["REPORTED PROBLEM"] ||
     obj.REPORTED_PROBLEM_EN ||
-    translateSupervisorTextToEnglish_(
-      obj.REPORTED_PROBLEM_ORIGINAL ||
-      obj.REPORTED_PROBLEM_ES ||
-      obj["REPORTED PROBLEM"] ||
-      ""
-    );
+    ""
+  );
 
   return obj;
 }
@@ -160,7 +162,13 @@ function translateSupervisorTextToEnglish_(value) {
   value = String(value || "").trim();
   if (!value) return "";
 
-  return safeTranslate_(value, "auto", "en");
+  const autoTranslated = String(safeTranslate_(value, "auto", "en") || "").trim();
+  if (autoTranslated && autoTranslated.toUpperCase() !== value.toUpperCase()) {
+    return autoTranslated;
+  }
+
+  const spanishTranslated = String(safeTranslate_(value, "es", "en") || "").trim();
+  return spanishTranslated || autoTranslated || value;
 }
 
 function titleCaseSupervisorText_(value) {
