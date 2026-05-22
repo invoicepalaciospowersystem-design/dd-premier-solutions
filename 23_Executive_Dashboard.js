@@ -151,6 +151,62 @@ function getAdminCompanyDashboard(sessionToken, companyId, periodMode, periodYea
   return dashboard;
 }
 
+function getEconomyModuleDashboard(sessionToken, companyId) {
+  const session = requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"], companyId);
+  const role = String(session.role || "").trim().toUpperCase();
+  const requestedCompany = String(companyId || session.companyId || CFG.DEFAULT_COMPANY_ID).trim().toUpperCase();
+  const companyScope = role === "OWNER"
+    ? requestedCompany
+    : String(session.companyId || requestedCompany || CFG.DEFAULT_COMPANY_ID).trim().toUpperCase();
+
+  if (!companyScope) {
+    throw new Error("No se pudo determinar la compania de economia.");
+  }
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const periodScope = buildAdminPeriodScope_("monthly");
+  const companies = getExecutiveCompanies_(ss);
+  const companyMap = {};
+
+  companies.forEach(function(c) {
+    companyMap[c.companyId] = c.companyName || c.companyId;
+  });
+
+  const dashboard = {
+    generatedAt: Utilities.formatDate(new Date(), CFG.TIMEZONE, "MM/dd/yyyy hh:mm a"),
+    companyId: companyScope,
+    companyName: companyMap[companyScope] || getCompanyName(companyScope) || companyScope,
+    periodMode: periodScope.mode,
+    periodYear: periodScope.year,
+    periodMonth: periodScope.month,
+    periodLabel: periodScope.label,
+    totals: {
+      economyPending: 0,
+      economyInvoiced: 0,
+      economyPaid: 0,
+      economyRows: 0,
+      totalBilled: 0,
+      taxTotal: 0,
+      laborHours: 0,
+      laborBilled: 0,
+      partsBilled: 0,
+      partsCost: 0,
+      techLaborCost: 0,
+      grossProfit: 0
+    },
+    investors: {
+      davidPartsCost: 0,
+      yoelPartsCost: 0,
+      unassignedPartsCost: 0
+    },
+    economyDetails: []
+  };
+
+  collectAdminEconomyFinancials_(ss, dashboard, companyScope, periodScope);
+
+  return dashboard;
+}
+
 function buildAdminPeriodScope_(periodMode, periodYear, periodMonth) {
   let currentPeriod = null;
 

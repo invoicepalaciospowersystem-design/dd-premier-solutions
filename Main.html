@@ -741,6 +741,49 @@
       line-height:1.35;
     }
 
+    .module-metrics {
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(115px, 1fr));
+      gap:8px;
+      margin-top:10px;
+    }
+
+    .module-metric {
+      background:#ffffff;
+      border:1px solid #e5e7eb;
+      border-left:4px solid #2563eb;
+      border-radius:8px;
+      padding:9px;
+      min-height:66px;
+      box-sizing:border-box;
+    }
+
+    .module-metric.warning { border-left-color:#f59e0b; }
+    .module-metric.success { border-left-color:#16a34a; }
+    .module-metric.danger { border-left-color:#dc2626; }
+
+    .module-metric-label {
+      font-size:11px;
+      color:#6b7280;
+      margin-bottom:4px;
+      line-height:1.2;
+    }
+
+    .module-metric-value {
+      color:#111827;
+      font-size:17px;
+      font-weight:bold;
+      line-height:1.1;
+      overflow-wrap:anywhere;
+    }
+
+    .module-metric-note {
+      grid-column:1 / -1;
+      color:#6b7280;
+      font-size:12px;
+      margin-top:2px;
+    }
+
     .module-footer {
       display:flex;
       justify-content:space-between;
@@ -2032,6 +2075,7 @@ function renderModules() {
               <div class="module-desc">${m.desc}</div>
             </div>
           </div>
+          ${m.url === "?view=economy" ? renderEconomyModuleMetricsShell() : ""}
           <div class="module-footer">
             <span class="module-role">${getModuleRoleLabel(m.roles)}</span>
             <span class="module-open">Abrir</span>
@@ -2039,6 +2083,94 @@ function renderModules() {
         </div>
       `;
     }).join("");
+
+  loadEconomyModuleDashboard();
+}
+
+function renderEconomyModuleMetricsShell() {
+  return `
+    <div id="economyModuleMetrics" class="module-metrics">
+      <div class="module-metric">
+        <div class="module-metric-label">Economia</div>
+        <div class="module-metric-value">...</div>
+      </div>
+      <div class="module-metric">
+        <div class="module-metric-label">Cargando</div>
+        <div class="module-metric-value">...</div>
+      </div>
+      <div class="module-metric-note">Cargando metricas del periodo actual...</div>
+    </div>
+  `;
+}
+
+function loadEconomyModuleDashboard() {
+  const box = document.getElementById("economyModuleMetrics");
+  if (!box || !CURRENT_USER) return;
+
+  const role = String(CURRENT_USER.role || "").trim().toUpperCase();
+  if (["OWNER", "ADMIN", "ECONOMIA"].indexOf(role) === -1) return;
+
+  const companyId = getActiveCompanyId();
+  if (!companyId) {
+    box.innerHTML = "<div class='module-metric-note'>Selecciona una compania para ver economia.</div>";
+    return;
+  }
+
+  box.innerHTML = renderEconomyModuleLoadingMetrics();
+
+  google.script.run
+    .withSuccessHandler(function(data) {
+      renderEconomyModuleDashboard(data || {});
+    })
+    .withFailureHandler(function(err) {
+      box.innerHTML =
+        "<div class='module-metric-note'>Error cargando economia: " +
+        escapeHtmlMain(err && err.message ? err.message : err) +
+        "</div>";
+    })
+    .getEconomyModuleDashboard(getSessionToken(), companyId);
+}
+
+function renderEconomyModuleLoadingMetrics() {
+  return [
+    { label:"Total", value:"..." },
+    { label:"Profit", value:"..." },
+    { label:"David", value:"..." },
+    { label:"Yoel", value:"..." }
+  ].map(renderEconomyModuleMetric).join("") +
+    "<div class='module-metric-note'>Cargando metricas del periodo actual...</div>";
+}
+
+function renderEconomyModuleDashboard(data) {
+  const box = document.getElementById("economyModuleMetrics");
+  if (!box) return;
+
+  const totals = data.totals || {};
+  const investors = data.investors || {};
+  const cards = [
+    { label:"Facturado", value:formatMoneyDashboard(totals.totalBilled || 0), tone:"info" },
+    { label:"Cobro Parts", value:formatMoneyDashboard(totals.partsBilled || 0), tone:"info" },
+    { label:"Gasto Real", value:formatMoneyDashboard(totals.partsCost || 0), tone:totals.partsCost ? "warning" : "success" },
+    { label:"Profit", value:formatMoneyDashboard(totals.grossProfit || 0), tone:Number(totals.grossProfit || 0) >= 0 ? "success" : "danger" },
+    { label:"David Parts", value:formatMoneyDashboard(investors.davidPartsCost || 0), tone:"info" },
+    { label:"Yoel Parts", value:formatMoneyDashboard(investors.yoelPartsCost || 0), tone:"info" }
+  ];
+
+  box.innerHTML =
+    cards.map(renderEconomyModuleMetric).join("") +
+    "<div class='module-metric-note'>" +
+    escapeHtmlMain(data.periodLabel || "Periodo actual") +
+    " | " + Number(totals.economyRows || 0) + " registros" +
+    "</div>";
+}
+
+function renderEconomyModuleMetric(card) {
+  return `
+    <div class="module-metric ${escapeHtmlMain(card.tone || "")}">
+      <div class="module-metric-label">${escapeHtmlMain(card.label || "")}</div>
+      <div class="module-metric-value">${escapeHtmlMain(card.value || "0")}</div>
+    </div>
+  `;
 }
 
 function getModuleRoleLabel(roles) {
@@ -2101,12 +2233,14 @@ function loadOwnerCompanySelector() {
       renderOwnerCompanySelector(false);
       loadOwnerDashboard();
       loadAdminDashboard();
+      loadEconomyModuleDashboard();
     })
     .withFailureHandler(function() {
       OWNER_COMPANIES = [];
       renderOwnerCompanySelector(false);
       loadOwnerDashboard();
       loadAdminDashboard();
+      loadEconomyModuleDashboard();
     })
     .getCompaniesForUser("", "", getSessionToken());
 }
@@ -2186,6 +2320,7 @@ function onOwnerCompanyChange() {
 
   loadOwnerDashboard();
   loadAdminDashboard();
+  loadEconomyModuleDashboard();
 }
 
 function updateOwnerScopeText() {
