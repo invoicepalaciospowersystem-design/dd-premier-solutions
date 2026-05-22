@@ -69,6 +69,34 @@ function renderAppShell(iframeUrl, title) {
     src="${escapeHtml(iframeUrl)}"
     allow="clipboard-read; clipboard-write"
   ></iframe>
+  <script>
+    window.addEventListener("message", function(event) {
+      var data = event.data || {};
+      if (!data || data.type !== "PPS_NAVIGATE") return;
+
+      try {
+        var target = new URL(String(data.url || ""), window.location.href);
+        if (target.protocol !== "https:") return;
+
+        if (target.hostname === "script.google.com") {
+          var sameHost = new URL(window.location.href);
+          sameHost.search = target.search;
+          sameHost.hash = target.hash;
+          window.location.href = sameHost.href;
+          return;
+        }
+
+        var allowedHosts = {
+          "app.palaciospowersystems.com": true,
+          "ddpremiersolutionscorp.com": true,
+          "www.ddpremiersolutionscorp.com": true
+        };
+
+        if (!allowedHosts[target.hostname]) return;
+        window.location.href = target.href;
+      } catch (err) {}
+    });
+  </script>
 </body>
 </html>`;
 }

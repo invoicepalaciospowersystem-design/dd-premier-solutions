@@ -173,6 +173,37 @@
 <div id="cards" class="grid">Loading...</div>
 
 <script>
+function navigateApp(url) {
+  const target = String(url || "").trim();
+  if (!target) return;
+
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: "PPS_NAVIGATE", url: target }, "*");
+      setTimeout(function() {
+        try {
+          window.open(target, "_top");
+        } catch (err) {
+          window.location.href = target;
+        }
+      }, 250);
+      return;
+    }
+  } catch (err) {}
+
+  try {
+    window.open(target, "_top");
+  } catch (err) {
+    window.location.href = target;
+  }
+}
+
+const TOP_NAV = {
+  set href(url) {
+    navigateApp(url);
+  }
+};
+
 const BASE_URL = "<?= baseUrl ?>";
 let ECONOMY = [];
 let ACTIVE_COMPANY_ID = "";
@@ -199,7 +230,7 @@ function requireEconomyLogin() {
 
   if (!token || ["OWNER", "ADMIN", "ECONOMIA"].indexOf(role) === -1) {
     localStorage.removeItem("pps_user");
-    window.top.location.href = BASE_URL;
+    TOP_NAV.href = BASE_URL;
     return false;
   }
 

@@ -1257,6 +1257,37 @@
 </div>
 
 <script>
+function navigateApp(url) {
+  const target = String(url || "").trim();
+  if (!target) return;
+
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: "PPS_NAVIGATE", url: target }, "*");
+      setTimeout(function() {
+        try {
+          window.open(target, "_top");
+        } catch (err) {
+          window.location.href = target;
+        }
+      }, 250);
+      return;
+    }
+  } catch (err) {}
+
+  try {
+    window.open(target, "_top");
+  } catch (err) {
+    window.location.href = target;
+  }
+}
+
+const TOP_NAV = {
+  set href(url) {
+    navigateApp(url);
+  }
+};
+
 const BASE_URL = "<?= baseUrl ?>";
 const LOGIN_COMPANY_ID = String("<?= companyId ?>").trim().toUpperCase();
 const OWNER_ONLY_LOGIN = String("<?= ownerOnly ?>").trim().toLowerCase() === "true";
@@ -1890,7 +1921,7 @@ function openModule(url) {
   }
 
   finalUrl = appendCompanyParam(finalUrl, companyId);
-  window.top.location.href = finalUrl;
+  TOP_NAV.href = finalUrl;
 }
 
 function getActiveCompanyId() {

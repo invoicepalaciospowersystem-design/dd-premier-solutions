@@ -127,6 +127,31 @@
 </div>
 
 <script>
+function navigateApp(url) {
+  const target = String(url || "").trim();
+  if (!target) return;
+
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: "PPS_NAVIGATE", url: target }, "*");
+      setTimeout(function() {
+        try {
+          window.open(target, "_top");
+        } catch (err) {
+          window.location.href = target;
+        }
+      }, 250);
+      return;
+    }
+  } catch (err) {}
+
+  try {
+    window.open(target, "_top");
+  } catch (err) {
+    window.location.href = target;
+  }
+}
+
 const BASE_URL = "<?= baseUrl ?>";
 const ROW_NUMBER = "<?= row ?>";
 const WO_PARAM = "<?= wo ?>";
@@ -372,19 +397,7 @@ function getQuoteReturnUrl() {
 
 function openReturnUrl(url) {
   showQuoteReturnLink(url);
-
-  try {
-    window.open(url, "_top");
-    return;
-  } catch (err) {
-    console.log("Top navigation blocked:", err);
-  }
-
-  try {
-    window.location.href = url;
-  } catch (err2) {
-    console.log("Frame navigation blocked:", err2);
-  }
+  navigateApp(url);
 }
 
 function showQuoteReturnLink(url) {

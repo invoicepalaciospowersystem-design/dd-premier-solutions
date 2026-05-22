@@ -184,6 +184,37 @@
 </div>
 
 <script>
+function navigateApp(url) {
+  const target = String(url || "").trim();
+  if (!target) return;
+
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: "PPS_NAVIGATE", url: target }, "*");
+      setTimeout(function() {
+        try {
+          window.open(target, "_top");
+        } catch (err) {
+          window.location.href = target;
+        }
+      }, 250);
+      return;
+    }
+  } catch (err) {}
+
+  try {
+    window.open(target, "_top");
+  } catch (err) {
+    window.location.href = target;
+  }
+}
+
+const TOP_NAV = {
+  set href(url) {
+    navigateApp(url);
+  }
+};
+
 const BASE_URL = "<?= baseUrl ?>";
 const COMPANY_FIELDS = [
   "COMPANY_ID", "COMPANY_NAME", "LEGAL_NAME", "EIN", "WEBSITE_URL",
@@ -216,7 +247,7 @@ function requireOwner() {
   const token = user.sessionToken || user.SESSION_TOKEN || "";
 
   if (!role || !token) {
-    window.top.location.href = BASE_URL;
+    TOP_NAV.href = BASE_URL;
     return false;
   }
 
@@ -360,7 +391,7 @@ function cancelEdit() {
 }
 
 function goHome() {
-  window.top.location.href = BASE_URL;
+  TOP_NAV.href = BASE_URL;
 }
 
 function escapeHtml(value) {

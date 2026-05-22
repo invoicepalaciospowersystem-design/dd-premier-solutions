@@ -53,6 +53,37 @@
 <div id="techs" class="grid"></div>
 
 <script>
+function navigateApp(url) {
+  const target = String(url || "").trim();
+  if (!target) return;
+
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: "PPS_NAVIGATE", url: target }, "*");
+      setTimeout(function() {
+        try {
+          window.open(target, "_top");
+        } catch (err) {
+          window.location.href = target;
+        }
+      }, 250);
+      return;
+    }
+  } catch (err) {}
+
+  try {
+    window.open(target, "_top");
+  } catch (err) {
+    window.location.href = target;
+  }
+}
+
+const TOP_NAV = {
+  set href(url) {
+    navigateApp(url);
+  }
+};
+
 const BASE_URL = "<?= baseUrl ?>";
 const COMPANY_ID_FROM_URL = String("<?= companyId ?>").trim().toUpperCase();
 
@@ -62,7 +93,7 @@ let ACTIVE_COMPANY_ID = "";
 function requireLogin() {
   const raw = localStorage.getItem("pps_user");
   if (!raw) {
-    window.top.location.href = BASE_URL;
+    TOP_NAV.href = BASE_URL;
     return false;
   }
 
@@ -71,16 +102,16 @@ function requireLogin() {
     const role = String(user.role || user.ROLE || "").toUpperCase();
     const token = user.sessionToken || user.SESSION_TOKEN || "";
     if (!token) {
-      window.top.location.href = BASE_URL;
+      TOP_NAV.href = BASE_URL;
       return false;
     }
     if (role !== "OWNER" && role !== "ADMIN") {
-      window.top.location.href = BASE_URL;
+      TOP_NAV.href = BASE_URL;
       return false;
     }
   } catch (e) {
     localStorage.removeItem("pps_user");
-    window.top.location.href = BASE_URL;
+    TOP_NAV.href = BASE_URL;
     return false;
   }
 
@@ -210,21 +241,21 @@ function techCard(t) {
 }
 
 function openTechPortal(name) {
-  window.top.location.href =
+  TOP_NAV.href =
     BASE_URL + "?view=tech&tech=" + encodeURIComponent(name) +
     "&companyId=" + encodeURIComponent(getCompanyId());
 }
 
 function openUsers() {
-  window.top.location.href = BASE_URL + "?view=users&companyId=" + encodeURIComponent(getCompanyId());
+  TOP_NAV.href = BASE_URL + "?view=users&companyId=" + encodeURIComponent(getCompanyId());
 }
 
 function openOrders() {
-  window.top.location.href = BASE_URL + "?view=orders&companyId=" + encodeURIComponent(getCompanyId());
+  TOP_NAV.href = BASE_URL + "?view=orders&companyId=" + encodeURIComponent(getCompanyId());
 }
 
 function goHome() {
-  window.top.location.href = BASE_URL + "?companyId=" + encodeURIComponent(getCompanyId());
+  TOP_NAV.href = BASE_URL + "?companyId=" + encodeURIComponent(getCompanyId());
 }
 
 function esc(value) {

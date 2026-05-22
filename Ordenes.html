@@ -127,11 +127,42 @@
 <div id="cards" class="grid"></div>
 
 <script>
+function navigateApp(url) {
+  const target = String(url || "").trim();
+  if (!target) return;
+
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: "PPS_NAVIGATE", url: target }, "*");
+      setTimeout(function() {
+        try {
+          window.open(target, "_top");
+        } catch (err) {
+          window.location.href = target;
+        }
+      }, 250);
+      return;
+    }
+  } catch (err) {}
+
+  try {
+    window.open(target, "_top");
+  } catch (err) {
+    window.location.href = target;
+  }
+}
+
+const TOP_NAV = {
+  set href(url) {
+    navigateApp(url);
+  }
+};
+
 function requireLogin() {
   const user = localStorage.getItem("pps_user");
 
   if (!user) {
-    window.top.location.href = "<?= baseUrl ?>";
+    TOP_NAV.href = "<?= baseUrl ?>";
     return false;
   }
 
@@ -139,12 +170,12 @@ function requireLogin() {
     const parsed = JSON.parse(user);
     if ((!parsed.role && !parsed.ROLE) || (!parsed.sessionToken && !parsed.SESSION_TOKEN)) {
       localStorage.removeItem("pps_user");
-      window.top.location.href = "<?= baseUrl ?>";
+      TOP_NAV.href = "<?= baseUrl ?>";
       return false;
     }
   } catch (e) {
     localStorage.removeItem("pps_user");
-    window.top.location.href = "<?= baseUrl ?>";
+    TOP_NAV.href = "<?= baseUrl ?>";
     return false;
   }
 
@@ -203,7 +234,7 @@ function canDeleteWO() {
 }
 
 function openQuote(row, woNumber, companyId) {
-  window.top.location.href =
+  TOP_NAV.href =
     BASE_URL +
     "?view=quote" +
     "&row=" + encodeURIComponent(row) +
@@ -248,7 +279,7 @@ function newOrder() {
     return;
   }
 
-  window.top.location.href =
+  TOP_NAV.href =
     BASE_URL + "?view=createOrder&companyId=" + encodeURIComponent(ACTIVE_COMPANY_ID);
 }
 

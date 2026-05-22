@@ -66,11 +66,42 @@
 </div>
 
 <script>
+function navigateApp(url) {
+  const target = String(url || "").trim();
+  if (!target) return;
+
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: "PPS_NAVIGATE", url: target }, "*");
+      setTimeout(function() {
+        try {
+          window.open(target, "_top");
+        } catch (err) {
+          window.location.href = target;
+        }
+      }, 250);
+      return;
+    }
+  } catch (err) {}
+
+  try {
+    window.open(target, "_top");
+  } catch (err) {
+    window.location.href = target;
+  }
+}
+
+const TOP_NAV = {
+  set href(url) {
+    navigateApp(url);
+  }
+};
+
 function requireLogin() {
   const user = localStorage.getItem("pps_user");
 
   if (!user) {
-    window.top.location.href = "<?= baseUrl ?>";
+    TOP_NAV.href = "<?= baseUrl ?>";
     return false;
   }
 
@@ -78,12 +109,12 @@ function requireLogin() {
     const parsed = JSON.parse(user);
     if (!parsed.role && !parsed.ROLE) {
       localStorage.removeItem("pps_user");
-      window.top.location.href = "<?= baseUrl ?>";
+      TOP_NAV.href = "<?= baseUrl ?>";
       return false;
     }
   } catch (e) {
     localStorage.removeItem("pps_user");
-    window.top.location.href = "<?= baseUrl ?>";
+    TOP_NAV.href = "<?= baseUrl ?>";
     return false;
   }
 
@@ -166,7 +197,7 @@ function saveOrder() {
       localStorage.setItem("lastWO", res.woNumber);
       localStorage.setItem("lastWOMessage", "Orden creada: " + res.woNumber);
 
-      window.top.location.href = BASE_URL + "?view=orders";
+      TOP_NAV.href = BASE_URL + "?view=orders";
     })
     .withFailureHandler(function(err) {
       alert(err.message);
@@ -175,7 +206,7 @@ function saveOrder() {
 }
 
 function goBack() {
-  window.top.location.href = BASE_URL + "?view=orders";
+  TOP_NAV.href = BASE_URL + "?view=orders";
 }
 
 loadHeader();
