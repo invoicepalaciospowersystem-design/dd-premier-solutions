@@ -1375,6 +1375,7 @@
 
     .owner-dashboard,
     .admin-dashboard,
+    .tech-dashboard,
     .supervisor-dashboard,
     .economy-dashboard {
       display:none;
@@ -2179,6 +2180,21 @@
     </div>
   </div>
 
+  <div id="techDashboard" class="tech-dashboard">
+    <div class="dash-head">
+      <div>
+        <h2>Dashboard T&eacute;cnico</h2>
+        <div class="muted" id="techDashboardScope">Cargando...</div>
+      </div>
+      <div class="dash-actions">
+        <button class="dash-refresh" onclick="loadTechDashboard()">Actualizar</button>
+        <button class="dash-refresh" onclick="openModule('?view=tech&tech=')">Abrir Portal T&eacute;cnico</button>
+      </div>
+    </div>
+
+    <div id="techMainMetrics" class="metric-grid"></div>
+  </div>
+
   <div id="ownerDashboard" class="owner-dashboard">
     <div class="dash-head">
       <div>
@@ -2350,6 +2366,9 @@ let ADMIN_DASHBOARD_DATA = null;
 let ADMIN_DASHBOARD_FILTER = "openOrders";
 let SUPERVISOR_DASHBOARD_ORDERS = [];
 let SUPERVISOR_DASHBOARD_FILTER = "open";
+let TECH_DASHBOARD_ACTIVE_ORDERS = [];
+let TECH_DASHBOARD_MONTHLY_SUMMARY = null;
+let TECH_DASHBOARD_INVOICE_SUMMARY = null;
 let ADMIN_PERIOD_INITIALIZED = false;
 
 setLoginTheme(LOGIN_COMPANY_ID);
@@ -2649,6 +2668,7 @@ function showPanel() {
   updateRoleShellLabels();
   renderModules();
   updateTechAccountBanner();
+  loadTechDashboard();
   loadAdminDashboard();
   loadSupervisorDashboard();
   loadOwnerCompanySelector();
@@ -2815,6 +2835,144 @@ function renderEconomyModuleMetric(card) {
       <div class="metric-note">Periodo actual</div>
     </div>
   `;
+}
+
+function loadTechDashboard() {
+  const dashboard = document.getElementById("techDashboard");
+  const box = document.getElementById("techMainMetrics");
+  const scope = document.getElementById("techDashboardScope");
+  if (!dashboard || !box || !CURRENT_USER) return;
+
+  const role = String(CURRENT_USER.role || "").trim().toUpperCase();
+  if (role !== "TECH") {
+    dashboard.style.display = "none";
+    return;
+  }
+
+  dashboard.style.display = "block";
+
+  const companyId = getActiveCompanyId();
+  const techName = String(CURRENT_USER.name || "").trim();
+  if (!companyId || !techName) {
+    if (scope) scope.innerText = "No se encontro tecnico o compania.";
+    box.innerHTML = "";
+    return;
+  }
+
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const year = now.getFullYear();
+
+  TECH_DASHBOARD_ACTIVE_ORDERS = [];
+  TECH_DASHBOARD_MONTHLY_SUMMARY = null;
+  TECH_DASHBOARD_INVOICE_SUMMARY = null;
+
+  if (scope) scope.innerText = "Cargando metricas del tecnico...";
+  box.innerHTML = renderMetricSkeletons();
+
+  google.script.run
+    .withSuccessHandler(function(data) {
+      TECH_DASHBOARD_ACTIVE_ORDERS = Array.isArray(data) ? data : [];
+      renderTechMainDashboard();
+    })
+    .withFailureHandler(function(err) {
+      TECH_DASHBOARD_ACTIVE_ORDERS = [];
+      renderTechMainDashboard("Ordenes: " + (err && err.message ? err.message : err));
+    })
+    .getTechnicianOrders(techName, getSessionToken(), companyId);
+
+  google.script.run
+    .withSuccessHandler(function(data) {
+      TECH_DASHBOARD_MONTHLY_SUMMARY = data || {};
+      renderTechMainDashboard();
+    })
+    .withFailureHandler(function(err) {
+      TECH_DASHBOARD_MONTHLY_SUMMARY = {};
+      renderTechMainDashboard("Resumen: " + (err && err.message ? err.message : err));
+    })
+    .getMyTechMonthlySummary(companyId, techName, month, year, getSessionToken());
+
+  google.script.run
+    .withSuccessHandler(function(data) {
+      TECH_DASHBOARD_INVOICE_SUMMARY = data || {};
+      renderTechMainDashboard();
+    })
+    .withFailureHandler(function(err) {
+      TECH_DASHBOARD_INVOICE_SUMMARY = { rows: [], totals: {} };
+      renderTechMainDashboard("Invoices: " + (err && err.message ? err.message : err));
+    })
+    .getMyTechInvoiceSummary(companyId, techName, month, year, getSessionToken());
+}
+
+function renderTechMainDashboard(errorText) {
+  const box = document.getElementById("techMainMetrics");
+  const scope = document.getElementById("techDashboardScope");
+  if (!box) return;
+
+  const activeOrders = TECH_DASHBOARD_ACTIVE_ORDERS || [];
+  const monthly = TECH_DASHBOARD_MONTHLY_SUMMARY || {};
+  const invoiceSummary = TECH_DASHBOARD_INVOICE_SUMMARY || {};
+  const invoiceTotals = invoiceSummary.totals || {};
+  const statusCounts = countTechDashboardStatuses(activeOrders);
+  const partsWaiting =
+    Number(statusCounts["REQUEST PARTS"] || 0) +
+    Number(statusCounts["PARTS IN TRANSIT"] || 0) +
+    Number(statusCounts["PARTS IN STORE"] || 0);
+
+  const hours = Number(invoiceTotals.hours || monthly.hours || 0);
+  const laborPay = Number(invoiceTotals.laborPay || monthly.laborPay || 0);
+  const materialBonus = Number(invoiceTotals.materialBonus || monthly.materialBonus || 0);
+  const totalEarned = Number(invoiceTotals.totalEarned || monthly.totalPay || 0);
+
+  const cards = [
+    { key:"orders", label:"Ordenes Activas", value:activeOrders.length, note:"Asignadas ahora", tone:activeOrders.length ? "info" : "success" },
+    { key:"progress", label:"En Progreso", value:statusCounts["IN PROGRESS"] || 0, note:"Trabajos iniciados", tone:"info" },
+    { key:"parts", label:"Esperando Piezas", value:partsWaiting, note:"Request / transit / store", tone:partsWaiting ? "warning" : "success" },
+    { key:"completed", label:"Completadas", value:monthly.orders || 0, note:"Este mes", tone:"success" },
+    { key:"invoices", label:"Invoices", value:invoiceTotals.invoices || 0, note:"Economia registrada", tone:"neutral" },
+    { key:"hours", label:"Horas", value:hours.toFixed(2), note:"Este mes", tone:"neutral" },
+    { key:"labor", label:"Pago Horas", value:formatMoneyDashboard(laborPay), note:"Labor del tecnico", tone:"info" },
+    { key:"materials", label:"10% Materiales", value:formatMoneyDashboard(materialBonus), note:"Bonus por parts", tone:"warning" },
+    { key:"total", label:"Total Estimado", value:formatMoneyDashboard(totalEarned), note:"Labor + materiales", tone:"success" }
+  ];
+
+  box.innerHTML = cards.map(renderTechMainMetric).join("");
+
+  if (scope) {
+    const now = new Date();
+    const monthLabel = now.toLocaleString("en-US", { month: "short" });
+    scope.innerText =
+      (CURRENT_USER.name || "Tecnico") +
+      " | " + (getActiveCompanyId() || "Company") +
+      " | " + monthLabel + " " + now.getFullYear() +
+      (errorText ? " | " + errorText : "");
+  }
+}
+
+function renderTechMainMetric(card) {
+  return `
+    <button type="button" class="metric metric-button ${escapeHtmlMain(card.tone || "")}"
+      onclick="openTechDashboardMetric('${escapeHtmlMain(card.key || "orders")}')">
+      <div class="metric-label">${escapeHtmlMain(card.label || "")}</div>
+      <div class="metric-value">${escapeHtmlMain(card.value || "0")}</div>
+      <div class="metric-note">${escapeHtmlMain(card.note || "")} | Ver en portal</div>
+    </button>
+  `;
+}
+
+function countTechDashboardStatuses(list) {
+  const counts = {};
+
+  (list || []).forEach(function(order) {
+    const status = String(order.STATUS || "").trim().toUpperCase();
+    counts[status] = (counts[status] || 0) + 1;
+  });
+
+  return counts;
+}
+
+function openTechDashboardMetric() {
+  openModule("?view=tech&tech=");
 }
 
 function getModuleRoleLabel(roles) {
