@@ -431,8 +431,9 @@ function generateWONumber_(companyId) {
   }
 }
 
-function createWorkOrderFromApp(data) {
+function createWorkOrderFromApp(data, sessionToken) {
   const companyId = String(data.COMPANY_ID || "").trim().toUpperCase();
+  const session = requireSession_(sessionToken, ["OWNER", "ADMIN", "ORDENES"], companyId);
 
   const woType = String(data.WO_TYPE || "REPAIR_FORM").trim();
 
@@ -524,7 +525,7 @@ function createWorkOrderFromApp(data) {
       "ORDER CREATED FROM APP",
       "",
       statusEn,
-      "App",
+      getSessionActorLabel_(session),
       "Created manually from CreateOrder"
     );
   } catch (err) {
@@ -554,6 +555,13 @@ function createWorkOrderFromApp(data) {
     "NEW",
     "🚨 New Work Order " + woNumber + " / NSN " + nsn
   );
+
+  addAuditLog_("ORDERS", "WORK_ORDER_CREATED_FROM_APP", companyId, "WORK_ORDER", woNumber, session, {
+    nsn: nsn,
+    woType: woType,
+    pmType: pmType,
+    manager: manager
+  });
 
   return {
     success: true,

@@ -10,6 +10,7 @@
     input, select, textarea, button { width:100%; box-sizing:border-box; padding:12px; border-radius:10px; border:1px solid #d1d5db; margin:7px 0; font-size:15px; }
     textarea { min-height:110px; }
     button { background:#111827; color:white; border:none; font-weight:bold; cursor:pointer; }
+    button:disabled { background:#9ca3af; cursor:not-allowed; }
     .save { background:#16a34a; }
     .cancel { background:#dc2626; }
     .muted { color:#6b7280; font-size:14px; }
@@ -67,7 +68,7 @@
 
   <input id="MANAGER" placeholder="Manager Name">
 
-  <button class="save" onclick="saveOrder()">Create Order</button>
+  <button id="createOrderBtn" class="save" onclick="saveOrder()">Create Order</button>
   <button class="cancel" onclick="goBack()">Cancel</button>
 </div>
 
@@ -113,7 +114,14 @@ function requireLogin() {
 
   try {
     const parsed = JSON.parse(user);
-    if (!parsed.role && !parsed.ROLE) {
+    if ((!parsed.role && !parsed.ROLE) || (!parsed.sessionToken && !parsed.SESSION_TOKEN)) {
+      localStorage.removeItem("pps_user");
+      TOP_NAV.href = "<?= baseUrl ?>";
+      return false;
+    }
+
+    const expiresAt = Number(parsed.sessionExpiresAt || parsed.SESSION_EXPIRES_AT || 0);
+    if (expiresAt && expiresAt <= Date.now()) {
       localStorage.removeItem("pps_user");
       TOP_NAV.href = "<?= baseUrl ?>";
       return false;
@@ -134,6 +142,7 @@ if (!requireLogin()) {
 const COMPANY_ID_FROM_URL = "<?= companyId ?>";
 const BASE_URL = "<?= baseUrl ?>";
 const RETURN_TO = "<?= returnTo ?>";
+let IS_CREATING_ORDER = false;
 
 function getCurrentUser() {
   try {
@@ -146,6 +155,21 @@ function getCurrentUser() {
 function getCompanyId() {
   const user = getCurrentUser();
   return String(COMPANY_ID_FROM_URL || user.companyId || "").toUpperCase();
+}
+
+function getSessionToken() {
+  const user = getCurrentUser();
+  return user.sessionToken || user.SESSION_TOKEN || "";
+}
+
+function setCreateOrderSaving(isSaving) {
+  IS_CREATING_ORDER = !!isSaving;
+
+  const btn = document.getElementById("createOrderBtn");
+  if (!btn) return;
+
+  btn.disabled = IS_CREATING_ORDER;
+  btn.innerText = IS_CREATING_ORDER ? "Creating order..." : "Create Order";
 }
 
 function togglePMType() {
@@ -176,6 +200,8 @@ function loadHeader() {
 }
 
 function saveOrder() {
+  if (IS_CREATING_ORDER) return;
+
   const companyId = getCompanyId();
 
   const payload = {
@@ -199,6 +225,8 @@ function saveOrder() {
     return;
   }
 
+  setCreateOrderSaving(true);
+
   google.script.run
     .withSuccessHandler(function(res) {
       localStorage.setItem("lastWO", res.woNumber);
@@ -207,9 +235,10 @@ function saveOrder() {
       TOP_NAV.href = getReturnUrl();
     })
     .withFailureHandler(function(err) {
-      alert(err.message);
+      setCreateOrderSaving(false);
+      alert(err && err.message ? err.message : err);
     })
-    .createWorkOrderFromApp(payload);
+    .createWorkOrderFromApp(payload, getSessionToken());
 }
 
 function goBack() {
