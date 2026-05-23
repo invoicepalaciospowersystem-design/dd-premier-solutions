@@ -314,7 +314,6 @@
     </div>
   </div>
 
-  <div id="myTechSummaryBox" style="margin-top:10px;">Cargando resumen...</div>
   <div id="myTechInvoiceTableBox" style="margin-top:15px;"></div>
 </div>
 
@@ -685,17 +684,15 @@ function loadMyTechSummary() {
   const month = Number(document.getElementById("mySummaryMonth").value);
   const year = Number(document.getElementById("mySummaryYear").value);
 
-  document.getElementById("myTechSummaryBox").innerHTML = "Cargando...";
-
   google.script.run
     .withSuccessHandler(function(r) {
       CURRENT_TECH_MONTHLY_SUMMARY = r || {};
       renderTechDashboardMetrics();
-      renderMyTechSummary(r || {});
     })
     .withFailureHandler(function(err) {
-      document.getElementById("myTechSummaryBox").innerHTML =
-        "ERROR resumen: " + err.message;
+      CURRENT_TECH_MONTHLY_SUMMARY = {};
+      renderTechDashboardMetrics();
+      console.warn("ERROR resumen tecnico:", err && err.message ? err.message : err);
     })
     .getMyTechMonthlySummary(companyId, TECH_NAME, month, year, getSessionToken());
 }
@@ -718,6 +715,7 @@ function loadMyTechDashboardInvoices() {
 }
 
 function renderMyTechSummary(r) {
+  return;
   document.getElementById("myTechSummaryBox").innerHTML = `
     <div style="background:#f9fafb; padding:12px; border-radius:10px;">
       <div><b>Técnico:</b> ${r.name || TECH_NAME}</div>
