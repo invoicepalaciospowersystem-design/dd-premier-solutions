@@ -1026,8 +1026,9 @@
         linear-gradient(180deg, rgba(248,250,252,.72), rgba(229,231,235,.82)),
         var(--pps-dashboard-bg),
         #eef2f7;
-      background-size:cover, cover, auto;
-      background-position:center top, center top, center;
+      background-repeat:no-repeat, no-repeat, repeat;
+      background-size:cover, 92vw auto, auto;
+      background-position:center top, center bottom, center;
       background-attachment:fixed, fixed, scroll;
     }
 
@@ -2467,8 +2468,8 @@ function applyWatermark(url) {
   if (companyId === "PPS") {
     document.documentElement.style.setProperty("--company-watermark-logo", "var(--pps-dashboard-bg)");
     document.documentElement.style.setProperty("--company-watermark-repeat", "no-repeat");
-    document.documentElement.style.setProperty("--company-watermark-position", "center top");
-    document.documentElement.style.setProperty("--company-watermark-size", "cover");
+    document.documentElement.style.setProperty("--company-watermark-position", "center bottom");
+    document.documentElement.style.setProperty("--company-watermark-size", "92vw auto");
     document.documentElement.style.setProperty("--company-watermark-opacity", ".28");
     document.documentElement.style.setProperty("--company-watermark-filter", "grayscale(100%) brightness(1.10)");
     return;

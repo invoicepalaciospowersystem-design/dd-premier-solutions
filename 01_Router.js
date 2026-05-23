@@ -227,8 +227,8 @@ function getCompanyWatermarkLogoCss_(companyId) {
   if (companyId === "PPS") {
     return "var(--pps-dashboard-bg);" +
       "--company-watermark-repeat:no-repeat;" +
-      "--company-watermark-position:center top;" +
-      "--company-watermark-size:cover;" +
+      "--company-watermark-position:center bottom;" +
+      "--company-watermark-size:92vw auto;" +
       "--company-watermark-opacity:.28;" +
       "--company-watermark-filter:grayscale(100%) brightness(1.10)";
   }
