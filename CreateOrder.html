@@ -10,9 +10,16 @@
     input, select, textarea, button { width:100%; box-sizing:border-box; padding:12px; border-radius:10px; border:1px solid #d1d5db; margin:7px 0; font-size:15px; }
     textarea { min-height:110px; }
     button { background:#111827; color:white; border:none; font-weight:bold; cursor:pointer; }
+    .top-actions { display:flex; gap:10px; align-items:center; justify-content:space-between; margin-bottom:12px; }
+    .back-button { width:auto; min-width:128px; background:#111827; display:inline-flex; align-items:center; justify-content:center; gap:8px; }
     .save { background:#16a34a; }
     .cancel { background:#dc2626; }
     .muted { color:#6b7280; font-size:14px; }
+    @media (max-width: 700px) {
+      body { padding:12px; }
+      .top-actions { position:sticky; top:0; z-index:5; background:rgba(243,244,246,.94); padding:8px 0; backdrop-filter:blur(8px); }
+      .back-button { width:100%; min-height:46px; }
+    }
   </style>
   <?!= include("AppWatermark"); ?>
 </head>
@@ -31,6 +38,10 @@
 </div>
 
 <div class="box">
+  <div class="top-actions">
+    <button class="back-button" type="button" onclick="goBack()">&larr; Back to Orders</button>
+  </div>
+
   <h2>Create Work Order</h2>
   <div class="muted">All fields are required. NSN # identifies the McDonald's store.</div>
 
@@ -128,6 +139,7 @@ if (!requireLogin()) {
 
 const COMPANY_ID_FROM_URL = "<?= companyId ?>";
 const BASE_URL = "<?= baseUrl ?>";
+const RETURN_TO = "<?= returnTo ?>";
 
 function getCurrentUser() {
   try {
@@ -198,7 +210,7 @@ function saveOrder() {
       localStorage.setItem("lastWO", res.woNumber);
       localStorage.setItem("lastWOMessage", "Orden creada: " + res.woNumber);
 
-      TOP_NAV.href = BASE_URL + "?view=orders";
+      TOP_NAV.href = getReturnUrl();
     })
     .withFailureHandler(function(err) {
       alert(err.message);
@@ -207,7 +219,15 @@ function saveOrder() {
 }
 
 function goBack() {
-  TOP_NAV.href = BASE_URL + "?view=orders";
+  TOP_NAV.href = getReturnUrl();
+}
+
+function getReturnUrl() {
+  const returnTo = String(RETURN_TO || "").trim();
+  if (returnTo) return returnTo;
+
+  const companyId = getCompanyId();
+  return BASE_URL + "?view=orders" + (companyId ? "&companyId=" + encodeURIComponent(companyId) : "");
 }
 
 loadHeader();

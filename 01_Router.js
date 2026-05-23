@@ -151,6 +151,7 @@ function doGet(e) {
       applyTemplateDefaults_(template, p, baseUrl);
       template.companyId = p.companyId || "";
       template.baseUrl = baseUrl;
+      template.returnTo = p.returnTo || "";
 
       return template.evaluate()
         .setTitle("Create Work Order")

@@ -328,7 +328,10 @@ function newOrder() {
   }
 
   TOP_NAV.href =
-    BASE_URL + "?view=createOrder&companyId=" + encodeURIComponent(ACTIVE_COMPANY_ID) + ownerPortalParam();
+    BASE_URL +
+    "?view=createOrder&companyId=" + encodeURIComponent(ACTIVE_COMPANY_ID) +
+    ownerPortalParam() +
+    "&returnTo=" + encodeURIComponent(getOrdersReturnUrl(ACTIVE_COMPANY_ID));
 }
 
 function load() {
