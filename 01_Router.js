@@ -224,6 +224,15 @@ function getCompanyWatermarkLogoCss_(companyId) {
   companyId = String(companyId || "").trim().toUpperCase();
   if (!companyId) return "none";
 
+  if (companyId === "PPS") {
+    return "var(--pps-dashboard-bg);" +
+      "--company-watermark-repeat:no-repeat;" +
+      "--company-watermark-position:center top;" +
+      "--company-watermark-size:cover;" +
+      "--company-watermark-opacity:.28;" +
+      "--company-watermark-filter:grayscale(100%) brightness(1.10)";
+  }
+
   const branding = getCompanyBranding(companyId || "");
   const logoUrl = String(branding.logoImageUrl || "").trim();
 

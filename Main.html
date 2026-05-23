@@ -10,6 +10,12 @@
       --brand-accent:#dc2626;
       --login-bg-image:none;
       --company-watermark-logo:none;
+      --company-watermark-repeat:repeat;
+      --company-watermark-position:center;
+      --company-watermark-size:260px auto;
+      --company-watermark-opacity:.035;
+      --company-watermark-filter:grayscale(100%);
+      --pps-dashboard-bg:none;
     }
 
     body {
@@ -35,11 +41,11 @@
       position:fixed;
       inset:0;
       background-image:var(--company-watermark-logo);
-      background-repeat:repeat;
-      background-position:center;
-      background-size:260px auto;
-      opacity:.035;
-      filter:grayscale(100%);
+      background-repeat:var(--company-watermark-repeat);
+      background-position:var(--company-watermark-position);
+      background-size:var(--company-watermark-size);
+      opacity:var(--company-watermark-opacity);
+      filter:var(--company-watermark-filter);
       pointer-events:none;
       z-index:0;
     }
@@ -1015,6 +1021,12 @@
       filter:grayscale(100%) blur(1.6px);
     }
 
+    body.app-mode.login-pps {
+      background:
+        linear-gradient(180deg, rgba(248,250,252,.90), rgba(229,231,235,.92)),
+        #eef2f7;
+    }
+
     .panel {
       max-width:1180px;
       margin:0 auto 30px;
@@ -1741,8 +1753,8 @@
       }
 
       body.app-mode::before {
-        background-size:190px auto;
-        opacity:.028;
+        background-size:var(--company-watermark-size);
+        opacity:var(--company-watermark-opacity);
       }
 
       .global-header {
@@ -2438,11 +2450,26 @@ function translateLoginSubtitleToEnglish(value) {
 
 function applyWatermark(url) {
   url = safeImageUrl(url);
+  const companyId = String((CURRENT_BRANDING && CURRENT_BRANDING.companyId) || LOGIN_COMPANY_ID || "")
+    .trim()
+    .toUpperCase();
 
-  document.documentElement.style.setProperty(
-    "--company-watermark-logo",
-    url ? "url('" + cssUrl(url) + "')" : "none"
-  );
+  if (companyId === "PPS") {
+    document.documentElement.style.setProperty("--company-watermark-logo", "var(--pps-dashboard-bg)");
+    document.documentElement.style.setProperty("--company-watermark-repeat", "no-repeat");
+    document.documentElement.style.setProperty("--company-watermark-position", "center top");
+    document.documentElement.style.setProperty("--company-watermark-size", "cover");
+    document.documentElement.style.setProperty("--company-watermark-opacity", ".28");
+    document.documentElement.style.setProperty("--company-watermark-filter", "grayscale(100%) brightness(1.10)");
+    return;
+  }
+
+  document.documentElement.style.setProperty("--company-watermark-logo", url ? "url('" + cssUrl(url) + "')" : "none");
+  document.documentElement.style.setProperty("--company-watermark-repeat", "repeat");
+  document.documentElement.style.setProperty("--company-watermark-position", "center");
+  document.documentElement.style.setProperty("--company-watermark-size", "260px auto");
+  document.documentElement.style.setProperty("--company-watermark-opacity", ".035");
+  document.documentElement.style.setProperty("--company-watermark-filter", "grayscale(100%)");
 }
 
 function shouldShowMainWatermark(companyId) {
