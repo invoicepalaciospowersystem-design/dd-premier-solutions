@@ -218,6 +218,9 @@ function getWebAppBaseUrl_(companyId, ownerPortal) {
 function applyTemplateDefaults_(template, params, baseUrl) {
   params = params || {};
   template.baseUrl = baseUrl;
+  template.companyId = params.companyId || "";
+  template.ownerOnly = isOwnerPortalRequest_(params) ? "true" : "";
+  template.returnTo = params.returnTo || "";
   template.watermarkLogoCss = getCompanyWatermarkLogoCss_(params.companyId || "");
 }
 

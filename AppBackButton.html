@@ -1,0 +1,142 @@
+<style>
+  .app-backbar {
+    width:100%;
+    margin:0 0 12px;
+    display:flex;
+    justify-content:flex-start;
+    align-items:center;
+    gap:10px;
+    position:sticky;
+    top:8px;
+    z-index:30;
+  }
+
+  .app-back-button {
+    width:auto !important;
+    min-width:118px;
+    min-height:42px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    padding:10px 14px !important;
+    margin:0 !important;
+    border:0 !important;
+    border-radius:10px !important;
+    background:#111827 !important;
+    color:#ffffff !important;
+    font-weight:bold !important;
+    font-size:14px !important;
+    line-height:1 !important;
+    cursor:pointer;
+    box-shadow:0 10px 22px rgba(15,23,42,.18);
+    text-decoration:none;
+  }
+
+  .app-back-button:hover {
+    filter:brightness(1.08);
+  }
+
+  @media (max-width:700px) {
+    .app-backbar {
+      top:0;
+      margin-bottom:10px;
+      padding:6px 0;
+      background:rgba(243,244,246,.88);
+      backdrop-filter:blur(8px);
+    }
+
+    .app-back-button {
+      width:100% !important;
+      min-height:46px;
+    }
+  }
+</style>
+
+<div class="app-backbar">
+  <button class="app-back-button" type="button" onclick="goAppBack()">
+    &larr; Back
+  </button>
+</div>
+
+<script>
+(function() {
+  var APP_BACK_BASE_URL = "<?= baseUrl ?>";
+  var APP_BACK_RETURN_TO = "<?= returnTo ?>";
+  var APP_BACK_COMPANY_ID = String("<?= companyId ?>").trim().toUpperCase();
+  var APP_BACK_OWNER_PORTAL = String("<?= ownerOnly ?>").trim().toLowerCase() === "true";
+
+  function getStoredUser() {
+    try {
+      return JSON.parse(localStorage.getItem("pps_user") || "{}");
+    } catch (err) {
+      return {};
+    }
+  }
+
+  function getStoredCompanyId() {
+    var user = getStoredUser();
+    var companyId = APP_BACK_COMPANY_ID ||
+      String(localStorage.getItem("pps_login_company") || "").trim().toUpperCase() ||
+      String(localStorage.getItem("owner_selected_company_ALL") || "").trim().toUpperCase() ||
+      String(user.companyId || user.COMPANY_ID || "").trim().toUpperCase();
+
+    return companyId;
+  }
+
+  function appendParam(url, key, value) {
+    if (!value) return url;
+    if (new RegExp("[?&]" + key + "=").test(url)) return url;
+
+    return url + (url.indexOf("?") === -1 ? "?" : "&") +
+      key + "=" + encodeURIComponent(value);
+  }
+
+  function getBackTarget() {
+    var returnTo = String(APP_BACK_RETURN_TO || "").trim();
+    if (returnTo) return returnTo;
+
+    var url = APP_BACK_BASE_URL || "/";
+    var companyId = getStoredCompanyId();
+
+    if (APP_BACK_OWNER_PORTAL) {
+      url = appendParam(url, "ownerOnly", "1");
+    }
+
+    if (companyId) {
+      url = appendParam(url, "companyId", companyId);
+    }
+
+    return url;
+  }
+
+  function navigateBackTarget(url) {
+    var target = String(url || "").trim();
+    if (!target) return;
+
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: "PPS_NAVIGATE", url: target }, "*");
+        setTimeout(function() {
+          try {
+            window.open(target, "_top");
+          } catch (err) {
+            window.location.href = target;
+          }
+        }, 250);
+        return;
+      }
+    } catch (err) {}
+
+    try {
+      window.open(target, "_top");
+    } catch (err) {
+      window.location.href = target;
+    }
+  }
+
+  window.goAppBack = function() {
+    navigateBackTarget(getBackTarget());
+  };
+})();
+</script>
