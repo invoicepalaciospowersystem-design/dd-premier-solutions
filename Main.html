@@ -1023,8 +1023,18 @@
 
     body.app-mode.login-pps {
       background:
-        linear-gradient(180deg, rgba(248,250,252,.90), rgba(229,231,235,.92)),
+        linear-gradient(180deg, rgba(248,250,252,.72), rgba(229,231,235,.82)),
+        var(--pps-dashboard-bg),
         #eef2f7;
+      background-size:cover, cover, auto;
+      background-position:center top, center top, center;
+      background-attachment:fixed, fixed, scroll;
+    }
+
+    body.app-mode.login-pps::before {
+      background:none;
+      opacity:0;
+      filter:none;
     }
 
     .panel {
