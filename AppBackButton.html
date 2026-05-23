@@ -61,10 +61,18 @@
 
 <script>
 (function() {
-  var APP_BACK_BASE_URL = "<?= baseUrl ?>";
-  var APP_BACK_RETURN_TO = "<?= returnTo ?>";
-  var APP_BACK_COMPANY_ID = String("<?= companyId ?>").trim().toUpperCase();
-  var APP_BACK_OWNER_PORTAL = String("<?= ownerOnly ?>").trim().toLowerCase() === "true";
+  var APP_BACK_PUBLIC_URLS = {
+    PPS: "https://app.palaciospowersystems.com/",
+    OWNER: "https://app.ddpremiersolutionscorp.com/"
+  };
+
+  function getSearchParams() {
+    try {
+      return new URLSearchParams(window.location.search || "");
+    } catch (err) {
+      return new URLSearchParams("");
+    }
+  }
 
   function getStoredUser() {
     try {
@@ -75,13 +83,28 @@
   }
 
   function getStoredCompanyId() {
+    var params = getSearchParams();
     var user = getStoredUser();
-    var companyId = APP_BACK_COMPANY_ID ||
+
+    var companyId =
+      String(params.get("companyId") || "").trim().toUpperCase() ||
       String(localStorage.getItem("pps_login_company") || "").trim().toUpperCase() ||
       String(localStorage.getItem("owner_selected_company_ALL") || "").trim().toUpperCase() ||
       String(user.companyId || user.COMPANY_ID || "").trim().toUpperCase();
 
     return companyId;
+  }
+
+  function isOwnerPortal() {
+    var params = getSearchParams();
+    var user = getStoredUser();
+    var role = String(user.role || user.ROLE || "").trim().toUpperCase();
+    var ownerOnly = String(params.get("ownerOnly") || params.get("portal") || "").trim().toLowerCase();
+
+    return ownerOnly === "1" ||
+      ownerOnly === "true" ||
+      ownerOnly === "owner" ||
+      (role === "OWNER" && !getStoredCompanyId());
   }
 
   function appendParam(url, key, value) {
@@ -92,14 +115,53 @@
       key + "=" + encodeURIComponent(value);
   }
 
+  function isUnsafeBackUrl(value) {
+    value = String(value || "").trim();
+    return !value ||
+      value.indexOf("<?= ") !== -1 ||
+      value.indexOf("<?=") !== -1 ||
+      /script\.googleusercontent\.com/i.test(value);
+  }
+
+  function getPublicBaseUrl(companyId) {
+    if (isOwnerPortal()) return APP_BACK_PUBLIC_URLS.OWNER;
+    if (companyId && APP_BACK_PUBLIC_URLS[companyId]) return APP_BACK_PUBLIC_URLS[companyId];
+
+    return APP_BACK_PUBLIC_URLS.OWNER;
+  }
+
+  function normalizeBackUrl(raw) {
+    if (isUnsafeBackUrl(raw)) return "";
+
+    try {
+      var parsed = new URL(String(raw), getPublicBaseUrl(getStoredCompanyId()));
+
+      if (parsed.protocol !== "https:") return "";
+
+      if (parsed.hostname === "script.google.com") {
+        var publicUrl = new URL(getPublicBaseUrl(getStoredCompanyId()));
+        publicUrl.search = parsed.search;
+        publicUrl.hash = parsed.hash;
+        return publicUrl.href;
+      }
+
+      if (/script\.googleusercontent\.com/i.test(parsed.hostname)) return "";
+
+      return parsed.href;
+    } catch (err) {
+      return "";
+    }
+  }
+
   function getBackTarget() {
-    var returnTo = String(APP_BACK_RETURN_TO || "").trim();
+    var params = getSearchParams();
+    var returnTo = normalizeBackUrl(params.get("returnTo"));
     if (returnTo) return returnTo;
 
-    var url = APP_BACK_BASE_URL || "/";
     var companyId = getStoredCompanyId();
+    var url = getPublicBaseUrl(companyId);
 
-    if (APP_BACK_OWNER_PORTAL) {
+    if (isOwnerPortal()) {
       url = appendParam(url, "ownerOnly", "1");
     }
 
@@ -110,13 +172,27 @@
     return url;
   }
 
+  function getParentMessageUrl(url) {
+    try {
+      var target = new URL(url);
+      if (target.hostname === "app.palaciospowersystems.com" ||
+          target.hostname === "app.ddpremiersolutionscorp.com" ||
+          target.hostname === "ddpremiersolutionscorp.com" ||
+          target.hostname === "www.ddpremiersolutionscorp.com") {
+        return target.pathname + target.search + target.hash;
+      }
+    } catch (err) {}
+
+    return url;
+  }
+
   function navigateBackTarget(url) {
     var target = String(url || "").trim();
     if (!target) return;
 
     try {
       if (window.parent && window.parent !== window) {
-        window.parent.postMessage({ type: "PPS_NAVIGATE", url: target }, "*");
+        window.parent.postMessage({ type: "PPS_NAVIGATE", url: getParentMessageUrl(target) }, "*");
         setTimeout(function() {
           try {
             window.open(target, "_top");
