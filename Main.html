@@ -1735,10 +1735,35 @@
     }
 
     @media (max-width: 1100px) {
+      body.login-dd .login-shell {
+        aspect-ratio:auto;
+        grid-template-columns:1fr;
+        min-height:calc(100vh - 28px);
+        min-height:calc(100svh - 28px);
+        max-height:none;
+        background-size:cover;
+        background-position:35% center;
+      }
+
+      body.login-dd .login-brand {
+        display:none;
+      }
+
+      body.login-dd .box {
+        min-height:calc(100vh - 28px);
+        min-height:calc(100svh - 28px);
+        padding:24px 18px 74px;
+      }
+
+      body.login-dd .login-card {
+        max-width:430px;
+      }
+
       body.login-pps .login-shell {
         aspect-ratio:auto;
         grid-template-columns:1fr;
         min-height:calc(100vh - 28px);
+        min-height:calc(100svh - 28px);
         max-height:none;
         background-size:cover;
         background-position:center;
@@ -1831,18 +1856,20 @@
       }
 
       body.login-dd .login-brand {
+        display:none;
         min-height:auto;
         padding:62px 18px 24px;
       }
 
       body.login-dd .login-shell {
-        min-height:auto;
+        min-height:calc(100vh - 28px);
+        min-height:calc(100svh - 28px);
         width:calc(100vw - 28px);
         max-width:calc(100vw - 28px);
         max-height:none;
         aspect-ratio:auto;
         background-size:cover;
-        background-position:32% center;
+        background-position:35% center;
       }
 
       body.login-pps .login-brand {
@@ -1932,7 +1959,8 @@
       }
 
       body.login-dd .box {
-        min-height:auto;
+        min-height:calc(100vh - 28px);
+        min-height:calc(100svh - 28px);
         padding:24px 18px 74px;
       }
 
@@ -1951,6 +1979,7 @@
         max-width:360px;
         width:calc(100vw - 70px);
         padding:30px 22px;
+        margin:0 auto;
       }
 
       body.login-pps .login-card {
