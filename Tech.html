@@ -139,6 +139,54 @@
       margin:6px 0;
     }
 
+    .tech-metric-grid {
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));
+      gap:10px;
+      margin:12px 0;
+    }
+
+    .tech-metric {
+      text-align:left;
+      background:#ffffff;
+      border:1px solid #e5e7eb;
+      border-left:5px solid #2563eb;
+      border-radius:12px;
+      padding:12px;
+      color:#111827;
+      box-shadow:0 2px 8px rgba(0,0,0,.08);
+      cursor:pointer;
+    }
+
+    .tech-metric:hover {
+      transform:translateY(-1px);
+      box-shadow:0 6px 16px rgba(0,0,0,.12);
+    }
+
+    .tech-metric.success { border-left-color:#16a34a; }
+    .tech-metric.warning { border-left-color:#f59e0b; }
+    .tech-metric.danger { border-left-color:#dc2626; }
+    .tech-metric.neutral { border-left-color:#64748b; }
+
+    .tech-metric-label {
+      color:#64748b;
+      font-size:12px;
+      font-weight:bold;
+      text-transform:uppercase;
+    }
+
+    .tech-metric-value {
+      font-size:26px;
+      font-weight:bold;
+      margin-top:5px;
+    }
+
+    .tech-metric-note {
+      color:#64748b;
+      font-size:12px;
+      margin-top:4px;
+    }
+
     .problem {
       background:#f9fafb;
       padding:10px;
@@ -230,10 +278,10 @@
 </div>
 
 <div id="notificationsBox"></div>
-<div id="techStatusMetrics" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:15px;"></div>
+<div id="techStatusMetrics" style="display:none;"></div>
 
 <div class="card" style="border-left:6px solid #2563eb;">
-  <h3>💰 Mi Resumen del Mes</h3>
+  <h3>Mi Dashboard del Mes</h3>
 
   <div style="display:flex; gap:8px; flex-wrap:wrap;">
     <select id="mySummaryMonth" style="padding:10px; border-radius:8px;">
@@ -252,8 +300,16 @@
     </select>
 
     <input id="mySummaryYear" type="number" style="padding:10px; border-radius:8px; width:100px;">
-    <button onclick="loadMyTechSummary()" style="width:auto;">Ver Resumen</button>
+    <button onclick="refreshMyTechDashboard()" style="width:auto;">Actualizar Metricas</button>
     <button onclick="loadMyTechInvoiceTable()" style="width:auto; background:#7c3aed;">Ver Tabla de Invoices</button>
+  </div>
+
+  <div id="techDashboardMetrics" class="tech-metric-grid">
+    <div class="tech-metric neutral">
+      <div class="tech-metric-label">Cargando</div>
+      <div class="tech-metric-value">...</div>
+      <div class="tech-metric-note">Espere un momento</div>
+    </div>
   </div>
 
   <div id="myTechSummaryBox" style="margin-top:10px;">Cargando resumen...</div>
@@ -327,6 +383,10 @@ const BASE_URL = "<?= baseUrl ?>";
 const UNITED_REFRIGERATION_ACCOUNT =
   String("<?= unitedRefrigerationAccount ?>").trim() || "11437479";
 
+let ACTIVE_TECH_ORDERS = [];
+let CURRENT_TECH_MONTHLY_SUMMARY = null;
+let CURRENT_TECH_INVOICE_SUMMARY = null;
+
 function getCurrentUser() {
   try {
     return JSON.parse(localStorage.getItem("pps_user") || "{}");
@@ -393,13 +453,17 @@ function loadOrders() {
 }
 
 function renderOrders(data) {
+  ACTIVE_TECH_ORDERS = data || [];
+
   if (!data.length) {
     document.getElementById("orders").innerHTML = "No hay órdenes activas.";
     renderTechStatusMetrics([]);
+    renderTechDashboardMetrics();
     return;
   }
 
   renderTechStatusMetrics(data);
+  renderTechDashboardMetrics();
   document.getElementById("orders").innerHTML = data.map(card).join("");
 }
 
@@ -609,6 +673,11 @@ function initMySummaryDate() {
   document.getElementById("mySummaryYear").value = now.getFullYear();
 }
 
+function refreshMyTechDashboard() {
+  loadMyTechSummary();
+  loadMyTechDashboardInvoices();
+}
+
 function loadMyTechSummary() {
   const companyId = getCurrentCompanyId();
   const month = Number(document.getElementById("mySummaryMonth").value);
@@ -618,6 +687,8 @@ function loadMyTechSummary() {
 
   google.script.run
     .withSuccessHandler(function(r) {
+      CURRENT_TECH_MONTHLY_SUMMARY = r || {};
+      renderTechDashboardMetrics();
       renderMyTechSummary(r || {});
     })
     .withFailureHandler(function(err) {
@@ -625,6 +696,23 @@ function loadMyTechSummary() {
         "ERROR resumen: " + err.message;
     })
     .getMyTechMonthlySummary(companyId, TECH_NAME, month, year, getSessionToken());
+}
+
+function loadMyTechDashboardInvoices() {
+  const companyId = getCurrentCompanyId();
+  const month = Number(document.getElementById("mySummaryMonth").value);
+  const year = Number(document.getElementById("mySummaryYear").value);
+
+  google.script.run
+    .withSuccessHandler(function(r) {
+      CURRENT_TECH_INVOICE_SUMMARY = r || {};
+      renderTechDashboardMetrics();
+    })
+    .withFailureHandler(function() {
+      CURRENT_TECH_INVOICE_SUMMARY = { rows: [], totals: {} };
+      renderTechDashboardMetrics();
+    })
+    .getMyTechInvoiceSummary(companyId, TECH_NAME, month, year, getSessionToken());
 }
 
 function renderMyTechSummary(r) {
@@ -653,6 +741,8 @@ function loadMyTechInvoiceTable() {
 
   google.script.run
     .withSuccessHandler(function(r) {
+      CURRENT_TECH_INVOICE_SUMMARY = r || {};
+      renderTechDashboardMetrics();
       renderMyTechInvoiceTable(r || {});
     })
     .withFailureHandler(function(err) {
@@ -720,6 +810,130 @@ function renderMyTechInvoiceTable(r) {
   `;
 }
 
+function renderTechDashboardMetrics() {
+  const box = document.getElementById("techDashboardMetrics");
+  if (!box) return;
+
+  const activeOrders = ACTIVE_TECH_ORDERS || [];
+  const monthly = CURRENT_TECH_MONTHLY_SUMMARY || {};
+  const invoiceSummary = CURRENT_TECH_INVOICE_SUMMARY || {};
+  const invoiceTotals = invoiceSummary.totals || {};
+
+  const statusCounts = countTechStatuses(activeOrders);
+  const partsWaiting =
+    Number(statusCounts["REQUEST PARTS"] || 0) +
+    Number(statusCounts["PARTS IN TRANSIT"] || 0) +
+    Number(statusCounts["PARTS IN STORE"] || 0);
+
+  const hours = Number(invoiceTotals.hours || monthly.hours || 0);
+  const laborPay = Number(invoiceTotals.laborPay || monthly.laborPay || 0);
+  const materialBonus = Number(invoiceTotals.materialBonus || monthly.materialBonus || 0);
+  const totalEarned = Number(invoiceTotals.totalEarned || monthly.totalPay || 0);
+
+  const cards = [
+    {
+      key: "orders",
+      label: "Ordenes Activas",
+      value: activeOrders.length,
+      note: "Asignadas ahora",
+      tone: activeOrders.length ? "info" : "success"
+    },
+    {
+      key: "progress",
+      label: "En Progreso",
+      value: statusCounts["IN PROGRESS"] || 0,
+      note: "Trabajos iniciados",
+      tone: "info"
+    },
+    {
+      key: "parts",
+      label: "Esperando Piezas",
+      value: partsWaiting,
+      note: "Request / transit / store",
+      tone: partsWaiting ? "warning" : "success"
+    },
+    {
+      key: "completed",
+      label: "Completadas",
+      value: monthly.orders || 0,
+      note: "Periodo seleccionado",
+      tone: "success"
+    },
+    {
+      key: "invoices",
+      label: "Invoices",
+      value: invoiceTotals.invoices || 0,
+      note: "Con economia registrada",
+      tone: "neutral"
+    },
+    {
+      key: "hours",
+      label: "Horas",
+      value: hours.toFixed(2),
+      note: "Horas del periodo",
+      tone: "neutral"
+    },
+    {
+      key: "labor",
+      label: "Pago Horas",
+      value: formatMoneyTech(laborPay),
+      note: "Labor del tecnico",
+      tone: "info"
+    },
+    {
+      key: "materials",
+      label: "10% Materiales",
+      value: formatMoneyTech(materialBonus),
+      note: "Bonus por parts",
+      tone: "warning"
+    },
+    {
+      key: "total",
+      label: "Total Estimado",
+      value: formatMoneyTech(totalEarned),
+      note: "Labor + materiales",
+      tone: "success"
+    }
+  ];
+
+  box.innerHTML = cards.map(function(card) {
+    return `
+      <button type="button" class="tech-metric ${card.tone || "neutral"}" onclick="openTechMetric('${card.key}')">
+        <div class="tech-metric-label">${card.label}</div>
+        <div class="tech-metric-value">${card.value}</div>
+        <div class="tech-metric-note">${card.note} | Ver detalle</div>
+      </button>
+    `;
+  }).join("");
+}
+
+function countTechStatuses(list) {
+  const counts = {};
+
+  (list || []).forEach(function(o) {
+    const status = String(o.STATUS || "").toUpperCase();
+    counts[status] = (counts[status] || 0) + 1;
+  });
+
+  return counts;
+}
+
+function openTechMetric(key) {
+  if (["orders", "progress", "parts"].indexOf(key) !== -1) {
+    document.getElementById("orders").scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+
+  if (!document.getElementById("myTechInvoiceTableBox").innerHTML.trim()) {
+    loadMyTechInvoiceTable();
+  }
+
+  document.getElementById("myTechInvoiceTableBox").scrollIntoView({
+    behavior: "smooth",
+    block: "start"
+  });
+}
+
 function renderTechStatusMetrics(list) {
   const statuses = [
     "SENT TO TECH",
@@ -757,6 +971,7 @@ document.addEventListener("DOMContentLoaded", function() {
   loadHeader();
   initMySummaryDate();
   loadMyTechSummary();
+  loadMyTechDashboardInvoices();
   loadOrders();
   loadNotifications();
   showTechMessage();
