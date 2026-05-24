@@ -135,7 +135,8 @@ function getEconomyData(companyId, role, sessionToken) {
     throw new Error("ECONOMY debe tener columna COMPANY_ID.");
   }
 
-  return data.slice(1).map(function(row, i) {
+  const activeInvoiceKeys = {};
+  const activeRows = data.slice(1).map(function(row, i) {
     if (isSoftDeletedRow_(row, headers)) return null;
 
     const obj = {};
@@ -151,11 +152,16 @@ function getEconomyData(companyId, role, sessionToken) {
     });
 
     obj.ROW_NUMBER = i + 2;
+    const invoiceKey = getEconomyHistoryInvoiceKey_(obj.COMPANY_ID || companyId, obj.INVOICE_NUMBER || obj.INVOICE || "");
+    if (invoiceKey) activeInvoiceKeys[invoiceKey] = true;
     return obj;
   }).filter(function(o) {
     if (!o) return false;
     return String(o.COMPANY_ID || "").trim().toUpperCase() === companyId;
   }).reverse();
+
+  const historyRows = getEconomyHistoryObjectsForCompany_(companyId, activeInvoiceKeys);
+  return activeRows.concat(historyRows);
 }
 
 function updateEconomyRow(rowNumber, updates, sessionToken) {

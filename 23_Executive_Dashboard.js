@@ -267,6 +267,7 @@ function buildAdminPeriodScope_(periodMode, periodYear, periodMonth) {
 function collectAdminEconomyFinancials_(ss, dashboard, companyId, periodScope) {
   const sh = ss.getSheetByName(CFG.SHEET_ECONOMY);
   const dateLookup = buildAdminEconomyDateLookup_(ss);
+  const activeInvoiceKeys = {};
 
   if (sh && sh.getLastRow() >= 2) {
     const data = sh.getDataRange().getValues();
@@ -280,6 +281,8 @@ function collectAdminEconomyFinancials_(ss, dashboard, companyId, periodScope) {
       const rowCompany = String(getExecutiveValue_(row, headers, ["COMPANY_ID"]) || CFG.DEFAULT_COMPANY_ID).trim().toUpperCase();
       if (rowCompany !== companyId) continue;
 
+      const invoiceKey = getEconomyHistoryInvoiceKey_(companyId, getExecutiveValue_(row, headers, ["INVOICE_NUMBER", "INVOICE"]));
+      if (invoiceKey) activeInvoiceKeys[invoiceKey] = true;
       companyRows.push(row);
     }
 
@@ -293,6 +296,8 @@ function collectAdminEconomyFinancials_(ss, dashboard, companyId, periodScope) {
     });
   }
 
+  collectAdminEconomyHistoryFinancials_(ss, dashboard, companyId, periodScope, activeInvoiceKeys);
+
   dashboard.totals.grossProfit =
     dashboard.totals.totalBilled -
     dashboard.totals.taxTotal -
@@ -300,7 +305,32 @@ function collectAdminEconomyFinancials_(ss, dashboard, companyId, periodScope) {
     dashboard.totals.techLaborCost;
 }
 
+function collectAdminEconomyHistoryFinancials_(ss, dashboard, companyId, periodScope, activeInvoiceKeys) {
+  const sh = ss.getSheetByName(ECONOMY_HISTORY_SHEET_NAME);
+  if (!sh || sh.getLastRow() < 2) return;
+
+  const data = sh.getDataRange().getValues();
+  const headers = data[0].map(function(h) { return String(h || "").trim(); });
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (isSoftDeletedRow_(row, headers)) continue;
+
+    const rowCompany = String(getExecutiveValue_(row, headers, ["COMPANY_ID"]) || CFG.DEFAULT_COMPANY_ID).trim().toUpperCase();
+    if (rowCompany !== companyId) continue;
+
+    const invoiceNumber = String(getExecutiveValue_(row, headers, ["INVOICE_NUMBER", "INVOICE"]) || "").trim();
+    const invoiceKey = getEconomyHistoryInvoiceKey_(companyId, invoiceNumber);
+    if (invoiceKey && activeInvoiceKeys && activeInvoiceKeys[invoiceKey]) continue;
+    if (!adminEconomyRowMatchesScope_(row, headers, periodScope, {})) continue;
+
+    const entry = buildAdminEconomyEntryFromEconomyRow_(row, headers);
+    addAdminEconomyEntryToDashboard_(dashboard, entry);
+  }
+}
+
 function buildAdminEconomyEntryFromEconomyRow_(row, headers) {
+  const sourceType = String(getExecutiveValue_(row, headers, ["SOURCE_TYPE"]) || "ECONOMY").trim();
   const status = String(getExecutiveValue_(row, headers, ["STATUS"]) || "").trim().toUpperCase();
   const amount = parseMoneyFlexible_(getExecutiveValue_(row, headers, ["AMOUNT", "INVOICE_TOTAL", "TOTAL"]));
   const tax = parseMoneyFlexible_(getExecutiveValue_(row, headers, ["TAX", "TAX_AMOUNT"]));
@@ -314,9 +344,9 @@ function buildAdminEconomyEntryFromEconomyRow_(row, headers) {
   const split = getAdminInvestorSplit_(invSource, rawPartsCost);
 
   return {
-    source: "ECONOMY",
+    source: sourceType || "ECONOMY",
     woNumber: String(getExecutiveValue_(row, headers, ["WO_NUMBER"]) || "").trim(),
-    invoiceNumber: String(getExecutiveValue_(row, headers, ["INVOICE_NUMBER", "INVOICE #"]) || "").trim(),
+    invoiceNumber: String(getExecutiveValue_(row, headers, ["INVOICE_NUMBER", "INVOICE #", "INVOICE"]) || "").trim(),
     status: status || "PENDING",
     amount: amount,
     tax: tax,
@@ -428,7 +458,7 @@ function setAdminEconomyLookupDate_(lookup, prefix, value, dateValue) {
 function getAdminEconomyRowLookupDate_(row, headers, dateLookup) {
   dateLookup = dateLookup || {};
 
-  const invoiceNumber = String(getExecutiveValue_(row, headers, ["INVOICE_NUMBER", "INVOICE #"]) || "").trim().toUpperCase();
+  const invoiceNumber = String(getExecutiveValue_(row, headers, ["INVOICE_NUMBER", "INVOICE #", "INVOICE"]) || "").trim().toUpperCase();
   const woNumber = String(getExecutiveValue_(row, headers, ["WO_NUMBER"]) || "").trim().toUpperCase();
 
   if (invoiceNumber && dateLookup["INV:" + invoiceNumber]) return dateLookup["INV:" + invoiceNumber];
@@ -528,6 +558,7 @@ function adminDateMatchesScope_(dateValue, periodScope) {
 
 function getAdminLaborBilled_(row, headers, hours) {
   const explicit = parseMoneyFlexible_(getExecutiveValue_(row, headers, [
+    "LABOR_BILLED",
     "LABOR_AMOUNT",
     "LABOR",
     "LABOR_COST",
@@ -548,6 +579,7 @@ function calculateAdminLaborCharge_(hours) {
 function getAdminPartsBilled_(row, headers, amount, tax, laborBilled) {
   const explicit = parseMoneyFlexible_(getExecutiveValue_(row, headers, [
     "PARTS_AMOUNT",
+    "PARTS_BILLED",
     "PARTS_CHARGE",
     "TOTAL_COBRO_PARTS",
     "COBRO_PARTS"
@@ -722,6 +754,30 @@ function collectExecutiveInvoices_(ss, dashboard, perCompany, companyMap, reques
 
 function collectExecutiveEconomy_(ss, dashboard, perCompany, companyMap, requestedCompany) {
   const sh = ss.getSheetByName(CFG.SHEET_ECONOMY);
+  const activeInvoiceKeys = {};
+
+  if (sh && sh.getLastRow() >= 2) {
+    const data = sh.getDataRange().getValues();
+    const headers = data[0].map(function(h) { return String(h || "").trim(); });
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (isSoftDeletedRow_(row, headers)) continue;
+
+      const companyId = String(getExecutiveValue_(row, headers, ["COMPANY_ID"]) || CFG.DEFAULT_COMPANY_ID).trim().toUpperCase();
+      if (requestedCompany && companyId !== requestedCompany) continue;
+
+      const invoiceKey = getEconomyHistoryInvoiceKey_(companyId, getExecutiveValue_(row, headers, ["INVOICE_NUMBER", "INVOICE"]));
+      if (invoiceKey) activeInvoiceKeys[invoiceKey] = true;
+      addExecutiveEconomyRowToDashboard_(dashboard, perCompany, companyMap, companyId, row, headers);
+    }
+  }
+
+  collectExecutiveEconomyHistory_(ss, dashboard, perCompany, companyMap, requestedCompany, activeInvoiceKeys);
+}
+
+function collectExecutiveEconomyHistory_(ss, dashboard, perCompany, companyMap, requestedCompany, activeInvoiceKeys) {
+  const sh = ss.getSheetByName(ECONOMY_HISTORY_SHEET_NAME);
   if (!sh || sh.getLastRow() < 2) return;
 
   const data = sh.getDataRange().getValues();
@@ -734,22 +790,29 @@ function collectExecutiveEconomy_(ss, dashboard, perCompany, companyMap, request
     const companyId = String(getExecutiveValue_(row, headers, ["COMPANY_ID"]) || CFG.DEFAULT_COMPANY_ID).trim().toUpperCase();
     if (requestedCompany && companyId !== requestedCompany) continue;
 
-    const company = ensureExecutiveCompanySummary_(perCompany, companyId, companyMap[companyId] || companyId);
-    const status = String(getExecutiveValue_(row, headers, ["STATUS"]) || "").trim().toUpperCase();
-    const amount = Number(getExecutiveValue_(row, headers, ["AMOUNT", "INVOICE_TOTAL", "TOTAL"]) || 0);
+    const invoiceKey = getEconomyHistoryInvoiceKey_(companyId, getExecutiveValue_(row, headers, ["INVOICE_NUMBER", "INVOICE"]));
+    if (invoiceKey && activeInvoiceKeys && activeInvoiceKeys[invoiceKey]) continue;
 
-    if (status === "INVOICED") {
-      dashboard.totals.economyInvoiced++;
-      company.economyInvoiced++;
-    } else {
-      dashboard.totals.economyPending++;
-      company.economyPending++;
-    }
+    addExecutiveEconomyRowToDashboard_(dashboard, perCompany, companyMap, companyId, row, headers);
+  }
+}
 
-    if (!isNaN(amount)) {
-      dashboard.totals.revenueTracked += amount;
-      company.revenueTracked += amount;
-    }
+function addExecutiveEconomyRowToDashboard_(dashboard, perCompany, companyMap, companyId, row, headers) {
+  const company = ensureExecutiveCompanySummary_(perCompany, companyId, companyMap[companyId] || companyId);
+  const status = String(getExecutiveValue_(row, headers, ["STATUS"]) || "").trim().toUpperCase();
+  const amount = Number(getExecutiveValue_(row, headers, ["AMOUNT", "INVOICE_TOTAL", "TOTAL"]) || 0);
+
+  if (status === "INVOICED" || status === "PAID") {
+    dashboard.totals.economyInvoiced++;
+    company.economyInvoiced++;
+  } else {
+    dashboard.totals.economyPending++;
+    company.economyPending++;
+  }
+
+  if (!isNaN(amount)) {
+    dashboard.totals.revenueTracked += amount;
+    company.revenueTracked += amount;
   }
 }
 

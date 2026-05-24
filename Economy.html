@@ -214,7 +214,7 @@
 
   <button id="syncInvoicesBtn" onclick="syncInvoices()">Sync Invoices</button>
 
-  <button id="syncOldBtn" onclick="syncOldLog()">Sync Old System</button>
+  <button id="syncOldBtn" onclick="syncOldLog()">Import Old History</button>
 
   <button onclick="loadOldDDSummary()">Histórico D&D</button>
 
@@ -651,8 +651,10 @@ function calculateEconomyMetrics(rows) {
     const realCost = calculateRealPartsCost(o.INV_SOURCE, rawCost);
     const techPay = parseEconomyNumber(o.TECH_LABOR_COST || o.TECH_LABOR_PAY);
     const hours = parseEconomyNumber(o.HORAS || o.LABOR_HOURS);
-    const laborBilled = calculateEconomyLaborCharge(hours);
-    const billedParts = Math.max(0, amount - tax - laborBilled);
+    const laborBilled = parseEconomyNumber(o.LABOR_BILLED || o.LABOR_AMOUNT || o.LABOR) ||
+      calculateEconomyLaborCharge(hours);
+    const billedParts = parseEconomyNumber(o.PARTS_BILLED || o.PARTS_AMOUNT || o.PARTS) ||
+      Math.max(0, amount - tax - laborBilled);
     const profit = amount - tax - realCost - techPay;
     const split = getInvestmentSplitValues(o.INV_SOURCE, rawCost);
 
@@ -688,8 +690,10 @@ function applyEconomyMetricFilter(rows) {
     const realCost = calculateRealPartsCost(o.INV_SOURCE, rawCost);
     const techPay = parseEconomyNumber(o.TECH_LABOR_COST || o.TECH_LABOR_PAY);
     const hours = parseEconomyNumber(o.HORAS || o.LABOR_HOURS);
-    const laborBilled = calculateEconomyLaborCharge(hours);
-    const billedParts = Math.max(0, amount - tax - laborBilled);
+    const laborBilled = parseEconomyNumber(o.LABOR_BILLED || o.LABOR_AMOUNT || o.LABOR) ||
+      calculateEconomyLaborCharge(hours);
+    const billedParts = parseEconomyNumber(o.PARTS_BILLED || o.PARTS_AMOUNT || o.PARTS) ||
+      Math.max(0, amount - tax - laborBilled);
     const profit = amount - tax - realCost - techPay;
     const split = getInvestmentSplitValues(o.INV_SOURCE, rawCost);
 
@@ -923,11 +927,15 @@ function card(o) {
   const isPM = VIEW_MODE === "PM" || String(o.INV_SOURCE || "").toUpperCase() === "PM";
 
   const periodLabel = String(o.PERIOD_LABEL || "").trim();
+  const isHistory = String(o.READ_ONLY || "").toUpperCase() === "YES" ||
+    String(o.SOURCE_TYPE || "").toUpperCase() === "OLD_LOG";
   const isLocked = periodLabel && CURRENT_PERIOD_LABEL && periodLabel !== CURRENT_PERIOD_LABEL;
-  const lockAttr = isLocked ? "disabled" : "";
-  const lockMsg = isLocked
-    ? `<div class="row" style="color:#dc2626; font-weight:bold;">🔒 Mes cerrado: ${periodLabel}</div>`
-    : "";
+  const lockAttr = (isLocked || isHistory) ? "disabled" : "";
+  const lockMsg = isHistory
+    ? `<div class="row" style="color:#2563eb; font-weight:bold;">Histórico importado del sistema viejo. Solo lectura.</div>`
+    : (isLocked
+      ? `<div class="row" style="color:#dc2626; font-weight:bold;">🔒 Mes cerrado: ${periodLabel}</div>`
+      : "");
 
   let cls = "pending";
   if (status === "INVOICED") cls = "invoiced";
@@ -1038,7 +1046,7 @@ function card(o) {
       <textarea id="notes_${row}" placeholder="Notes" ${lockAttr}>${o.NOTES || ""}</textarea>
 
       <button onclick="save(${row}, this)" ${lockAttr}>
-        ${isLocked ? "Bloqueado" : "Guardar"}
+        ${isHistory ? "Histórico" : (isLocked ? "Bloqueado" : "Guardar")}
       </button>
     </div>
   `;
@@ -1254,19 +1262,40 @@ function loadPeriodFilter() {
 }
 
 function syncOldLog() {
+  if (!ACTIVE_COMPANY_ID) {
+    alert("Primero cargue la compañía.");
+    return;
+  }
+
+  const btn = document.getElementById("syncOldBtn");
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = "Importing...";
+  }
+
   google.script.run
     .withSuccessHandler(function(res) {
-      alert("Sistema viejo sincronizado. Nuevos invoices: " + (res.added || 0));
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = "Import Old History";
+      }
 
-      window.open(
-        "https://docs.google.com/spreadsheets/d/1kkOZMlZRcrmnf5fYT6GYJk0Ne8t_but2-1Enknoy7vw/edit?gid=0#gid=0",
-        "_blank"
+      alert(
+        "Historial viejo importado.\n" +
+        "Nuevos: " + (res.imported || 0) + "\n" +
+        "Actualizados: " + (res.updated || 0) + "\n" +
+        "Ya estaban en economía activa: " + (res.skippedActive || 0)
       );
+      load();
     })
     .withFailureHandler(function(err) {
-      alert(err.message);
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = "Import Old History";
+      }
+      alertServerError(err);
     })
-    .syncInvoicesToOldLog();
+    .syncOldEconomyLogToHistory(ACTIVE_COMPANY_ID, getSessionToken());
 }
 
 function loadOldDDSummary() {
