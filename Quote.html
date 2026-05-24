@@ -15,6 +15,7 @@
     th, td { border:1px solid #ddd; padding:6px; font-size:13px; }
     th { background:#111827; color:white; }
     button { padding:10px 14px; border:none; border-radius:8px; cursor:pointer; font-weight:bold; }
+    button:disabled { background:#9ca3af !important; cursor:not-allowed; }
     .save { background:#16a34a; color:white; }
     .back { background:#111827; color:white; }
     .add { background:#2563eb; color:white; }
@@ -125,7 +126,7 @@
 </div>
 
 <div class="box">
-  <button class="save" onclick="saveQuote()">Create Quote & Generate PDFs</button>
+  <button id="saveQuoteBtn" class="save" onclick="saveQuote()">Create Quote & Generate PDFs</button>
   <button class="back" onclick="goBack()">Back</button>
 </div>
 
@@ -162,6 +163,30 @@ const COMPANY_ID = "<?= companyId ?>";
 const RETURN_TO = "<?= returnTo ?>";
 
 let items = [];
+let IS_SAVING_QUOTE = false;
+
+function getCurrentUser() {
+  try {
+    return JSON.parse(localStorage.getItem("pps_user") || "{}");
+  } catch (e) {
+    return {};
+  }
+}
+
+function getSessionToken() {
+  const user = getCurrentUser();
+  return user.sessionToken || user.SESSION_TOKEN || "";
+}
+
+function setQuoteSaving(isSaving) {
+  IS_SAVING_QUOTE = !!isSaving;
+
+  const btn = document.getElementById("saveQuoteBtn");
+  if (!btn) return;
+
+  btn.disabled = IS_SAVING_QUOTE;
+  btn.innerText = IS_SAVING_QUOTE ? "Creating quote..." : "Create Quote & Generate PDFs";
+}
 
 function todayISO() {
   return new Date().toISOString().slice(0,10);
@@ -326,6 +351,8 @@ function calculateTotals() {
 }
 
 function saveQuote() {
+  if (IS_SAVING_QUOTE) return;
+
   calculateTotals();
 
   const data = {
@@ -358,6 +385,8 @@ function saveQuote() {
     total: document.getElementById("total").value
   };
 
+  setQuoteSaving(true);
+
   google.script.run
     .withSuccessHandler(function(res) {
       if (res && res.pdfEnUrl) window.open(res.pdfEnUrl, "_blank");
@@ -368,9 +397,10 @@ function saveQuote() {
       );
     })
     .withFailureHandler(function(err) {
-      alert("Error creando quote: " + err.message);
+      setQuoteSaving(false);
+      alert("Error creando quote: " + (err && err.message ? err.message : err));
     })
-    .createQuote(data);
+    .createQuote(data, getSessionToken());
 }
 
 function goBack() {

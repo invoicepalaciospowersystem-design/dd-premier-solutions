@@ -165,6 +165,7 @@ const RETURN_TO = "<?= returnTo ?>";
 
 let ORDER = null;
 let ORDER_READY = false;
+let IS_SAVING_CLOSE_ORDER = false;
 
 function getCurrentUser() {
   try {
@@ -285,6 +286,8 @@ function getPartsTotal() {
 }
 
 function saveClose() {
+  if (IS_SAVING_CLOSE_ORDER) return;
+
   if (!ORDER_READY || !ORDER || !ORDER.WO_NUMBER) {
     alert("Orden no cargada.");
     return;
@@ -300,6 +303,7 @@ function saveClose() {
     return;
   }
 
+  IS_SAVING_CLOSE_ORDER = true;
   document.getElementById("saveBtn").disabled = true;
   document.getElementById("saveBtn").innerText = "Guardando...";
 
@@ -377,6 +381,7 @@ function saveClose() {
       showCloseReturnLink(getCloseOrderReturnUrl(closeTech));
     })
     .withFailureHandler(function(err) {
+      IS_SAVING_CLOSE_ORDER = false;
       document.getElementById("saveBtn").disabled = false;
       document.getElementById("saveBtn").innerText = "Guardar y completar orden";
 

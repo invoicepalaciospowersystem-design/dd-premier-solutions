@@ -10,6 +10,7 @@
     input,textarea,select{width:100%;padding:10px;border-radius:8px;border:1px solid #d1d5db;margin-top:5px;box-sizing:border-box;font-family:Arial;}
     label{font-weight:bold;display:block;margin-top:12px;}
     button{padding:12px 16px;border:none;border-radius:10px;color:white;font-weight:bold;cursor:pointer;margin-top:10px;}
+    button:disabled{background:#9ca3af !important;cursor:not-allowed;}
     .purple{background:#7c3aed;}
     .gray{background:#6b7280;}
     .return-btn{display:inline-block;background:#7c3aed;color:white;padding:12px 16px;border-radius:10px;font-weight:bold;text-decoration:none;margin-top:10px;}
@@ -90,7 +91,7 @@
 </div>
 
 <div class="box">
-  <button class="purple" onclick="savePMReport()">💾 Guardar Reporte PM</button>
+  <button id="savePMReportBtn" class="purple" onclick="savePMReport()">💾 Guardar Reporte PM</button>
   <button class="gray" onclick="goBack()">Volver</button>
 </div>
 
@@ -161,6 +162,8 @@ const BASE_URL = "<?= baseUrl ?>";
 const RETURN_TO = "<?= returnTo ?>";
 
 let PM_TEXTS_DATA = {};
+let IS_SAVING_PM_REPORT = false;
+let IS_PM_REPORT_DONE = false;
 
 function getCurrentUser() {
   try {
@@ -305,10 +308,25 @@ function runServer(functionName, arg) {
   });
 }
 
+function setPMReportSaving(isSaving) {
+  IS_SAVING_PM_REPORT = !!isSaving;
+
+  const btns = document.querySelectorAll("button");
+  btns.forEach(function(button) {
+    button.disabled = IS_SAVING_PM_REPORT;
+  });
+
+  const saveBtn = document.getElementById("savePMReportBtn");
+  if (saveBtn) {
+    saveBtn.innerText = IS_SAVING_PM_REPORT ? "Guardando reporte PM..." : "💾 Guardar Reporte PM";
+  }
+}
+
 async function savePMReport() {
+  if (IS_SAVING_PM_REPORT || IS_PM_REPORT_DONE) return;
+
   try {
-    const btns = document.querySelectorAll("button");
-    btns.forEach(b => b.disabled = true);
+    setPMReportSaving(true);
 
     document.getElementById("orderInfo").innerHTML =
       "Guardando reporte PM...";
@@ -403,18 +421,22 @@ async function savePMReport() {
 
     const pdf = await runServer("generatePMReportPDF", payload);
 
+    IS_PM_REPORT_DONE = true;
+
     return returnToPreviousScreen(
       "Reportes PM generados correctamente en Espa\u00f1ol e Ingl\u00e9s." +
       (pdf.savedToWorkOrder ? "\nLinks guardados en la orden." : "\nPDF creado, pero no se pudieron guardar los links en la orden.")
     );
 
   } catch (err) {
+    IS_SAVING_PM_REPORT = false;
     alert("ERROR guardando PM: " + (err.message || err));
     document.getElementById("orderInfo").innerHTML =
       "ERROR guardando PM: " + (err.message || err);
   } finally {
-    const btns = document.querySelectorAll("button");
-    btns.forEach(b => b.disabled = false);
+    if (!IS_PM_REPORT_DONE) {
+      setPMReportSaving(false);
+    }
   }
 }
 

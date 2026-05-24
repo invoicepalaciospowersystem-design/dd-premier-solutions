@@ -125,9 +125,14 @@ function getStoreInfoForQuote_(ss, nsn) {
   return { client: "", address: "" };
 }
 
-function createQuote(data) {
+function createQuote(data, sessionToken) {
+  const companyId = data && (data.companyId || CFG.DEFAULT_COMPANY_ID || "");
+  const session = requireSession_(sessionToken || (data && data.sessionToken), ["OWNER", "ADMIN", "ORDENES"], companyId);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+
   try {
-    return createQuote_(data);
+    return createQuote_(data, session);
   } catch (err) {
     notifySystemError_("QUOTE_CREATE_ERROR", err, {
       module: "QUOTE",
@@ -137,16 +142,37 @@ function createQuote(data) {
       nsn: data && data.ns_number
     });
     throw err;
+  } finally {
+    lock.releaseLock();
   }
 }
 
-function createQuote_(data) {
+function createQuote_(data, session) {
   if (!data) throw new Error("No quote data received.");
 
   setupQuotesModule();
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = ss.getSheetByName("QUOTES");
+  const quoteHeaders = sh.getRange(1, 1, 1, sh.getLastColumn())
+    .getValues()[0]
+    .map(function(h) {
+      return String(h).trim();
+    });
+
+  const existingQuote = findExistingQuoteByNumber_(sh, quoteHeaders, data.quote_number);
+  if (existingQuote) {
+    return {
+      success: true,
+      duplicateSkipped: true,
+      pdfEnUrl: existingQuote.PDF_EN_URL || "",
+      pdfEsUrl: existingQuote.PDF_ES_URL || "",
+      emailResult: {
+        sent: false,
+        status: "DUPLICATE_SKIPPED"
+      }
+    };
+  }
 
   const address = normalizeQuoteAddressForTemplate_(data);
 
@@ -159,12 +185,6 @@ function createQuote_(data) {
 
   const pdfEs = generateQuotePdfFromTemplate_(data, "ES", targetFolder);
   const pdfEn = generateQuotePdfFromTemplate_(data, "EN", targetFolder);
-
-  const quoteHeaders = sh.getRange(1, 1, 1, sh.getLastColumn())
-    .getValues()[0]
-    .map(function(h) {
-      return String(h).trim();
-    });
 
   const quoteRow = {
     CREATED_AT: new Date(),
@@ -210,6 +230,10 @@ function createQuote_(data) {
   addNotification_(data.companyId, "ADMIN", data.wo_number, "QUOTE", "📄 Quote created for " + data.wo_number);
   addNotification_(data.companyId, "SYSTEM", data.wo_number, "QUOTE", "📄 Quote created for " + data.wo_number);
   addNotification_(data.companyId, "ORDENES", data.wo_number, "QUOTE", "📄 Quote created for " + data.wo_number);
+  addAuditLog_("QUOTE", "QUOTE_CREATED", data.companyId || CFG.DEFAULT_COMPANY_ID || "", "QUOTE", data.quote_number || "", session, {
+    woNumber: data.wo_number || "",
+    nsn: data.ns_number || ""
+  });
 
   return {
     success: true,
@@ -217,6 +241,36 @@ function createQuote_(data) {
     pdfEsUrl: pdfEs,
     emailResult: emailResult
   };
+}
+
+function findExistingQuoteByNumber_(sh, headers, quoteNumber) {
+  quoteNumber = String(quoteNumber || "").trim();
+  if (!quoteNumber || !sh || sh.getLastRow() < 2) return null;
+
+  headers = (headers || []).map(function(h) {
+    return String(h || "").trim();
+  });
+
+  const idxQuote = headers.findIndex(function(h) {
+    return h.toUpperCase() === "QUOTE_NUMBER";
+  });
+
+  if (idxQuote === -1) return null;
+
+  const values = sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn()).getValues();
+
+  for (let i = values.length - 1; i >= 0; i--) {
+    const row = values[i];
+    if (String(row[idxQuote] || "").trim() !== quoteNumber) continue;
+
+    const obj = {};
+    headers.forEach(function(h, c) {
+      obj[h] = row[c];
+    });
+    return obj;
+  }
+
+  return null;
 }
 
 function setupQuotesModule() {
