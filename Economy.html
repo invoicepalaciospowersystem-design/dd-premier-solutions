@@ -1284,7 +1284,9 @@ function syncOldLog() {
         "Historial viejo importado.\n" +
         "Nuevos: " + (res.imported || 0) + "\n" +
         "Actualizados: " + (res.updated || 0) + "\n" +
-        "Ya estaban en economía activa: " + (res.skippedActive || 0)
+        "Ya estaban en economía activa: " + (res.skippedActive || 0) +
+        formatImportInvoiceList("Actualizados", res.updatedInvoices) +
+        formatImportInvoiceList("Nuevos", res.importedInvoices, 12)
       );
       load();
     })
@@ -1296,6 +1298,17 @@ function syncOldLog() {
       alertServerError(err);
     })
     .syncOldEconomyLogToHistory(ACTIVE_COMPANY_ID, getSessionToken());
+}
+
+function formatImportInvoiceList(label, invoices, maxItems) {
+  invoices = Array.isArray(invoices) ? invoices.filter(Boolean) : [];
+  if (!invoices.length) return "";
+
+  maxItems = maxItems || 25;
+  const shown = invoices.slice(0, maxItems);
+  const extra = invoices.length > maxItems ? " +" + (invoices.length - maxItems) + " más" : "";
+
+  return "\n\n" + label + ":\n" + shown.join(", ") + extra;
 }
 
 function loadOldDDSummary() {

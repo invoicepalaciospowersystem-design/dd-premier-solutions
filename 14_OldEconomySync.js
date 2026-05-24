@@ -160,6 +160,9 @@ function syncOldEconomyLogToHistory(companyId, sessionToken) {
   let updated = 0;
   let skippedActive = 0;
   let skippedNoInvoice = 0;
+  const importedInvoices = [];
+  const updatedInvoices = [];
+  const skippedActiveInvoices = [];
 
   for (let i = 1; i < oldData.length; i++) {
     const oldRow = oldData[i];
@@ -173,6 +176,7 @@ function syncOldEconomyLogToHistory(companyId, sessionToken) {
 
     if (activeKeys[invoiceKey]) {
       skippedActive++;
+      skippedActiveInvoices.push(normalized.INVOICE_NUMBER);
       continue;
     }
 
@@ -183,10 +187,12 @@ function syncOldEconomyLogToHistory(companyId, sessionToken) {
     if (existingHistory[invoiceKey]) {
       history.getRange(existingHistory[invoiceKey], 1, 1, historyHeaders.length).setValues([values]);
       updated++;
+      updatedInvoices.push(normalized.INVOICE_NUMBER);
     } else {
       history.appendRow(values);
       existingHistory[invoiceKey] = history.getLastRow();
       imported++;
+      importedInvoices.push(normalized.INVOICE_NUMBER);
     }
   }
 
@@ -194,7 +200,10 @@ function syncOldEconomyLogToHistory(companyId, sessionToken) {
     imported: imported,
     updated: updated,
     skippedActive: skippedActive,
-    skippedNoInvoice: skippedNoInvoice
+    skippedNoInvoice: skippedNoInvoice,
+    importedInvoices: importedInvoices,
+    updatedInvoices: updatedInvoices,
+    skippedActiveInvoices: skippedActiveInvoices
   });
 
   return {
@@ -202,7 +211,10 @@ function syncOldEconomyLogToHistory(companyId, sessionToken) {
     imported: imported,
     updated: updated,
     skippedActive: skippedActive,
-    skippedNoInvoice: skippedNoInvoice
+    skippedNoInvoice: skippedNoInvoice,
+    importedInvoices: importedInvoices,
+    updatedInvoices: updatedInvoices,
+    skippedActiveInvoices: skippedActiveInvoices
   };
 }
 
