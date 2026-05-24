@@ -2202,6 +2202,26 @@
         <div class="muted" id="dashboardScope">Loading...</div>
       </div>
       <div class="dash-actions">
+        <select id="ownerPeriodMode" class="admin-period-select" onchange="onOwnerPeriodModeChange()">
+          <option value="monthly">Mensual</option>
+          <option value="annual">Anual</option>
+          <option value="all">Todos</option>
+        </select>
+        <select id="ownerPeriodMonth" class="admin-period-select" onchange="loadOwnerDashboard()">
+          <option value="1">Ene</option>
+          <option value="2">Feb</option>
+          <option value="3">Mar</option>
+          <option value="4">Abr</option>
+          <option value="5">May</option>
+          <option value="6">Jun</option>
+          <option value="7">Jul</option>
+          <option value="8">Ago</option>
+          <option value="9">Sep</option>
+          <option value="10">Oct</option>
+          <option value="11">Nov</option>
+          <option value="12">Dic</option>
+        </select>
+        <input id="ownerPeriodYear" class="admin-period-input" type="number" min="2020" max="2100" step="1" onchange="loadOwnerDashboard()">
         <button class="dash-refresh" onclick="loadOwnerDashboard()">Actualizar</button>
       </div>
     </div>
@@ -2298,6 +2318,26 @@
         <div class="muted" id="economyDashboardScope">Loading...</div>
       </div>
       <div class="dash-actions">
+        <select id="economyDashboardPeriodMode" class="admin-period-select" onchange="onEconomyDashboardPeriodModeChange()">
+          <option value="monthly">Mensual</option>
+          <option value="annual">Anual</option>
+          <option value="all">Todos</option>
+        </select>
+        <select id="economyDashboardPeriodMonth" class="admin-period-select" onchange="loadEconomyModuleDashboard()">
+          <option value="1">Ene</option>
+          <option value="2">Feb</option>
+          <option value="3">Mar</option>
+          <option value="4">Abr</option>
+          <option value="5">May</option>
+          <option value="6">Jun</option>
+          <option value="7">Jul</option>
+          <option value="8">Ago</option>
+          <option value="9">Sep</option>
+          <option value="10">Oct</option>
+          <option value="11">Nov</option>
+          <option value="12">Dic</option>
+        </select>
+        <input id="economyDashboardPeriodYear" class="admin-period-input" type="number" min="2020" max="2100" step="1" onchange="loadEconomyModuleDashboard()">
         <button class="dash-refresh" onclick="loadEconomyModuleDashboard()">Actualizar</button>
         <button class="dash-refresh" onclick="openModule('?view=economy')">Abrir Economia</button>
       </div>
@@ -2369,7 +2409,9 @@ let SUPERVISOR_DASHBOARD_FILTER = "open";
 let TECH_DASHBOARD_ACTIVE_ORDERS = [];
 let TECH_DASHBOARD_MONTHLY_SUMMARY = null;
 let TECH_DASHBOARD_INVOICE_SUMMARY = null;
+let OWNER_PERIOD_INITIALIZED = false;
 let ADMIN_PERIOD_INITIALIZED = false;
+let ECONOMY_DASHBOARD_PERIOD_INITIALIZED = false;
 
 setLoginTheme(LOGIN_COMPANY_ID);
 
@@ -2770,6 +2812,8 @@ function loadEconomyModuleDashboard() {
     return;
   }
 
+  initEconomyDashboardPeriodControls();
+
   dashboard.style.display = "block";
 
   const companyId = getActiveCompanyId();
@@ -2782,6 +2826,8 @@ function loadEconomyModuleDashboard() {
   box.innerHTML = renderEconomyModuleLoadingMetrics();
   if (scope) scope.innerText = "Cargando metricas de economia...";
 
+  const period = getEconomyDashboardPeriodSelection();
+
   google.script.run
     .withSuccessHandler(function(data) {
       renderEconomyModuleDashboard(data || {});
@@ -2793,11 +2839,63 @@ function loadEconomyModuleDashboard() {
         escapeHtmlMain(err && err.message ? err.message : err) +
         "</div>";
     })
-    .getEconomyModuleDashboard(getSessionToken(), companyId);
+    .getEconomyModuleDashboard(
+      getSessionToken(),
+      companyId,
+      period.mode,
+      period.year,
+      period.month
+    );
 }
 
 function renderEconomyModuleLoadingMetrics() {
   return renderMetricSkeletons();
+}
+
+function initEconomyDashboardPeriodControls() {
+  if (ECONOMY_DASHBOARD_PERIOD_INITIALIZED) {
+    syncEconomyDashboardPeriodControlVisibility();
+    return;
+  }
+
+  const now = new Date();
+  const yearInput = document.getElementById("economyDashboardPeriodYear");
+  const monthSelect = document.getElementById("economyDashboardPeriodMonth");
+
+  if (yearInput && !yearInput.value) yearInput.value = now.getFullYear();
+  if (monthSelect) monthSelect.value = String(now.getMonth() + 1);
+
+  ECONOMY_DASHBOARD_PERIOD_INITIALIZED = true;
+  syncEconomyDashboardPeriodControlVisibility();
+}
+
+function getEconomyDashboardPeriodSelection() {
+  initEconomyDashboardPeriodControls();
+
+  const modeEl = document.getElementById("economyDashboardPeriodMode");
+  const yearEl = document.getElementById("economyDashboardPeriodYear");
+  const monthEl = document.getElementById("economyDashboardPeriodMonth");
+
+  return {
+    mode: String(modeEl && modeEl.value || "monthly"),
+    year: Number(yearEl && yearEl.value || new Date().getFullYear()),
+    month: Number(monthEl && monthEl.value || (new Date().getMonth() + 1))
+  };
+}
+
+function onEconomyDashboardPeriodModeChange() {
+  syncEconomyDashboardPeriodControlVisibility();
+  loadEconomyModuleDashboard();
+}
+
+function syncEconomyDashboardPeriodControlVisibility() {
+  const modeEl = document.getElementById("economyDashboardPeriodMode");
+  const monthEl = document.getElementById("economyDashboardPeriodMonth");
+  const yearEl = document.getElementById("economyDashboardPeriodYear");
+  const mode = String(modeEl && modeEl.value || "monthly");
+
+  if (monthEl) monthEl.style.display = mode === "monthly" ? "" : "none";
+  if (yearEl) yearEl.style.display = mode === "all" ? "none" : "";
 }
 
 function renderEconomyModuleDashboard(data) {
@@ -2832,7 +2930,7 @@ function renderEconomyModuleMetric(card) {
     <div class="metric ${escapeHtmlMain(card.tone || "")}">
       <div class="metric-label">${escapeHtmlMain(card.label || "")}</div>
       <div class="metric-value">${escapeHtmlMain(card.value || "0")}</div>
-      <div class="metric-note">Periodo actual</div>
+      <div class="metric-note">Periodo seleccionado</div>
     </div>
   `;
 }
@@ -3153,12 +3251,16 @@ function loadOwnerDashboard() {
     return;
   }
 
+  initOwnerPeriodControls();
+
   box.style.display = "block";
   document.getElementById("dashboardScope").innerText = "Cargando metricas ejecutivas...";
   document.getElementById("ownerMetrics").innerHTML = renderMetricSkeletons();
   document.getElementById("ownerCompanyBreakdown").innerHTML = "<div class='muted'>Cargando empresas...</div>";
   document.getElementById("ownerAlerts").innerHTML = "<div class='muted'>Cargando prioridades...</div>";
   document.getElementById("ownerRecentActivity").innerHTML = "<div class='muted'>Cargando actividad...</div>";
+
+  const period = getOwnerPeriodSelection();
 
   google.script.run
     .withSuccessHandler(function(data) {
@@ -3172,7 +3274,59 @@ function loadOwnerDashboard() {
       document.getElementById("ownerAlerts").innerHTML = "";
       document.getElementById("ownerRecentActivity").innerHTML = "";
     })
-    .getOwnerExecutiveDashboard(getSessionToken(), getDashboardCompanyScope());
+    .getOwnerExecutiveDashboard(
+      getSessionToken(),
+      getDashboardCompanyScope(),
+      period.mode,
+      period.year,
+      period.month
+    );
+}
+
+function initOwnerPeriodControls() {
+  if (OWNER_PERIOD_INITIALIZED) {
+    syncOwnerPeriodControlVisibility();
+    return;
+  }
+
+  const now = new Date();
+  const yearInput = document.getElementById("ownerPeriodYear");
+  const monthSelect = document.getElementById("ownerPeriodMonth");
+
+  if (yearInput && !yearInput.value) yearInput.value = now.getFullYear();
+  if (monthSelect) monthSelect.value = String(now.getMonth() + 1);
+
+  OWNER_PERIOD_INITIALIZED = true;
+  syncOwnerPeriodControlVisibility();
+}
+
+function getOwnerPeriodSelection() {
+  initOwnerPeriodControls();
+
+  const modeEl = document.getElementById("ownerPeriodMode");
+  const yearEl = document.getElementById("ownerPeriodYear");
+  const monthEl = document.getElementById("ownerPeriodMonth");
+
+  return {
+    mode: String(modeEl && modeEl.value || "monthly"),
+    year: Number(yearEl && yearEl.value || new Date().getFullYear()),
+    month: Number(monthEl && monthEl.value || (new Date().getMonth() + 1))
+  };
+}
+
+function onOwnerPeriodModeChange() {
+  syncOwnerPeriodControlVisibility();
+  loadOwnerDashboard();
+}
+
+function syncOwnerPeriodControlVisibility() {
+  const modeEl = document.getElementById("ownerPeriodMode");
+  const monthEl = document.getElementById("ownerPeriodMonth");
+  const yearEl = document.getElementById("ownerPeriodYear");
+  const mode = String(modeEl && modeEl.value || "monthly");
+
+  if (monthEl) monthEl.style.display = mode === "monthly" ? "" : "none";
+  if (yearEl) yearEl.style.display = mode === "all" ? "none" : "";
 }
 
 function loadAdminDashboard() {
@@ -3928,8 +4082,10 @@ function renderOwnerDashboard(data) {
   const totals = data.totals || {};
   const scope = data.scopeLabel || "Todas las empresas";
   const generated = data.generatedAt ? "Actualizado " + data.generatedAt : "";
+  const period = data.periodLabel ? data.periodLabel : "";
 
-  document.getElementById("dashboardScope").innerText = scope + (generated ? " | " + generated : "");
+  document.getElementById("dashboardScope").innerText =
+    scope + (period ? " | " + period : "") + (generated ? " | " + generated : "");
 
   const cards = [
     {

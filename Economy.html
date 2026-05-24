@@ -210,6 +210,30 @@
     <option value="">All Periods</option>
   </select>
 
+  <select id="metricPeriodMode" onchange="onMetricPeriodModeChange()">
+    <option value="period">Por periodo</option>
+    <option value="monthly">Mes</option>
+    <option value="annual">Año</option>
+    <option value="all">Todos</option>
+  </select>
+
+  <select id="metricPeriodMonth" onchange="render()">
+    <option value="1">Enero</option>
+    <option value="2">Febrero</option>
+    <option value="3">Marzo</option>
+    <option value="4">Abril</option>
+    <option value="5">Mayo</option>
+    <option value="6">Junio</option>
+    <option value="7">Julio</option>
+    <option value="8">Agosto</option>
+    <option value="9">Septiembre</option>
+    <option value="10">Octubre</option>
+    <option value="11">Noviembre</option>
+    <option value="12">Diciembre</option>
+  </select>
+
+  <input id="metricPeriodYear" type="number" min="2020" max="2100" step="1" placeholder="Año" style="width:90px;" onchange="render()">
+
   <button onclick="load()">Refresh</button>
 
   <button id="syncInvoicesBtn" onclick="syncInvoices()">Sync Invoices</button>
@@ -226,6 +250,11 @@
 </div>
 
 <div class="box">
+  <select id="summaryMode" onchange="syncTechSummaryPeriodControls()">
+    <option value="monthly">Mensual</option>
+    <option value="annual">Anual</option>
+  </select>
+
   <select id="summaryMonth">
     <option value="1">Enero</option>
     <option value="2">Febrero</option>
@@ -292,6 +321,7 @@ let ACTIVE_COMPANY_ID = COMPANY_ID_FROM_URL || getSavedOwnerCompanyId();
 let CURRENT_PERIOD_LABEL = "";
 let VIEW_MODE = "REGULAR";
 let ECONOMY_METRIC_FILTER = "all";
+let METRIC_PERIOD_INITIALIZED = false;
 
 function getCurrentUser() {
   try {
@@ -402,6 +432,8 @@ function initSummaryDate() {
   const now = new Date();
   document.getElementById("summaryMonth").value = now.getMonth() + 1;
   document.getElementById("summaryYear").value = now.getFullYear();
+  initMetricPeriodControls();
+  syncTechSummaryPeriodControls();
 }
 
 function loadTechSummary() {
@@ -410,6 +442,7 @@ function loadTechSummary() {
     return;
   }
 
+  const mode = String(document.getElementById("summaryMode").value || "monthly");
   const month = Number(document.getElementById("summaryMonth").value);
   const year = Number(document.getElementById("summaryYear").value);
 
@@ -418,16 +451,32 @@ function loadTechSummary() {
 
   google.script.run
     .withSuccessHandler(function(res) {
-      renderTechSummary(res || []);
+      renderTechSummary(res || [], mode, month, year);
     })
     .withFailureHandler(function(err) {
       document.getElementById("techSummaryBox").innerHTML =
         "ERROR resumen técnicos: " + err.message;
     })
-    .getTechMonthlySummary(ACTIVE_COMPANY_ID, month, year, getSessionToken());
+    .getTechPeriodSummary(ACTIVE_COMPANY_ID, mode, month, year, getSessionToken());
 }
 
-function renderTechSummary(rows) {
+function syncTechSummaryPeriodControls() {
+  const mode = String(document.getElementById("summaryMode").value || "monthly");
+  const month = document.getElementById("summaryMonth");
+
+  if (month) month.style.display = mode === "monthly" ? "" : "none";
+}
+
+function renderTechSummary(rows, mode, month, year) {
+  const label = String(mode || "monthly") === "annual"
+    ? "Anual " + year
+    : "Mensual " + year + "-" + String(month || "").padStart(2, "0");
+  const noDataMessage = "<h3>Resumen Tecnicos - " + label + "</h3>No hay datos para este periodo.";
+
+  if (!rows.length) {
+    document.getElementById("techSummaryBox").innerHTML = noDataMessage;
+    return;
+  }
   if (!rows.length) {
     document.getElementById("techSummaryBox").innerHTML =
       "<h3>Resumen Técnicos</h3>No hay datos para este mes.";
@@ -473,6 +522,9 @@ function renderTechSummary(rows) {
       </table>
     </div>
   `;
+
+  const heading = document.querySelector("#techSummaryBox h3");
+  if (heading) heading.innerText = "Resumen Tecnicos - " + label;
 }
 
 function load() {
@@ -527,16 +579,20 @@ function load() {
 }
 
 function render() {
+  initMetricPeriodControls();
+
   const search = document.getElementById("search").value.toLowerCase();
   const status = document.getElementById("statusFilter").value;
   const period = document.getElementById("periodFilter").value;
+  const periodMode = String(document.getElementById("metricPeriodMode").value || "period");
 
   const baseFiltered = ECONOMY.filter(function(o) {
     const text = JSON.stringify(o).toLowerCase();
 
     return (!search || text.includes(search)) &&
            (!status || String(o.STATUS || "").toUpperCase() === status) &&
-           (!period || String(o.PERIOD_LABEL || "") === period);
+           (periodMode !== "period" || !period || String(o.PERIOD_LABEL || "") === period) &&
+           economyRecordMatchesMetricPeriod(o);
   });
 
   renderEconomyMetrics(baseFiltered);
@@ -546,6 +602,75 @@ function render() {
     filtered.length
       ? filtered.map(card).join("")
       : "No economy records found.";
+}
+
+function initMetricPeriodControls() {
+  if (METRIC_PERIOD_INITIALIZED) {
+    syncMetricPeriodControlVisibility();
+    return;
+  }
+
+  const now = new Date();
+  const month = document.getElementById("metricPeriodMonth");
+  const year = document.getElementById("metricPeriodYear");
+
+  if (month) month.value = String(now.getMonth() + 1);
+  if (year && !year.value) year.value = now.getFullYear();
+
+  METRIC_PERIOD_INITIALIZED = true;
+  syncMetricPeriodControlVisibility();
+}
+
+function onMetricPeriodModeChange() {
+  syncMetricPeriodControlVisibility();
+  render();
+}
+
+function syncMetricPeriodControlVisibility() {
+  const mode = String(document.getElementById("metricPeriodMode").value || "period");
+  const periodFilter = document.getElementById("periodFilter");
+  const month = document.getElementById("metricPeriodMonth");
+  const year = document.getElementById("metricPeriodYear");
+
+  if (periodFilter) periodFilter.style.display = mode === "period" ? "" : "none";
+  if (month) month.style.display = mode === "monthly" ? "" : "none";
+  if (year) year.style.display = (mode === "monthly" || mode === "annual") ? "" : "none";
+}
+
+function economyRecordMatchesMetricPeriod(row) {
+  const mode = String(document.getElementById("metricPeriodMode").value || "period");
+  if (mode === "all" || mode === "period") return true;
+
+  const year = Number(document.getElementById("metricPeriodYear").value || new Date().getFullYear());
+  const month = Number(document.getElementById("metricPeriodMonth").value || (new Date().getMonth() + 1));
+  const periodYear = Number(row.PERIOD_YEAR || 0);
+  const periodMonth = Number(row.PERIOD_MONTH || 0);
+  const periodLabel = String(row.PERIOD_LABEL || "").trim();
+
+  if (mode === "annual") {
+    if (periodYear && periodYear === year) return true;
+    if (periodLabel && periodLabel.indexOf(String(year)) === 0) return true;
+  }
+
+  if (mode === "monthly") {
+    const wantedLabel = year + "-" + String(month).padStart(2, "0");
+    if (periodLabel && periodLabel === wantedLabel) return true;
+    if (periodYear && periodMonth && periodYear === year && periodMonth === month) return true;
+  }
+
+  const date = getEconomyRecordDate(row);
+  if (!date) return false;
+
+  if (mode === "annual") return date.getFullYear() === year;
+  return date.getFullYear() === year && (date.getMonth() + 1) === month;
+}
+
+function getEconomyRecordDate(row) {
+  const value = row.DATE_INVOICE || row.DATE_COMPLETED || row.DATE_PAID || row.CREATED_AT || row.DATE_CREATED;
+  if (!value) return null;
+
+  const date = new Date(value);
+  return isNaN(date.getTime()) ? null : date;
 }
 
 function clearEconomyMetrics() {
@@ -1259,6 +1384,8 @@ function loadPeriodFilter() {
   } else if (CURRENT_PERIOD_LABEL && periods.includes(CURRENT_PERIOD_LABEL)) {
     select.value = CURRENT_PERIOD_LABEL;
   }
+
+  syncMetricPeriodControlVisibility();
 }
 
 function syncOldLog() {

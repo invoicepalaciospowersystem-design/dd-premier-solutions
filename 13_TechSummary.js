@@ -5,8 +5,18 @@
 // =====================================================
 
 function getTechMonthlySummary(companyId, month, year, sessionToken) {
+  return getTechSummaryByPeriod_(companyId, "monthly", month, year, sessionToken);
+}
+
+function getTechPeriodSummary(companyId, periodMode, month, year, sessionToken) {
+  return getTechSummaryByPeriod_(companyId, periodMode, month, year, sessionToken);
+}
+
+function getTechSummaryByPeriod_(companyId, periodMode, month, year, sessionToken) {
 
   companyId = String(companyId || "").trim().toUpperCase();
+  periodMode = String(periodMode || "monthly").trim().toLowerCase();
+  periodMode = (periodMode === "annual" || periodMode === "yearly") ? "annual" : "monthly";
   month = Number(month);
   year = Number(year);
   const session = requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA", "TECH"], companyId);
@@ -105,7 +115,7 @@ function getTechMonthlySummary(companyId, month, year, sessionToken) {
 
     if (isNaN(d.getTime())) continue;
 
-    if ((d.getMonth() + 1) !== month || d.getFullYear() !== year) continue;
+    if (!techSummaryDateMatches_(d, periodMode, month, year)) continue;
 
     const wo = String(row[eWO] || "").trim();
 
@@ -221,7 +231,7 @@ function getTechMonthlySummary(companyId, month, year, sessionToken) {
 
       if (isNaN(d.getTime())) continue;
 
-      if ((d.getMonth() + 1) !== month || d.getFullYear() !== year) continue;
+      if (!techSummaryDateMatches_(d, periodMode, month, year)) continue;
 
       const techName = String(row[pTechs] || "").trim();
 
@@ -260,11 +270,9 @@ function getTechMonthlySummary(companyId, month, year, sessionToken) {
 
   if (summary[ddKey].totalPay === 0) {
 
-    const selectedLabel = year + "-" + String(month).padStart(2, "0");
-
     const NEW_SYSTEM_START_LABEL = "2026-06";
 
-    if (selectedLabel < NEW_SYSTEM_START_LABEL) {
+    if (periodMode === "annual") {
 
       summary["d&d premier solutions corp"] = {
         name: "D&D PREMIER SOLUTIONS CORP",
@@ -278,7 +286,32 @@ function getTechMonthlySummary(companyId, month, year, sessionToken) {
         workOrders: []
       };
 
-      addOldDDMonthlyToSummary_(summary, month, year);
+      for (let oldMonth = 1; oldMonth <= 12; oldMonth++) {
+        const selectedLabel = year + "-" + String(oldMonth).padStart(2, "0");
+        if (selectedLabel < NEW_SYSTEM_START_LABEL) {
+          addOldDDMonthlyToSummary_(summary, oldMonth, year);
+        }
+      }
+    } else {
+
+      const selectedLabel = year + "-" + String(month).padStart(2, "0");
+
+      if (selectedLabel < NEW_SYSTEM_START_LABEL) {
+
+        summary["d&d premier solutions corp"] = {
+          name: "D&D PREMIER SOLUTIONS CORP",
+          rate: "",
+          orders: 0,
+          hours: 0,
+          materialCost: 0,
+          laborPay: 0,
+          materialBonus: 0,
+          totalPay: 0,
+          workOrders: []
+        };
+
+        addOldDDMonthlyToSummary_(summary, month, year);
+      }
     }
   }
 
@@ -294,6 +327,17 @@ function getTechMonthlySummary(companyId, month, year, sessionToken) {
   }
 
   return rows;
+}
+
+function techSummaryDateMatches_(dateValue, periodMode, month, year) {
+  if (!(dateValue instanceof Date) || isNaN(dateValue.getTime())) return false;
+
+  if (String(periodMode || "monthly") === "annual") {
+    return dateValue.getFullYear() === Number(year);
+  }
+
+  return dateValue.getFullYear() === Number(year) &&
+    (dateValue.getMonth() + 1) === Number(month);
 }
 
 // =====================================================

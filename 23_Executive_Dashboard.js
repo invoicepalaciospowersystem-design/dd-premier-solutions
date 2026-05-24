@@ -2,10 +2,11 @@
 // FILE: 23_Executive_Dashboard.gs
 // =====================================================
 
-function getOwnerExecutiveDashboard(sessionToken, companyId) {
+function getOwnerExecutiveDashboard(sessionToken, companyId, periodMode, periodYear, periodMonth) {
   const session = requireSession_(sessionToken, ["OWNER"]);
   const requestedCompany = String(companyId || "").trim().toUpperCase();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const periodScope = buildAdminPeriodScope_(periodMode, periodYear, periodMonth);
   const companies = getExecutiveCompanies_(ss);
   const companyMap = {};
 
@@ -17,6 +18,10 @@ function getOwnerExecutiveDashboard(sessionToken, companyId) {
     generatedAt: Utilities.formatDate(new Date(), CFG.TIMEZONE, "MM/dd/yyyy hh:mm a"),
     scopeCompanyId: requestedCompany,
     scopeLabel: requestedCompany ? (companyMap[requestedCompany] || requestedCompany) : "Todas las empresas",
+    periodMode: periodScope.mode,
+    periodYear: periodScope.year,
+    periodMonth: periodScope.month,
+    periodLabel: periodScope.label,
     totals: {
       activeCompanies: requestedCompany ? 1 : companies.filter(function(c) { return c.active === "YES"; }).length,
       totalOrders: 0,
@@ -46,9 +51,9 @@ function getOwnerExecutiveDashboard(sessionToken, companyId) {
     ensureExecutiveCompanySummary_(perCompany, c.companyId, c.companyName || c.companyId);
   });
 
-  const woCompanyMap = collectExecutiveWorkOrders_(ss, dashboard, perCompany, companyMap, requestedCompany);
-  collectExecutiveInvoices_(ss, dashboard, perCompany, companyMap, requestedCompany, woCompanyMap);
-  collectExecutiveEconomy_(ss, dashboard, perCompany, companyMap, requestedCompany);
+  const woCompanyMap = collectExecutiveWorkOrders_(ss, dashboard, perCompany, companyMap, requestedCompany, periodScope);
+  collectExecutiveInvoices_(ss, dashboard, perCompany, companyMap, requestedCompany, woCompanyMap, periodScope);
+  collectExecutiveEconomy_(ss, dashboard, perCompany, companyMap, requestedCompany, periodScope);
   collectExecutiveNotifications_(ss, dashboard, requestedCompany);
   dashboard.recentActivity = collectExecutiveRecentActivity_(ss, companyMap, requestedCompany, 12);
 
@@ -66,7 +71,8 @@ function getOwnerExecutiveDashboard(sessionToken, companyId) {
   dashboard.alerts = buildExecutiveAlerts_(dashboard.totals);
 
   addAuditLog_("DASHBOARD", "OWNER_EXECUTIVE_DASHBOARD_VIEWED", requestedCompany || "ALL", "DASHBOARD", requestedCompany || "ALL", session, {
-    scopeLabel: dashboard.scopeLabel
+    scopeLabel: dashboard.scopeLabel,
+    periodLabel: dashboard.periodLabel
   });
 
   return dashboard;
@@ -141,7 +147,7 @@ function getAdminCompanyDashboard(sessionToken, companyId, periodMode, periodYea
   ensureExecutiveCompanySummary_(perCompany, companyScope, dashboard.companyName);
 
   const woCompanyMap = collectExecutiveWorkOrders_(ss, dashboard, perCompany, companyMap, companyScope, periodScope);
-  collectExecutiveInvoices_(ss, dashboard, perCompany, companyMap, companyScope, woCompanyMap);
+  collectExecutiveInvoices_(ss, dashboard, perCompany, companyMap, companyScope, woCompanyMap, periodScope);
   collectAdminEconomyFinancials_(ss, dashboard, companyScope, periodScope);
 
   addAuditLog_("DASHBOARD", "ADMIN_COMPANY_DASHBOARD_VIEWED", companyScope, "DASHBOARD", companyScope, session, {
@@ -151,7 +157,7 @@ function getAdminCompanyDashboard(sessionToken, companyId, periodMode, periodYea
   return dashboard;
 }
 
-function getEconomyModuleDashboard(sessionToken, companyId) {
+function getEconomyModuleDashboard(sessionToken, companyId, periodMode, periodYear, periodMonth) {
   const session = requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"], companyId);
   const role = String(session.role || "").trim().toUpperCase();
   const requestedCompany = String(companyId || session.companyId || CFG.DEFAULT_COMPANY_ID).trim().toUpperCase();
@@ -164,7 +170,7 @@ function getEconomyModuleDashboard(sessionToken, companyId) {
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const periodScope = buildAdminPeriodScope_("monthly");
+  const periodScope = buildAdminPeriodScope_(periodMode, periodYear, periodMonth);
   const companies = getExecutiveCompanies_(ss);
   const companyMap = {};
 
@@ -726,7 +732,7 @@ function collectExecutiveWorkOrders_(ss, dashboard, perCompany, companyMap, requ
   return woCompanyMap;
 }
 
-function collectExecutiveInvoices_(ss, dashboard, perCompany, companyMap, requestedCompany, woCompanyMap) {
+function collectExecutiveInvoices_(ss, dashboard, perCompany, companyMap, requestedCompany, woCompanyMap, periodScope) {
   const sh = ss.getSheetByName("INVOICES");
   if (!sh || sh.getLastRow() < 2) return;
 
@@ -746,14 +752,25 @@ function collectExecutiveInvoices_(ss, dashboard, perCompany, companyMap, reques
 
     if (requestedCompany && companyId !== requestedCompany) continue;
 
+    const invoiceDate = parseExecutiveDate_(getExecutiveValue_(row, headers, [
+      "DATE_INVOICE",
+      "Timestamp",
+      "INVOICE_DATE",
+      "DATE_COMPLETED",
+      "DATE_PAID"
+    ]));
+
+    if (periodScope && !adminDateMatchesScope_(invoiceDate, periodScope)) continue;
+
     const company = ensureExecutiveCompanySummary_(perCompany, companyId, companyMap[companyId] || companyId);
     dashboard.totals.invoicesCreated++;
     company.invoicesCreated++;
   }
 }
 
-function collectExecutiveEconomy_(ss, dashboard, perCompany, companyMap, requestedCompany) {
+function collectExecutiveEconomy_(ss, dashboard, perCompany, companyMap, requestedCompany, periodScope) {
   const sh = ss.getSheetByName(CFG.SHEET_ECONOMY);
+  const dateLookup = buildAdminEconomyDateLookup_(ss);
   const activeInvoiceKeys = {};
 
   if (sh && sh.getLastRow() >= 2) {
@@ -769,14 +786,17 @@ function collectExecutiveEconomy_(ss, dashboard, perCompany, companyMap, request
 
       const invoiceKey = getEconomyHistoryInvoiceKey_(companyId, getExecutiveValue_(row, headers, ["INVOICE_NUMBER", "INVOICE"]));
       if (invoiceKey) activeInvoiceKeys[invoiceKey] = true;
+
+      if (periodScope && !adminEconomyRowMatchesScope_(row, headers, periodScope, dateLookup)) continue;
+
       addExecutiveEconomyRowToDashboard_(dashboard, perCompany, companyMap, companyId, row, headers);
     }
   }
 
-  collectExecutiveEconomyHistory_(ss, dashboard, perCompany, companyMap, requestedCompany, activeInvoiceKeys);
+  collectExecutiveEconomyHistory_(ss, dashboard, perCompany, companyMap, requestedCompany, activeInvoiceKeys, periodScope);
 }
 
-function collectExecutiveEconomyHistory_(ss, dashboard, perCompany, companyMap, requestedCompany, activeInvoiceKeys) {
+function collectExecutiveEconomyHistory_(ss, dashboard, perCompany, companyMap, requestedCompany, activeInvoiceKeys, periodScope) {
   const sh = ss.getSheetByName(ECONOMY_HISTORY_SHEET_NAME);
   if (!sh || sh.getLastRow() < 2) return;
 
@@ -792,6 +812,8 @@ function collectExecutiveEconomyHistory_(ss, dashboard, perCompany, companyMap, 
 
     const invoiceKey = getEconomyHistoryInvoiceKey_(companyId, getExecutiveValue_(row, headers, ["INVOICE_NUMBER", "INVOICE"]));
     if (invoiceKey && activeInvoiceKeys && activeInvoiceKeys[invoiceKey]) continue;
+
+    if (periodScope && !adminEconomyRowMatchesScope_(row, headers, periodScope, {})) continue;
 
     addExecutiveEconomyRowToDashboard_(dashboard, perCompany, companyMap, companyId, row, headers);
   }
