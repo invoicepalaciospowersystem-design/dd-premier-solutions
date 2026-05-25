@@ -1444,7 +1444,7 @@ function closeMonth() {
   const btn = document.getElementById("closeMonthBtn");
   if (btn && btn.disabled) return;
 
-  if (!confirm("Cerrar mes economico? Esta accion cambia el periodo activo.")) return;
+  if (!confirm("Cerrar mes economico? Los registros del periodo actual quedaran archivados y la pantalla abrira el nuevo periodo.")) return;
 
   if (btn) {
     btn.disabled = true;
@@ -1453,7 +1453,12 @@ function closeMonth() {
 
   google.script.run
     .withSuccessHandler(function(p) {
-      alert("Mes cerrado. Nuevo periodo: " + p.label);
+      alert(
+        "Mes cerrado.\n" +
+        "Periodo archivado: " + (p.previousLabel || "") + "\n" +
+        "Registros archivados: " + (p.closedRows || 0) + "\n" +
+        "Nuevo periodo: " + p.label
+      );
       if (btn) {
         btn.disabled = false;
         btn.innerText = "Cerrar Mes";
@@ -1477,13 +1482,15 @@ function loadPeriodFilter() {
 
   const current = select.value;
 
-  const periods = [...new Set(
-    ECONOMY
-      .map(function(o) {
-        return String(o.PERIOD_LABEL || "").trim();
-      })
-      .filter(Boolean)
-  )].sort().reverse();
+  const periodSet = {};
+  if (CURRENT_PERIOD_LABEL) periodSet[CURRENT_PERIOD_LABEL] = true;
+
+  ECONOMY.forEach(function(o) {
+    const label = String(o.PERIOD_LABEL || o.ACCOUNTING_PERIOD || "").trim();
+    if (label) periodSet[label] = true;
+  });
+
+  const periods = Object.keys(periodSet).sort().reverse();
 
   select.innerHTML =
     `<option value="">All Periods</option>` +
@@ -1493,7 +1500,7 @@ function loadPeriodFilter() {
 
   if (current && periods.includes(current)) {
     select.value = current;
-  } else if (CURRENT_PERIOD_LABEL && periods.includes(CURRENT_PERIOD_LABEL)) {
+  } else if (CURRENT_PERIOD_LABEL) {
     select.value = CURRENT_PERIOD_LABEL;
   }
 

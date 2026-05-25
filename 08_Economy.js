@@ -10,6 +10,17 @@ function createEconomyFromWO(companyId, woNumber) {
   if (!shWO) throw new Error("No existe " + CFG.SHEET_WORK_ORDERS);
   if (!shEco) throw new Error("No existe " + CFG.SHEET_ECONOMY);
 
+  ensureSheetColumns_(shEco, [
+    "PERIOD_MONTH",
+    "PERIOD_YEAR",
+    "PERIOD_LABEL",
+    "ACCOUNTING_PERIOD",
+    "CLOSED_PERIOD",
+    "MONTH_CLOSED_AT",
+    "MONTH_CLOSED_BY",
+    "MONTH_CLOSED_BY_EMAIL"
+  ]);
+
   companyId = String(companyId || "").trim().toUpperCase();
   woNumber = String(woNumber || "").trim();
 
@@ -73,6 +84,13 @@ if (
   return true;
 }
 
+      let period = null;
+      try {
+        period = getCurrentEconomyPeriod();
+      } catch (err) {
+        period = null;
+      }
+
       const rowObj = {
         COMPANY_ID: companyId,
         WO_NUMBER: woNumber,
@@ -94,7 +112,11 @@ if (
         TECH_LABOR_COST: "",
         TECH_LABOR_PAY: "",
         NOTES: "",
-        INV_SOURCE: ""
+        INV_SOURCE: "",
+        PERIOD_MONTH: period ? period.month : "",
+        PERIOD_YEAR: period ? period.year : "",
+        PERIOD_LABEL: period ? period.label : "",
+        ACCOUNTING_PERIOD: period ? period.label : ""
       };
 
       const newRow = ecoHeaders.map(function(h) {
@@ -260,6 +282,17 @@ function syncInvoicesToEconomy(companyId, sessionToken) {
     throw new Error("Faltan hojas INVOICES, ECONOMY, WORK_ORDERS o USERS.");
   }
 
+  ensureSheetColumns_(shEco, [
+    "PERIOD_MONTH",
+    "PERIOD_YEAR",
+    "PERIOD_LABEL",
+    "ACCOUNTING_PERIOD",
+    "CLOSED_PERIOD",
+    "MONTH_CLOSED_AT",
+    "MONTH_CLOSED_BY",
+    "MONTH_CLOSED_BY_EMAIL"
+  ]);
+
   const invData = shInv.getDataRange().getValues();
   const woData = shWO.getDataRange().getValues();
   const userData = shUsers.getDataRange().getValues();
@@ -342,6 +375,7 @@ function syncInvoicesToEconomy(companyId, sessionToken) {
   const period = getCurrentEconomyPeriod();
   let syncedRows = 0;
   let createdRows = 0;
+  let skippedClosedRows = 0;
 
   for (let i = 1; i < invData.length; i++) {
     const invRow = invData[i];
@@ -411,9 +445,19 @@ if (invType === "PM") continue;
       const ecoComp = String(ecoData[j][ecoCompany] || "").trim().toUpperCase();
 
       if (ecoWo === wo && ecoComp === companyId) {
+        if (isEconomyRowClosedForSync_(ecoData[j], ecoHeaders, period.label)) {
+          targetRow = -2;
+          break;
+        }
+
         targetRow = j + 1;
         break;
       }
+    }
+
+    if (targetRow === -2) {
+      skippedClosedRows++;
+      continue;
     }
 
     if (targetRow === -1) {
@@ -456,6 +500,7 @@ if (invType === "PM") continue;
     setEcoValue_(shEco, targetRow, ecoHeaders, ["PERIOD_MONTH"], period.month);
     setEcoValue_(shEco, targetRow, ecoHeaders, ["PERIOD_YEAR"], period.year);
     setEcoValue_(shEco, targetRow, ecoHeaders, ["PERIOD_LABEL"], period.label);
+    setEcoValue_(shEco, targetRow, ecoHeaders, ["ACCOUNTING_PERIOD"], period.label);
     syncedRows++;
   }
 
@@ -463,11 +508,31 @@ if (invType === "PM") continue;
     addAuditLog_("ECONOMY", "INVOICES_SYNCED_TO_ECONOMY", companyId, "ECONOMY", period.label, session, {
       syncedRows: syncedRows,
       createdRows: createdRows,
+      skippedClosedRows: skippedClosedRows,
       period: period.label
     });
   }
 
   return true;
+}
+
+function isEconomyRowClosedForSync_(row, headers, currentPeriodLabel) {
+  const closedPeriod = String(getHeaderValueFromRow_(row, headers, "CLOSED_PERIOD") || "").trim();
+  const closedAt = getHeaderValueFromRow_(row, headers, "MONTH_CLOSED_AT");
+  if (closedPeriod || closedAt) return true;
+
+  const rowPeriod = getEconomyRowPeriodLabelFromData_(row, headers);
+  currentPeriodLabel = String(currentPeriodLabel || "").trim();
+  return !!(rowPeriod && currentPeriodLabel && rowPeriod !== currentPeriodLabel);
+}
+
+function getHeaderValueFromRow_(row, headers, headerName) {
+  const normalizedHeaderName = String(headerName || "").trim().toUpperCase();
+  const idx = headers.map(function(h) {
+    return String(h || "").trim().toUpperCase();
+  }).indexOf(normalizedHeaderName);
+
+  return idx >= 0 ? row[idx] : "";
 }
 
 function closeWorkOrderAfterEconomyInvoiceSync_(shWO, woHeaders, woInfo, invoiceNumber, invoiceDate) {
@@ -576,6 +641,12 @@ function closeEconomyMonth(sessionToken) {
     }
 
     const previousLabel = year + "-" + String(month).padStart(2, "0");
+    const closedAt = new Date();
+
+    const shEco = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.SHEET_ECONOMY);
+    if (!shEco) throw new Error("No existe la hoja ECONOMY.");
+
+    const closedRows = closeEconomyRowsForPeriod_(shEco, previousLabel, closedAt, session);
 
     month++;
 
@@ -588,20 +659,25 @@ function closeEconomyMonth(sessionToken) {
 
     sh.getRange(monthRow, 2).setValue(month);
     sh.getRange(yearRow, 2).setValue(year);
+    setAppSettingValue_(sh, "ECONOMY_LAST_CLOSED_PERIOD", previousLabel);
+    setAppSettingValue_(sh, "ECONOMY_LAST_CLOSED_AT", closedAt);
+    setAppSettingValue_(sh, "ECONOMY_LAST_CLOSED_BY", getSessionActorLabel_(session));
     SpreadsheetApp.flush();
 
     addAuditLog_("ECONOMY", "ECONOMY_MONTH_CLOSED", session.companyId || CFG.DEFAULT_COMPANY_ID, "APP_SETTINGS", "ECONOMY_PERIOD", session, {
       previousLabel: previousLabel,
       newMonth: month,
       newYear: year,
-      label: newLabel
+      label: newLabel,
+      closedRows: closedRows
     });
 
     return {
       month: month,
       year: year,
       previousLabel: previousLabel,
-      label: newLabel
+      label: newLabel,
+      closedRows: closedRows
     };
   } catch (err) {
     notifySystemError_("ECONOMY_CLOSE_MONTH_ERROR", err, {
@@ -613,6 +689,87 @@ function closeEconomyMonth(sessionToken) {
   } finally {
     if (locked) lock.releaseLock();
   }
+}
+
+function closeEconomyRowsForPeriod_(sh, periodLabel, closedAt, session) {
+  periodLabel = String(periodLabel || "").trim();
+  if (!periodLabel) return 0;
+
+  const headers = ensureSheetColumns_(sh, [
+    "ACCOUNTING_PERIOD",
+    "CLOSED_PERIOD",
+    "MONTH_CLOSED_AT",
+    "MONTH_CLOSED_BY",
+    "MONTH_CLOSED_BY_EMAIL"
+  ]);
+
+  const lastRow = sh.getLastRow();
+  if (lastRow < 2) return 0;
+
+  const data = sh.getRange(1, 1, lastRow, sh.getLastColumn()).getValues();
+  const actor = getSessionActorLabel_(session);
+  const actorEmail = String(session && session.email || "").trim();
+  let closed = 0;
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (isSoftDeletedRow_(row, headers)) continue;
+
+    const rowPeriod = getEconomyRowPeriodLabelFromData_(row, headers);
+    if (rowPeriod !== periodLabel) continue;
+
+    const rowNumber = i + 1;
+    const existingAccountingPeriod = getCellByHeader_(sh, rowNumber, headers, "ACCOUNTING_PERIOD");
+    if (!existingAccountingPeriod) {
+      setCellByHeader_(sh, rowNumber, headers, "ACCOUNTING_PERIOD", periodLabel);
+    }
+
+    setCellByHeader_(sh, rowNumber, headers, "CLOSED_PERIOD", periodLabel);
+    setCellByHeader_(sh, rowNumber, headers, "MONTH_CLOSED_AT", closedAt);
+    setCellByHeader_(sh, rowNumber, headers, "MONTH_CLOSED_BY", actor);
+    setCellByHeader_(sh, rowNumber, headers, "MONTH_CLOSED_BY_EMAIL", actorEmail);
+    closed++;
+  }
+
+  return closed;
+}
+
+function getEconomyRowPeriodLabelFromData_(row, headers) {
+  const idxLabel = headers.indexOf("PERIOD_LABEL");
+  const label = idxLabel >= 0 ? String(row[idxLabel] || "").trim() : "";
+  if (label) return label;
+
+  const idxAccountingPeriod = headers.indexOf("ACCOUNTING_PERIOD");
+  const accountingPeriod = idxAccountingPeriod >= 0 ? String(row[idxAccountingPeriod] || "").trim() : "";
+  if (accountingPeriod) return accountingPeriod;
+
+  const idxYear = headers.indexOf("PERIOD_YEAR");
+  const idxMonth = headers.indexOf("PERIOD_MONTH");
+  const year = idxYear >= 0 ? Number(row[idxYear] || 0) : 0;
+  const month = idxMonth >= 0 ? Number(row[idxMonth] || 0) : 0;
+
+  if (year && month) {
+    return year + "-" + String(month).padStart(2, "0");
+  }
+
+  return "";
+}
+
+function setAppSettingValue_(sh, key, value) {
+  key = String(key || "").trim();
+  if (!key) return;
+
+  const lastRow = Math.max(sh.getLastRow(), 1);
+  const data = sh.getRange(1, 1, lastRow, Math.max(sh.getLastColumn(), 2)).getValues();
+
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0] || "").trim() === key) {
+      sh.getRange(i + 1, 2).setValue(value);
+      return;
+    }
+  }
+
+  sh.appendRow([key, value]);
 }
 
 function removePMFromRegularEconomy(sessionToken) {
