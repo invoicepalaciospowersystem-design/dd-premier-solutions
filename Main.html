@@ -3525,7 +3525,7 @@ function renderAdminDashboard(data) {
       { label: "Yoel - cobra por parts", value: formatMoneyDashboard(investors.yoelPartsCost || 0), tone: "info" },
       { label: "Sin INV_SOURCE", value: formatMoneyDashboard(investors.unassignedPartsCost || 0), tone: investors.unassignedPartsCost ? "warning" : "success" }
     ]) +
-    "<div class='company-meta' style='margin-top:10px;'>Regla: DAVID = 75/25, YOEL = 25/75, MISCELANEAS = 50/50. El gasto real total de parts queda arriba separado.</div>";
+    "<div class='company-meta' style='margin-top:10px;'>Regla de cobro: DAVID = 75/25, YOEL = 25/75, MISCELANEAS = 50/50. Gasto real de parts: solo cuenta cuando INV_SOURCE es YOEL.</div>";
 }
 
 function renderAdminMetricButton(card) {

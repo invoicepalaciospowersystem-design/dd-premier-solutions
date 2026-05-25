@@ -742,7 +742,7 @@ function getEconomyMetricCards(m) {
     { key:"tax", label:"Tax", value:formatMoney(m.tax), note:"Tax collected", tone:"neutral" },
     { key:"billedParts", label:"Billed Parts", value:formatMoney(m.billedParts), note:"Estimated parts charge", tone:"info" },
     { key:"laborBilled", label:"Billed Labor", value:formatMoney(m.laborBilled), note:m.hours.toFixed(2) + " hours", tone:"info" },
-    { key:"cost", label:"Real Parts Cost", value:formatMoney(m.cost), note:"Calculated from COST + INV_SOURCE", tone:m.cost ? "warning" : "success" },
+    { key:"cost", label:"Real Parts Cost", value:formatMoney(m.cost), note:"Only counts when INV_SOURCE is YOEL", tone:m.cost ? "warning" : "success" },
     { key:"techPay", label:"Tech Pay", value:formatMoney(m.techPay), note:"Labor paid to techs", tone:"warning" },
     { key:"profit", label:"Profit", value:formatMoney(m.profit), note:"Billed - tax - real cost - tech pay", tone:m.profit >= 0 ? "success" : "danger" },
     { key:"david", label:"David Parts", value:formatMoney(m.david), note:"Investor parts split", tone:"info" },
@@ -851,10 +851,7 @@ function calculateRealPartsCost(source, cost) {
   source = String(source || "").trim().toUpperCase();
   cost = Number(cost || 0);
 
-  if (source === "MISCELANEAS") return 0;
-  if (source === "DAVID" || source === "YOEL") return cost * 0.50;
-
-  return cost;
+  return source === "YOEL" ? cost : 0;
 }
 
 function calculateEconomyLaborCharge(hours) {
@@ -971,10 +968,85 @@ function renderTechPay(o) {
   `;
 }
 
+function getEconomyRecordByRowNumber(rowNumber) {
+  rowNumber = Number(rowNumber);
+  return ECONOMY.find(function(item) {
+    return Number(item && item.ROW_NUMBER) === rowNumber;
+  }) || null;
+}
+
+function parsePmSummaryFromNotes(noteText) {
+  const summary = {};
+  const labelMap = {
+    "PM Invoice Total": "invoiceTotal",
+    "Subtotal": "invoiceSubtotal",
+    "Tax": "invoiceTax",
+    "Paid to D&D": "ddPayment",
+    "Tech Pay": "techPay",
+    "D&D Profit": "ddProfit"
+  };
+
+  String(noteText || "").split("|").forEach(function(part) {
+    const pieces = part.split(":");
+    if (pieces.length < 2) return;
+
+    const key = labelMap[pieces[0].trim()];
+    if (!key) return;
+
+    const numeric = pieces.slice(1).join(":").replace(/[^0-9.-]/g, "");
+    if (!numeric) return;
+
+    summary[key] = Number(numeric);
+  });
+
+  return summary;
+}
+
+function getPmDerivedValues(record, noteTextOverride) {
+  const legacyPmDefaults = {
+    subtotal: 391.67,
+    tax: 27.42,
+    total: 419.09
+  };
+  const safeRecord = record || {};
+  const notes = noteTextOverride !== undefined ? noteTextOverride : safeRecord.NOTES;
+  const noteSummary = parsePmSummaryFromNotes(notes);
+  const amount = parseEconomyNumber(safeRecord.AMOUNT);
+  const techPay = parseEconomyNumber(
+    safeRecord.TECH_LABOR_COST || safeRecord.TECH_LABOR_PAY || safeRecord.COST
+  );
+  const tax = noteSummary.invoiceTax !== undefined
+    ? noteSummary.invoiceTax
+    : (parseEconomyNumber(safeRecord.TAX) || legacyPmDefaults.tax);
+  const profit = String(safeRecord.PROFIT || "").trim() !== ""
+    ? parseEconomyNumber(safeRecord.PROFIT)
+    : (noteSummary.ddProfit !== undefined
+      ? noteSummary.ddProfit
+      : (amount - tax - techPay));
+  const subtotal = noteSummary.invoiceSubtotal !== undefined
+    ? noteSummary.invoiceSubtotal
+    : legacyPmDefaults.subtotal;
+  const invoiceTotal = noteSummary.invoiceTotal !== undefined
+    ? noteSummary.invoiceTotal
+    : legacyPmDefaults.total;
+
+  return {
+    noteSummary: noteSummary,
+    amount: amount,
+    techPay: techPay,
+    tax: tax,
+    profit: profit,
+    subtotal: subtotal,
+    invoiceTotal: invoiceTotal
+  };
+}
+
 function renderPMSummary(o) {
   const isPM = VIEW_MODE === "PM" || String(o.INV_SOURCE || "").toUpperCase() === "PM";
 
   if (!isPM) return "";
+
+  const pmValues = getPmDerivedValues(o);
 
   return `
     <div class="pm-box">
@@ -982,34 +1054,34 @@ function renderPMSummary(o) {
 
       <div class="pm-row">
         <span>Invoice Subtotal:</span>
-        <b>$391.67</b>
+        <b>${formatMoney(pmValues.subtotal)}</b>
       </div>
 
       <div class="pm-row">
         <span>Tax:</span>
-        <b>$27.42</b>
+        <b>${formatMoney(pmValues.tax)}</b>
       </div>
 
       <div class="pm-row">
         <span>Invoice Total:</span>
-        <b>$419.09</b>
+        <b>${formatMoney(pmValues.invoiceTotal)}</b>
       </div>
 
       <hr style="margin:10px 0; border:none; border-top:1px solid #dbeafe;">
 
       <div class="pm-row">
         <span>Paid to D&D:</span>
-        <b>$180.00</b>
+        <b>${formatMoney(pmValues.amount)}</b>
       </div>
 
       <div class="pm-row">
         <span>Tech Pay:</span>
-        <b>$80.00</b>
+        <b>${formatMoney(pmValues.techPay)}</b>
       </div>
 
       <div class="pm-row">
         <span>D&D Profit:</span>
-        <b>$100.00</b>
+        <b>${formatMoney(pmValues.profit)}</b>
       </div>
     </div>
   `;
@@ -1073,6 +1145,10 @@ function card(o) {
   const techPay = parseEconomyNumber(o.TECH_LABOR_COST || o.TECH_LABOR_PAY);
   const calculatedProfit = amount - tax - realCost - techPay;
   const split = getInvestmentSplitValues(o.INV_SOURCE, rawCost);
+  const pmValues = isPM ? getPmDerivedValues(o) : null;
+  const pmTechPay = pmValues ? pmValues.techPay : 0;
+  const pmProfit = pmValues ? pmValues.profit : 0;
+  const displayProfit = isPM ? pmProfit : calculatedProfit;
 
   return `
     <div class="card ${cls}">
@@ -1107,7 +1183,7 @@ function card(o) {
         <div>
           <label>${isPM ? "Tech Pay" : "Cost"}</label>
           <input id="cost_${row}" type="number" step="0.01"
-            value="${formatMoneyValue(o.COST)}"
+            value="${formatMoneyValue(isPM ? (o.TECH_LABOR_COST || o.TECH_LABOR_PAY || o.COST) : o.COST)}"
             oninput="updateInvView(${row})" ${isPM ? "readonly" : lockAttr}>
         </div>
       </div>
@@ -1115,9 +1191,9 @@ function card(o) {
       ${isPM ? `
         <div class="row" style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:10px;">
           <b>Economía D&D:</b><br>
-          Palacios Power System paga a D&D: <b>$180.00</b><br>
-          D&D paga al técnico: <b>$80.00</b><br>
-          Ganancia D&D: <b>$100.00</b>
+          Palacios Power System paga a D&D: <b>${formatMoney(amount)}</b><br>
+          D&D paga al técnico: <b>${formatMoney(pmTechPay)}</b><br>
+          Ganancia D&D: <b>${formatMoney(pmProfit)}</b>
         </div>
       ` : `
         <div class="row">
@@ -1149,7 +1225,7 @@ function card(o) {
         </div>
       `}
 
-      <div class="row"><b>Profit:</b> ${formatMoney(calculatedProfit)}</div>
+      <div class="row"><b>Profit:</b> ${formatMoney(displayProfit)}</div>
 
       <div class="row">
         <label>Status</label><br>
@@ -1178,7 +1254,8 @@ function card(o) {
 }
 
 function save(row, btn) {
-  const isPM = VIEW_MODE === "PM";
+  const currentRecord = getEconomyRecordByRowNumber(row);
+  const isPM = VIEW_MODE === "PM" || String(currentRecord && currentRecord.INV_SOURCE || "").toUpperCase() === "PM";
 
   const updates = {
     AMOUNT: document.getElementById("amount_" + row).value,
@@ -1191,11 +1268,30 @@ function save(row, btn) {
   if (!isPM) {
     updates.INV_SOURCE = document.getElementById("inv_" + row).value;
   } else {
+    const pmAmount = parseEconomyNumber(updates.AMOUNT);
+    const pmCost = parseEconomyNumber(updates.COST);
+    const currentDetail = String(currentRecord && currentRecord.TECH_PAY_DETAIL || "").trim();
+    const pmTax = getPmDerivedValues(
+      Object.assign({}, currentRecord, {
+        AMOUNT: updates.AMOUNT,
+        COST: updates.COST,
+        TECH_LABOR_COST: updates.COST,
+        NOTES: updates.NOTES,
+        PROFIT: ""
+      }),
+      updates.NOTES
+    ).tax;
+
     updates.INV_SOURCE = "PM";
-    updates.TAX = 0;
-    updates.PROFIT = 100;
-    updates.TECH_LABOR_COST = 80;
-    updates.TECH_PAY_DETAIL = "Technician: $80";
+    updates.TECH_LABOR_COST = pmCost;
+    updates.PROFIT = (pmAmount - pmTax - pmCost).toFixed(2);
+
+    if (!currentDetail || currentDetail.indexOf("|") === -1) {
+      const techName = currentDetail
+        ? String(currentDetail.split(":")[0] || "Technician").trim()
+        : String(currentRecord && currentRecord.TECHNICIANS || "Technician").trim();
+      updates.TECH_PAY_DETAIL = techName + ": $" + pmCost.toFixed(2);
+    }
   }
 
   btn.innerText = "Guardando...";

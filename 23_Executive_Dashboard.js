@@ -373,10 +373,7 @@ function getAdminRealPartsCost_(source, cost) {
   source = String(source || "").trim().toUpperCase();
   cost = Number(cost || 0);
 
-  if (source === "MISCELANEAS") return 0;
-  if (source === "DAVID" || source === "YOEL") return cost * 0.50;
-
-  return cost;
+  return source === "YOEL" ? cost : 0;
 }
 
 function getAdminEconomyCost_(row, headers) {
