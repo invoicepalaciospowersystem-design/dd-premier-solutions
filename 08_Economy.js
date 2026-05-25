@@ -515,6 +515,8 @@ function setEcoValue_(sh, rowNumber, headers, possibleNames, value) {
 }
 function getCurrentEconomyPeriod() {
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("APP_SETTINGS");
+  if (!sh) throw new Error("No existe la hoja APP_SETTINGS.");
+
   const data = sh.getDataRange().getValues();
 
   let month = 0;
@@ -541,47 +543,76 @@ function getCurrentEconomyPeriod() {
 
 function closeEconomyMonth(sessionToken) {
   const session = requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"], getDashboardCompanyIdFromSession_(sessionToken));
-  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("APP_SETTINGS");
-  const data = sh.getDataRange().getValues();
+  const lock = LockService.getScriptLock();
+  let locked = false;
 
-  let monthRow = -1;
-  let yearRow = -1;
+  try {
+    lock.waitLock(30000);
+    locked = true;
 
-  for (let i = 1; i < data.length; i++) {
-    const key = String(data[i][0] || "").trim();
+    const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("APP_SETTINGS");
+    if (!sh) throw new Error("No existe la hoja APP_SETTINGS.");
 
-    if (key === "ECONOMY_MONTH") monthRow = i + 1;
-    if (key === "ECONOMY_YEAR") yearRow = i + 1;
+    const data = sh.getDataRange().getValues();
+    let monthRow = -1;
+    let yearRow = -1;
+
+    for (let i = 1; i < data.length; i++) {
+      const key = String(data[i][0] || "").trim();
+
+      if (key === "ECONOMY_MONTH") monthRow = i + 1;
+      if (key === "ECONOMY_YEAR") yearRow = i + 1;
+    }
+
+    if (monthRow === -1 || yearRow === -1) {
+      throw new Error("No se encontro configuracion ECONOMY_MONTH / YEAR.");
+    }
+
+    let month = Number(sh.getRange(monthRow, 2).getValue());
+    let year = Number(sh.getRange(yearRow, 2).getValue());
+
+    if (!month || !year || month < 1 || month > 12) {
+      throw new Error("Periodo economico invalido en APP_SETTINGS.");
+    }
+
+    const previousLabel = year + "-" + String(month).padStart(2, "0");
+
+    month++;
+
+    if (month > 12) {
+      month = 1;
+      year++;
+    }
+
+    const newLabel = year + "-" + String(month).padStart(2, "0");
+
+    sh.getRange(monthRow, 2).setValue(month);
+    sh.getRange(yearRow, 2).setValue(year);
+    SpreadsheetApp.flush();
+
+    addAuditLog_("ECONOMY", "ECONOMY_MONTH_CLOSED", session.companyId || CFG.DEFAULT_COMPANY_ID, "APP_SETTINGS", "ECONOMY_PERIOD", session, {
+      previousLabel: previousLabel,
+      newMonth: month,
+      newYear: year,
+      label: newLabel
+    });
+
+    return {
+      month: month,
+      year: year,
+      previousLabel: previousLabel,
+      label: newLabel
+    };
+  } catch (err) {
+    notifySystemError_("ECONOMY_CLOSE_MONTH_ERROR", err, {
+      module: "ECONOMY",
+      actorEmail: session.email || "",
+      actorRole: session.role || ""
+    });
+    throw err;
+  } finally {
+    if (locked) lock.releaseLock();
   }
-
-  if (monthRow === -1 || yearRow === -1) {
-    throw new Error("No se encontró configuración ECONOMY_MONTH / YEAR");
-  }
-
-  let month = Number(sh.getRange(monthRow, 2).getValue());
-  let year = Number(sh.getRange(yearRow, 2).getValue());
-
-  month++;
-
-  if (month > 12) {
-    month = 1;
-    year++;
-  }
-
-  sh.getRange(monthRow, 2).setValue(month);
-  sh.getRange(yearRow, 2).setValue(year);
-
-  addAuditLog_("ECONOMY", "ECONOMY_MONTH_CLOSED", session.companyId || CFG.DEFAULT_COMPANY_ID, "APP_SETTINGS", "ECONOMY_PERIOD", session, {
-    newMonth: month,
-    newYear: year,
-    label: year + "-" + String(month).padStart(2, "0")
-  });
-
-  return {
-    month: month,
-    year: year,
-    label: year + "-" + String(month).padStart(2, "0")
-  };
 }
 
 function removePMFromRegularEconomy(sessionToken) {

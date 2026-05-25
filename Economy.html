@@ -242,7 +242,7 @@
 
   <button onclick="loadOldDDSummary()">Histórico D&D</button>
 
-  <button onclick="closeMonth()" style="background:#dc2626;">
+  <button id="closeMonthBtn" onclick="closeMonth()" style="background:#dc2626;">
     Cerrar Mes
   </button>
 
@@ -1441,15 +1441,31 @@ function loadPeriod() {
 }
 
 function closeMonth() {
-  if (!confirm("¿Cerrar mes económico?")) return;
+  const btn = document.getElementById("closeMonthBtn");
+  if (btn && btn.disabled) return;
+
+  if (!confirm("Cerrar mes economico? Esta accion cambia el periodo activo.")) return;
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = "Cerrando...";
+  }
 
   google.script.run
     .withSuccessHandler(function(p) {
       alert("Mes cerrado. Nuevo periodo: " + p.label);
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = "Cerrar Mes";
+      }
       loadPeriod();
       load();
     })
     .withFailureHandler(function(err) {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = "Cerrar Mes";
+      }
       alert(err.message);
     })
     .closeEconomyMonth(getSessionToken());
