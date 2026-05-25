@@ -1,4 +1,5 @@
-function syncOldDDPremierMonthly() {
+function syncOldDDPremierMonthly(sessionToken) {
+  const session = requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"]);
   const oldSS = SpreadsheetApp.openById(CFG.OLD_ECONOMY_SPREADSHEET_ID);
   const oldSh = oldSS.getSheetByName("RESUMEN  D&D-PREMIER");
   if (!oldSh) throw new Error("No existe RESUMEN  D&D-PREMIER.");
@@ -54,12 +55,17 @@ function syncOldDDPremierMonthly() {
     newSh.getRange(2, 3, output.length - 1, 5).setNumberFormat("$#,##0.00");
   }
 
+  addAuditLog_("ECONOMY", "OLD_DD_MONTHLY_SYNCED", session.companyId || CFG.DEFAULT_COMPANY_ID, "DD_OLD_MONTHLY", "SYNC", session, {
+    rows: output.length - 1
+  });
+
   return {
     success: true,
     rows: output.length - 1
   };
 }
-function testOldSheetData() {
+function testOldSheetData(sessionToken) {
+  requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"]);
   const oldSS = SpreadsheetApp.openById("1kkOZMlZRcrmnf5fYT6GYJk0Ne8t_but2-1Enknoy7vw");
   const oldSh = oldSS.getSheetByName("RESUMEN  D&D-PREMIER");
 
@@ -68,7 +74,8 @@ function testOldSheetData() {
   Logger.log(data);
 }
 
-function getOldDDPremierMonthlyData() {
+function getOldDDPremierMonthlyData(sessionToken) {
+  requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"]);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = ss.getSheetByName("DD_OLD_MONTHLY");
 

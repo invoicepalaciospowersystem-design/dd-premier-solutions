@@ -151,6 +151,19 @@ function recordLoginFailure_(email) {
   }
 
   props.setProperty(key, JSON.stringify(next));
+
+  if (next.lockedUntil) {
+    try {
+      notifySystemError_("AUTH_LOGIN_LOCKED", new Error("Login bloqueado por demasiados intentos fallidos."), {
+        module: "AUTH",
+        email: maskEmailForSecurity_(email),
+        attempts: next.count,
+        lockMinutes: lockMinutes
+      });
+    } catch (err) {
+      Logger.log("WARN AUTH_LOGIN_LOCKED alert: " + err);
+    }
+  }
 }
 
 function clearLoginFailures_(email) {
@@ -179,6 +192,20 @@ function getLoginFailureRecord_(email) {
 
 function getLoginFailureKey_(email) {
   return AUTH_LOGIN_FAIL_PREFIX + hashSessionToken_(String(email || "").trim().toLowerCase());
+}
+
+function maskEmailForSecurity_(email) {
+  email = String(email || "").trim().toLowerCase();
+  const parts = email.split("@");
+  if (parts.length !== 2) return email ? "***" : "";
+
+  const local = parts[0];
+  const domainParts = parts[1].split(".");
+  const visibleLocal = local.length <= 2 ? local.charAt(0) : local.slice(0, 2);
+  const visibleDomain = domainParts[0] ? domainParts[0].charAt(0) + "***" : "***";
+  const suffix = domainParts.length > 1 ? "." + domainParts.slice(1).join(".") : "";
+
+  return visibleLocal + "***@" + visibleDomain + suffix;
 }
 
 function verifyUserPassword_(sh, rowNumber, headers, row, password) {
@@ -339,6 +366,32 @@ function destroySession(sessionToken) {
   CacheService.getScriptCache().remove(key);
   PropertiesService.getScriptProperties().deleteProperty(key);
   return true;
+}
+
+function cleanupExpiredSessions_() {
+  const props = PropertiesService.getScriptProperties();
+  const all = props.getProperties();
+  const now = Date.now();
+  let removed = 0;
+
+  Object.keys(all).forEach(function(key) {
+    if (key.indexOf(AUTH_SESSION_PREFIX) !== 0) return;
+
+    try {
+      const session = JSON.parse(all[key] || "{}");
+      if (!session.expiresAt || Number(session.expiresAt) < now) {
+        props.deleteProperty(key);
+        CacheService.getScriptCache().remove(key);
+        removed++;
+      }
+    } catch (err) {
+      props.deleteProperty(key);
+      CacheService.getScriptCache().remove(key);
+      removed++;
+    }
+  });
+
+  return removed;
 }
 
 function getSessionStorageKey_(sessionToken) {

@@ -404,7 +404,8 @@ function sendSupervisorOrderMessage(rowNumber, supervisorName, message, sessionT
   return true;
 }
 
-function testSupervisorEmail() {
+function testSupervisorEmail(sessionToken) {
+  requireSession_(sessionToken, ["OWNER", "ADMIN"]);
   MailApp.sendEmail({
     to: "invoice.palaciospowersystem@gmail.com",
     subject: "TEST EMAIL FROM APP SCRIPT",

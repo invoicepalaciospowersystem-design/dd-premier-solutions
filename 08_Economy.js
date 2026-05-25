@@ -173,7 +173,7 @@ function updateEconomyRow(rowNumber, updates, sessionToken) {
 
   const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
   const companyId = getCellByHeader_(sh, rowNumber, headers, "COMPANY_ID") || CFG.DEFAULT_COMPANY_ID;
-  requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"], companyId);
+  const session = requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"], companyId);
 
   Object.keys(updates).forEach(function(key) {
     const col = headers.indexOf(key) + 1;
@@ -211,6 +211,11 @@ function updateEconomyRow(rowNumber, updates, sessionToken) {
     sh.getRange(rowNumber, datePaidCol).setValue(new Date());
   }
 
+  addAuditLog_("ECONOMY", "ECONOMY_ROW_UPDATED", companyId, "ECONOMY", String(rowNumber), session, {
+    rowNumber: rowNumber,
+    fields: Object.keys(updates || {})
+  });
+
   return true;
 }
 
@@ -240,8 +245,9 @@ function calculateEconomyRealPartsCost_(source, cost) {
 
 function syncInvoicesToEconomy(companyId, sessionToken) {
   companyId = String(companyId || "").trim().toUpperCase();
+  let session = null;
   if (sessionToken) {
-    requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"], companyId);
+    session = requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"], companyId);
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -334,6 +340,8 @@ function syncInvoicesToEconomy(companyId, sessionToken) {
   }
 
   const period = getCurrentEconomyPeriod();
+  let syncedRows = 0;
+  let createdRows = 0;
 
   for (let i = 1; i < invData.length; i++) {
     const invRow = invData[i];
@@ -424,6 +432,7 @@ if (invType === "PM") continue;
 
       shEco.appendRow(newRow);
       targetRow = shEco.getLastRow();
+      createdRows++;
     }
 
     setEcoValue_(shEco, targetRow, ecoHeaders, ["AMOUNT", "INVOICE_TOTAL"], total);
@@ -447,6 +456,15 @@ if (invType === "PM") continue;
     setEcoValue_(shEco, targetRow, ecoHeaders, ["PERIOD_MONTH"], period.month);
     setEcoValue_(shEco, targetRow, ecoHeaders, ["PERIOD_YEAR"], period.year);
     setEcoValue_(shEco, targetRow, ecoHeaders, ["PERIOD_LABEL"], period.label);
+    syncedRows++;
+  }
+
+  if (session) {
+    addAuditLog_("ECONOMY", "INVOICES_SYNCED_TO_ECONOMY", companyId, "ECONOMY", period.label, session, {
+      syncedRows: syncedRows,
+      createdRows: createdRows,
+      period: period.label
+    });
   }
 
   return true;
@@ -521,7 +539,8 @@ function getCurrentEconomyPeriod() {
   };
 }
 
-function closeEconomyMonth() {
+function closeEconomyMonth(sessionToken) {
+  const session = requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"], getDashboardCompanyIdFromSession_(sessionToken));
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("APP_SETTINGS");
   const data = sh.getDataRange().getValues();
 
@@ -552,6 +571,12 @@ function closeEconomyMonth() {
   sh.getRange(monthRow, 2).setValue(month);
   sh.getRange(yearRow, 2).setValue(year);
 
+  addAuditLog_("ECONOMY", "ECONOMY_MONTH_CLOSED", session.companyId || CFG.DEFAULT_COMPANY_ID, "APP_SETTINGS", "ECONOMY_PERIOD", session, {
+    newMonth: month,
+    newYear: year,
+    label: year + "-" + String(month).padStart(2, "0")
+  });
+
   return {
     month: month,
     year: year,
@@ -559,7 +584,8 @@ function closeEconomyMonth() {
   };
 }
 
-function removePMFromRegularEconomy() {
+function removePMFromRegularEconomy(sessionToken) {
+  const session = requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"]);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = ss.getSheetByName(CFG.SHEET_ECONOMY);
   if (!sh) throw new Error("No existe ECONOMY.");
@@ -590,5 +616,15 @@ function removePMFromRegularEconomy() {
     }
   }
 
+  addAuditLog_("ECONOMY", "PM_ROWS_SOFT_DELETED_FROM_ECONOMY", session.companyId || CFG.DEFAULT_COMPANY_ID, "ECONOMY", "PM_ROWS", session, {
+    removed: removed
+  });
+
   return removed;
+}
+
+function getDashboardCompanyIdFromSession_(sessionToken) {
+  const session = getSession_(sessionToken);
+  if (!session) return "";
+  return String(session.companyId || "").trim().toUpperCase();
 }

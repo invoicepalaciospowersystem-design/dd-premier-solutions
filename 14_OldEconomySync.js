@@ -1,4 +1,5 @@
-function syncInvoicesToOldLog() {
+function syncInvoicesToOldLog(sessionToken) {
+  const session = requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"]);
   const oldSS = SpreadsheetApp.openById(CFG.OLD_ECONOMY_SPREADSHEET_ID);
   const oldLog = oldSS.getSheetByName("LOG");
   if (!oldLog) throw new Error("No existe la hoja LOG en el sistema viejo.");
@@ -96,6 +97,10 @@ function syncInvoicesToOldLog() {
       .getRange(oldLog.getLastRow() + 1, 1, rowsToAdd.length, rowsToAdd[0].length)
       .setValues(rowsToAdd);
   }
+
+  addAuditLog_("ECONOMY", "INVOICES_SYNCED_TO_OLD_LOG", session.companyId || CFG.DEFAULT_COMPANY_ID, "OLD_LOG", "SYNC", session, {
+    added: rowsToAdd.length
+  });
 
   return {
     success: true,

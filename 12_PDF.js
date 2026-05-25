@@ -276,7 +276,8 @@ function parseMoney_(v) {
   return isNaN(n) ? 0 : n;
 }
 
-function testGeneratePdfFromCloseOrder() {
+function testGeneratePdfFromCloseOrder(sessionToken) {
+  requireSession_(sessionToken, ["OWNER", "ADMIN"]);
   const testInvoice = {
     Invoice: "TEST-1001",
     WO_NUMBER: "WO-TEST",

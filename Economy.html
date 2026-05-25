@@ -1452,7 +1452,7 @@ function closeMonth() {
     .withFailureHandler(function(err) {
       alert(err.message);
     })
-    .closeEconomyMonth();
+    .closeEconomyMonth(getSessionToken());
 }
 
 function loadPeriodFilter() {
@@ -1550,13 +1550,13 @@ function loadOldDDSummary() {
           document.getElementById("oldDDSummaryBox").innerHTML =
             "ERROR histórico D&D: " + err.message;
         })
-        .getOldDDPremierMonthlyData();
+        .getOldDDPremierMonthlyData(getSessionToken());
     })
     .withFailureHandler(function(err) {
       document.getElementById("oldDDSummaryBox").innerHTML =
         "ERROR sincronizando histórico D&D: " + err.message;
     })
-    .syncOldDDPremierMonthly();
+    .syncOldDDPremierMonthly(getSessionToken());
 }
 
 function renderOldDDSummary(rows) {

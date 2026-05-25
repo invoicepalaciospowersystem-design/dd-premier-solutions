@@ -150,7 +150,7 @@ function createQuote(data, sessionToken) {
 function createQuote_(data, session) {
   if (!data) throw new Error("No quote data received.");
 
-  setupQuotesModule();
+  setupQuotesModule_();
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = ss.getSheetByName("QUOTES");
@@ -273,7 +273,7 @@ function findExistingQuoteByNumber_(sh, headers, quoteNumber) {
   return null;
 }
 
-function setupQuotesModule() {
+function setupQuotesModule_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sh = ss.getSheetByName("QUOTES");
   if (!sh) sh = ss.insertSheet("QUOTES");

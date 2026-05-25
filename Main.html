@@ -1702,6 +1702,132 @@
     .alert-row.info .alert-value { background:#dbeafe; color:#1e40af; }
     .alert-row.success .alert-value { background:#dcfce7; color:#166534; }
 
+    .system-health-section {
+      grid-column:1 / -1;
+      border-top:4px solid #111827;
+    }
+
+    .system-health-head {
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:flex-start;
+      flex-wrap:wrap;
+      margin-bottom:12px;
+    }
+
+    .system-health-head h3 {
+      margin:0;
+    }
+
+    .system-health-status {
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:7px 10px;
+      border-radius:999px;
+      font-weight:bold;
+      font-size:12px;
+      background:#f3f4f6;
+      color:#111827;
+    }
+
+    .system-health-status.ok,
+    .health-pill.ok { background:#dcfce7; color:#166534; }
+    .system-health-status.warning,
+    .health-pill.warning { background:#fef3c7; color:#92400e; }
+    .system-health-status.critical,
+    .health-pill.critical { background:#fee2e2; color:#991b1b; }
+
+    .system-health-summary {
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(170px, 1fr));
+      gap:10px;
+      margin:12px 0;
+    }
+
+    .health-summary-card {
+      border:1px solid #e5e7eb;
+      border-radius:8px;
+      padding:10px;
+      background:#f8fafc;
+    }
+
+    .health-summary-label {
+      color:#6b7280;
+      font-size:12px;
+      margin-bottom:4px;
+    }
+
+    .health-summary-value {
+      color:#111827;
+      font-size:22px;
+      font-weight:bold;
+      line-height:1.1;
+    }
+
+    .system-health-grid {
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:12px;
+      align-items:start;
+    }
+
+    .health-check-row,
+    .health-error-row {
+      border-top:1px solid #f3f4f6;
+      padding:10px 0;
+    }
+
+    .health-check-row:first-child,
+    .health-error-row:first-child {
+      border-top:0;
+      padding-top:0;
+    }
+
+    .health-check-top,
+    .health-error-top {
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:flex-start;
+    }
+
+    .health-title {
+      font-weight:bold;
+      color:#111827;
+      overflow-wrap:anywhere;
+    }
+
+    .health-meta {
+      margin-top:4px;
+      color:#6b7280;
+      font-size:12px;
+      line-height:1.35;
+      overflow-wrap:anywhere;
+    }
+
+    .health-pill {
+      flex:0 0 auto;
+      border-radius:999px;
+      padding:5px 8px;
+      background:#f3f4f6;
+      color:#111827;
+      font-size:11px;
+      font-weight:bold;
+      text-transform:uppercase;
+    }
+
+    .health-resolve {
+      width:auto;
+      margin:8px 0 0;
+      padding:7px 10px;
+      border-radius:8px;
+      background:#111827;
+      color:#fff;
+      font-size:12px;
+    }
+
     .module-heading {
       margin:22px 0 0;
       font-size:20px;
@@ -2000,7 +2126,8 @@
       }
 
       .metric-grid,
-      .dash-layout {
+      .dash-layout,
+      .system-health-grid {
         grid-template-columns:1fr;
       }
 
@@ -2243,6 +2370,31 @@
         <h3>Actividad Reciente</h3>
         <div id="ownerRecentActivity"></div>
       </div>
+
+      <div class="dash-section system-health-section">
+        <div class="system-health-head">
+          <div>
+            <h3>System Health</h3>
+            <div class="muted" id="systemHealthScope">Vigilancia, errores, backups y seguridad.</div>
+          </div>
+          <div class="dash-actions">
+            <button class="dash-refresh" onclick="loadSystemHealthDashboard()">Revisar</button>
+            <button class="dash-refresh" onclick="installSystemMaintenance()">Activar vigilancia</button>
+            <button class="dash-refresh" onclick="createSystemBackupNow()">Crear backup</button>
+          </div>
+        </div>
+        <div id="systemHealthSummary" class="system-health-summary"></div>
+        <div class="system-health-grid">
+          <div>
+            <h3>Checks</h3>
+            <div id="systemHealthChecks"></div>
+          </div>
+          <div>
+            <h3>Errores abiertos</h3>
+            <div id="systemHealthErrors"></div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -2386,6 +2538,7 @@ const BASE_URL = "<?= baseUrl ?>";
 const LOGIN_COMPANY_ID = String("<?= companyId ?>").trim().toUpperCase();
 const OWNER_ONLY_LOGIN = String("<?= ownerOnly ?>").trim().toLowerCase() === "true";
 const REMEMBER_EMAIL_KEY = "pps_remembered_email_" + (LOGIN_COMPANY_ID || "OWNER");
+const ACTIVE_BROWSER_SESSION_KEY = "pps_active_browser_session";
 const UNITED_REFRIGERATION_ACCOUNT =
   String("<?= unitedRefrigerationAccount ?>").trim() || "11437479";
 
@@ -2402,6 +2555,52 @@ let CURRENT_BRANDING = {
 };
 let OWNER_COMPANIES = [];
 let SELECTED_OWNER_COMPANY_ID = "";
+
+function markActiveBrowserSession() {
+  try {
+    sessionStorage.setItem(ACTIVE_BROWSER_SESSION_KEY, "1");
+  } catch (err) {}
+}
+
+function hasActiveBrowserSession() {
+  try {
+    return sessionStorage.getItem(ACTIVE_BROWSER_SESSION_KEY) === "1";
+  } catch (err) {
+    return false;
+  }
+}
+
+function safeLocalStorageGet(key, fallback) {
+  try {
+    const value = localStorage.getItem(key);
+    return value == null ? fallback : value;
+  } catch (err) {
+    return fallback;
+  }
+}
+
+function safeLocalStorageSet(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+function safeLocalStorageRemove(key) {
+  try {
+    localStorage.removeItem(key);
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+function clearStoredLoginSession() {
+  safeLocalStorageRemove("pps_user");
+  safeLocalStorageRemove("pps_login_company");
+}
 let ADMIN_DASHBOARD_DATA = null;
 let ADMIN_DASHBOARD_FILTER = "openOrders";
 let SUPERVISOR_DASHBOARD_ORDERS = [];
@@ -2615,8 +2814,9 @@ function login() {
   google.script.run
     .withSuccessHandler(function(user) {
       CURRENT_USER = normalizeUser(user || {});
-      localStorage.setItem("pps_user", JSON.stringify(CURRENT_USER));
-      localStorage.setItem("pps_login_company", LOGIN_COMPANY_ID || "");
+      markActiveBrowserSession();
+      safeLocalStorageSet("pps_user", JSON.stringify(CURRENT_USER));
+      safeLocalStorageSet("pps_login_company", LOGIN_COMPANY_ID || "");
       updateRememberedEmail(email);
       showPanel();
     })
@@ -2633,7 +2833,7 @@ function restoreRememberedEmail() {
   const checkbox = document.getElementById("rememberEmail");
   if (!input || !checkbox) return;
 
-  const savedEmail = localStorage.getItem(REMEMBER_EMAIL_KEY) || "";
+  const savedEmail = safeLocalStorageGet(REMEMBER_EMAIL_KEY, "") || "";
   if (!savedEmail) return;
 
   input.value = savedEmail;
@@ -2646,11 +2846,11 @@ function restoreRememberedEmail() {
 function updateRememberedEmail(email) {
   const checkbox = document.getElementById("rememberEmail");
   if (!checkbox || !checkbox.checked) {
-    localStorage.removeItem(REMEMBER_EMAIL_KEY);
+    safeLocalStorageRemove(REMEMBER_EMAIL_KEY);
     return;
   }
 
-  localStorage.setItem(REMEMBER_EMAIL_KEY, String(email || "").trim());
+  safeLocalStorageSet(REMEMBER_EMAIL_KEY, String(email || "").trim());
 }
 
 function bindLoginKeyboard() {
@@ -3107,7 +3307,7 @@ function getInitialOwnerCompanySelection() {
 
   if (LOGIN_COMPANY_ID) return LOGIN_COMPANY_ID;
 
-  return String(localStorage.getItem(getOwnerSelectionStorageKey()) || "").trim().toUpperCase();
+  return String(safeLocalStorageGet(getOwnerSelectionStorageKey(), "") || "").trim().toUpperCase();
 }
 
 function getOwnerSelectionStorageKey() {
@@ -3209,7 +3409,7 @@ function onOwnerCompanyChange() {
   SELECTED_OWNER_COMPANY_ID = String(select && select.value || "").trim().toUpperCase();
 
   if (!LOGIN_COMPANY_ID) {
-    localStorage.setItem(getOwnerSelectionStorageKey(), SELECTED_OWNER_COMPANY_ID);
+    safeLocalStorageSet(getOwnerSelectionStorageKey(), SELECTED_OWNER_COMPANY_ID);
   }
 
   updateOwnerScopeText();
@@ -3259,8 +3459,13 @@ function loadOwnerDashboard() {
   document.getElementById("ownerCompanyBreakdown").innerHTML = "<div class='muted'>Cargando empresas...</div>";
   document.getElementById("ownerAlerts").innerHTML = "<div class='muted'>Cargando prioridades...</div>";
   document.getElementById("ownerRecentActivity").innerHTML = "<div class='muted'>Cargando actividad...</div>";
+  document.getElementById("systemHealthScope").innerText = "Cargando salud del sistema...";
+  document.getElementById("systemHealthSummary").innerHTML = renderSystemHealthSkeleton();
+  document.getElementById("systemHealthChecks").innerHTML = "<div class='muted'>Cargando checks...</div>";
+  document.getElementById("systemHealthErrors").innerHTML = "<div class='muted'>Cargando errores...</div>";
 
   const period = getOwnerPeriodSelection();
+  loadSystemHealthDashboard();
 
   google.script.run
     .withSuccessHandler(function(data) {
@@ -4146,6 +4351,160 @@ function renderOwnerDashboard(data) {
   renderRecentActivity(data.recentActivity || []);
 }
 
+function loadSystemHealthDashboard() {
+  const role = String(CURRENT_USER && CURRENT_USER.role || "").trim().toUpperCase();
+  if (role !== "OWNER") return;
+
+  const scope = document.getElementById("systemHealthScope");
+  const summary = document.getElementById("systemHealthSummary");
+  const checks = document.getElementById("systemHealthChecks");
+  const errors = document.getElementById("systemHealthErrors");
+  if (!summary || !checks || !errors) return;
+
+  if (scope) scope.innerText = "Revisando salud del sistema...";
+  summary.innerHTML = renderSystemHealthSkeleton();
+  checks.innerHTML = "<div class='muted'>Cargando checks...</div>";
+  errors.innerHTML = "<div class='muted'>Cargando errores...</div>";
+
+  google.script.run
+    .withSuccessHandler(function(data) {
+      renderSystemHealthDashboard(data || {});
+    })
+    .withFailureHandler(function(err) {
+      if (scope) {
+        scope.innerText = "Error leyendo salud del sistema: " + (err && err.message ? err.message : err);
+      }
+      summary.innerHTML = "";
+      checks.innerHTML = "";
+      errors.innerHTML = "";
+    })
+    .getSystemHealthDashboard(getSessionToken());
+}
+
+function renderSystemHealthSkeleton() {
+  return [
+    { label: "Estado", value: "..." },
+    { label: "Errores abiertos", value: "..." },
+    { label: "Checks criticos", value: "..." },
+    { label: "Backup", value: "..." }
+  ].map(function(item) {
+    return `
+      <div class="health-summary-card">
+        <div class="health-summary-label">${escapeHtmlMain(item.label)}</div>
+        <div class="health-summary-value">${escapeHtmlMain(item.value)}</div>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderSystemHealthDashboard(data) {
+  const scope = document.getElementById("systemHealthScope");
+  const summary = document.getElementById("systemHealthSummary");
+  const checks = document.getElementById("systemHealthChecks");
+  const errors = document.getElementById("systemHealthErrors");
+  if (!summary || !checks || !errors) return;
+
+  const status = String(data.status || "UNKNOWN").toLowerCase();
+  const totals = data.summary || {};
+  const backup = data.backup || {};
+  const generated = data.generatedAt ? " | Actualizado " + data.generatedAt : "";
+
+  if (scope) {
+    scope.innerHTML = `<span class="system-health-status ${escapeHtmlMain(status)}">${escapeHtmlMain(data.status || "UNKNOWN")}</span>${escapeHtmlMain(generated)}`;
+  }
+
+  summary.innerHTML = [
+    { label: "Errores abiertos", value: totals.openErrors || 0 },
+    { label: "Errores 24h", value: totals.openErrors24h || 0 },
+    { label: "Checks criticos", value: totals.criticalChecks || 0 },
+    { label: "Warnings", value: totals.warningChecks || 0 },
+    { label: "Backups", value: backup.lastBackupAt ? backup.lastBackupAt : "Pendiente" },
+    { label: "Triggers", value: (data.triggers && data.triggers.installedCount || 0) + "/" + (data.triggers && data.triggers.requiredCount || 0) }
+  ].map(function(item) {
+    return `
+      <div class="health-summary-card">
+        <div class="health-summary-label">${escapeHtmlMain(item.label)}</div>
+        <div class="health-summary-value">${escapeHtmlMain(item.value)}</div>
+      </div>
+    `;
+  }).join("");
+
+  const checkItems = Array.isArray(data.checks) ? data.checks : [];
+  checks.innerHTML = checkItems.length ? checkItems.map(function(check) {
+    const tone = String(check.status || "UNKNOWN").toLowerCase();
+    return `
+      <div class="health-check-row">
+        <div class="health-check-top">
+          <div>
+            <div class="health-title">${escapeHtmlMain(check.label || check.key || "")}</div>
+            <div class="health-meta">${escapeHtmlMain(check.detail || "")}</div>
+          </div>
+          <div class="health-pill ${escapeHtmlMain(tone)}">${escapeHtmlMain(check.status || "")}</div>
+        </div>
+      </div>
+    `;
+  }).join("") : "<div class='muted'>No hay checks para mostrar.</div>";
+
+  const errorItems = Array.isArray(data.errors) ? data.errors : [];
+  errors.innerHTML = errorItems.length ? errorItems.map(function(row) {
+    const tone = String(row.status || "OPEN").toLowerCase();
+    const canResolve = String(row.status || "OPEN").toUpperCase() !== "RESOLVED";
+    return `
+      <div class="health-error-row">
+        <div class="health-error-top">
+          <div>
+            <div class="health-title">${escapeHtmlMain(row.context || "ERROR")}</div>
+            <div class="health-meta">${escapeHtmlMain(row.message || "")}</div>
+            <div class="health-meta">${escapeHtmlMain(row.timestamp || "")}${row.userEmail ? " | " + escapeHtmlMain(row.userEmail) : ""}</div>
+          </div>
+          <div class="health-pill ${escapeHtmlMain(tone)}">${escapeHtmlMain(row.status || "OPEN")}</div>
+        </div>
+        ${canResolve ? `<button type="button" class="health-resolve" onclick="resolveSystemError(${Number(row.rowNumber || 0)})">Marcar resuelto</button>` : ""}
+      </div>
+    `;
+  }).join("") : "<div class='muted'>No hay errores registrados.</div>";
+}
+
+function installSystemMaintenance() {
+  if (!confirm("Activar vigilancia automatica cada 15 minutos y backup diario?")) return;
+
+  google.script.run
+    .withSuccessHandler(function() {
+      alert("Vigilancia automatica instalada.");
+      loadSystemHealthDashboard();
+    })
+    .withFailureHandler(function(err) {
+      alert("Error activando vigilancia: " + (err && err.message ? err.message : err));
+    })
+    .installSystemMaintenanceTriggers(getSessionToken());
+}
+
+function createSystemBackupNow() {
+  google.script.run
+    .withSuccessHandler(function(result) {
+      alert("Backup creado: " + (result && result.name ? result.name : "OK"));
+      loadSystemHealthDashboard();
+    })
+    .withFailureHandler(function(err) {
+      alert("Error creando backup: " + (err && err.message ? err.message : err));
+    })
+    .createSystemBackup(getSessionToken());
+}
+
+function resolveSystemError(rowNumber) {
+  rowNumber = Number(rowNumber || 0);
+  if (!rowNumber) return;
+
+  google.script.run
+    .withSuccessHandler(function() {
+      loadSystemHealthDashboard();
+    })
+    .withFailureHandler(function(err) {
+      alert("Error marcando resuelto: " + (err && err.message ? err.message : err));
+    })
+    .markSystemErrorResolved(rowNumber, getSessionToken());
+}
+
 function renderMetricSkeletons() {
   const empty = [];
   for (let i = 0; i < 4; i++) {
@@ -4274,6 +4633,7 @@ function openModule(url) {
 
   finalUrl = appendCompanyParam(finalUrl, companyId);
   finalUrl = appendOwnerPortalParam(finalUrl);
+  markActiveBrowserSession();
   TOP_NAV.href = finalUrl;
 }
 
@@ -4345,8 +4705,10 @@ function logout() {
     google.script.run.destroySession(token);
   }
 
-  localStorage.removeItem("pps_user");
-  localStorage.removeItem("pps_login_company");
+  clearStoredLoginSession();
+  try {
+    sessionStorage.removeItem(ACTIVE_BROWSER_SESSION_KEY);
+  } catch (err) {}
   CURRENT_USER = null;
 
   document.body.classList.add("login-mode");
@@ -4389,7 +4751,12 @@ window.onload = function() {
   restoreRememberedEmail();
   bindLoginKeyboard();
 
-  const saved = localStorage.getItem("pps_user");
+  if (!hasActiveBrowserSession()) {
+    clearStoredLoginSession();
+    return;
+  }
+
+  const saved = safeLocalStorageGet("pps_user", "");
 
   if (saved) {
     try {
@@ -4399,10 +4766,10 @@ window.onload = function() {
         CURRENT_USER = parsed;
         showPanel();
       } else {
-        localStorage.removeItem("pps_user");
+        safeLocalStorageRemove("pps_user");
       }
     } catch (e) {
-      localStorage.removeItem("pps_user");
+      safeLocalStorageRemove("pps_user");
     }
   }
 };

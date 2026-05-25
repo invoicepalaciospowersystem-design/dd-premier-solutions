@@ -114,10 +114,22 @@ function shellHtml(brand, iframeUrl) {
     html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#07090d}
     iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:#07090d}
   </style>
+  <script>
+    (function(){
+      try {
+        var hasModuleView = /[?&]view=/.test(window.location.search || "");
+        var hasActiveWrapperSession = sessionStorage.getItem("pps_wrapper_active_session") === "1";
+        if (hasModuleView && !hasActiveWrapperSession) {
+          window.location.replace(window.location.origin + window.location.pathname);
+        }
+      } catch (err) {}
+    })();
+  </script>
 </head>
 <body>
   <iframe title="${esc(brand.name)}" src="${esc(iframeUrl)}" allow="clipboard-read; clipboard-write"></iframe>
   <script>
+    try { sessionStorage.setItem("pps_wrapper_active_session", "1"); } catch (err) {}
     if ("serviceWorker" in navigator && window.isSecureContext) {
       window.addEventListener("load", function(){ navigator.serviceWorker.register("/service-worker.js").catch(function(){}); });
     }
@@ -131,6 +143,7 @@ function shellHtml(brand, iframeUrl) {
           var sameHost = new URL(window.location.href);
           sameHost.search = target.search;
           sameHost.hash = target.hash;
+          try { sessionStorage.setItem("pps_wrapper_active_session", "1"); } catch (err) {}
           window.location.href = sameHost.href;
           return;
         }
@@ -140,7 +153,10 @@ function shellHtml(brand, iframeUrl) {
           "ddpremiersolutionscorp.com": true,
           "www.ddpremiersolutionscorp.com": true
         };
-        if (ok[target.hostname]) window.location.href = target.href;
+        if (ok[target.hostname]) {
+          try { sessionStorage.setItem("pps_wrapper_active_session", "1"); } catch (err) {}
+          window.location.href = target.href;
+        }
       } catch (err) {}
     });
   </script>

@@ -130,11 +130,13 @@ function normalizeSmsPhone_(phone) {
   return "+" + value;
 }
 
-function testSMS() {
+function testSMS(sessionToken) {
+  requireSession_(sessionToken, ["OWNER", "ADMIN"]);
   sendSMS_("+17869674478", "TEST SMS funcionando");
 }
 
-function checkLastSMSStatus() {
+function checkLastSMSStatus(sessionToken) {
+  requireSession_(sessionToken, ["OWNER", "ADMIN"]);
   const props = PropertiesService.getScriptProperties();
   const sid = props.getProperty("LAST_SMS_SID");
 

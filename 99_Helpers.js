@@ -222,25 +222,52 @@ function appendSystemErrorLog_(context, info, safeDetails) {
     sh = ss.insertSheet(sheetName);
   }
 
-  if (sh.getLastRow() === 0) {
-    sh.appendRow([
-      "TIMESTAMP",
-      "CONTEXT",
-      "MESSAGE",
-      "STACK",
-      "DETAILS",
-      "USER_EMAIL"
-    ]);
-  }
+  const headers = ensureSystemErrorLogHeaders_(sh);
+  const fingerprint = getSystemErrorFingerprint_(context, info, safeDetails);
+  const row = headers.map(function(header) {
+    switch (String(header || "").trim().toUpperCase()) {
+      case "TIMESTAMP": return new Date();
+      case "CONTEXT": return context;
+      case "MESSAGE": return info.message;
+      case "STACK": return info.stack;
+      case "DETAILS": return safeDetails;
+      case "USER_EMAIL": return getActiveUserEmailSafe_();
+      case "STATUS": return "OPEN";
+      case "RESOLVED_AT": return "";
+      case "RESOLVED_BY": return "";
+      case "FINGERPRINT": return fingerprint;
+      default: return "";
+    }
+  });
 
-  sh.appendRow([
-    new Date(),
-    context,
-    info.message,
-    info.stack,
-    safeDetails,
-    getActiveUserEmailSafe_()
+  sh.appendRow(row);
+}
+
+function ensureSystemErrorLogHeaders_(sh) {
+  return ensureSheetColumns_(sh, [
+    "TIMESTAMP",
+    "CONTEXT",
+    "MESSAGE",
+    "STACK",
+    "DETAILS",
+    "USER_EMAIL",
+    "STATUS",
+    "RESOLVED_AT",
+    "RESOLVED_BY",
+    "FINGERPRINT"
   ]);
+}
+
+function getSystemErrorFingerprint_(context, info, safeDetails) {
+  const raw = [
+    context || "",
+    info && info.message ? info.message : "",
+    safeDetails || ""
+  ].join("|");
+
+  return Utilities.base64EncodeWebSafe(
+    Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, raw)
+  ).replace(/=+$/g, "").slice(0, 22);
 }
 
 function normalizeSystemError_(err) {
@@ -302,7 +329,8 @@ function escapeHtmlForEmail_(value) {
     .replace(/'/g, "&#039;");
 }
 
-function testSystemErrorAlert() {
+function testSystemErrorAlert(sessionToken) {
+  requireSession_(sessionToken, ["OWNER"]);
   notifySystemError_("TEST_SYSTEM_ALERT", new Error("System alert test."), {
     module: "TEST",
     expectedTo: CFG.SYSTEM_ALERT_EMAIL || ""
@@ -336,6 +364,16 @@ function hardenGeneratedPdfFile_(file) {
     });
   } catch (err) {
     Logger.log("WARN hardenGeneratedPdfFile_ getEditors: " + err);
+  }
+
+  try {
+    if (typeof Drive !== "undefined" && Drive.Files && Drive.Files.update) {
+      Drive.Files.update({
+        copyRequiresWriterPermission: false
+      }, file.getId());
+    }
+  } catch (err) {
+    Logger.log("WARN hardenGeneratedPdfFile_ Drive.Files.update: " + err);
   }
 
   return file;

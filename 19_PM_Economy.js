@@ -291,7 +291,7 @@ function updatePMEconomyRow(rowNumber, updates, sessionToken) {
   const companyId = getCellByHeader_(sh, rowNumber, headers, "COMPANY_ID") ||
     PM_ECO_CFG.COMPANY_ID ||
     CFG.DEFAULT_COMPANY_ID;
-  requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"], companyId);
+  const session = requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"], companyId);
 
   Object.keys(updates).forEach(function(key) {
 
@@ -321,6 +321,11 @@ function updatePMEconomyRow(rowNumber, updates, sessionToken) {
         .setValue(new Date());
     }
   }
+
+  addAuditLog_("PM_ECONOMY", "PM_ECONOMY_ROW_UPDATED", companyId, "PM_ECONOMY", String(rowNumber), session, {
+    rowNumber: rowNumber,
+    fields: Object.keys(updates || {})
+  });
 
   return true;
 }
