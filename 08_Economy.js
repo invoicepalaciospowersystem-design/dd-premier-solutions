@@ -241,6 +241,366 @@ function updateEconomyRow(rowNumber, updates, sessionToken) {
   return true;
 }
 
+function previewMcDonaldsPaymentText(companyId, remittanceText, sessionToken) {
+  companyId = String(companyId || "").trim().toUpperCase();
+  const session = requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"], companyId);
+  const parsed = parseMcDonaldsRemittanceText_(remittanceText);
+  const preview = buildMcDonaldsPaymentPreview_(companyId, parsed);
+
+  addAuditLog_("ECONOMY", "MCD_PAYMENT_PREVIEWED", companyId, "ECONOMY", parsed.paymentNumber || "", session, {
+    paymentNumber: parsed.paymentNumber || "",
+    invoiceCount: parsed.invoices.length,
+    matchedCount: preview.matchedCount,
+    unmatchedCount: preview.unmatchedCount
+  });
+
+  return preview;
+}
+
+function applyMcDonaldsPaymentText(companyId, remittanceText, sessionToken) {
+  companyId = String(companyId || "").trim().toUpperCase();
+  const session = requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"], companyId);
+  const lock = LockService.getScriptLock();
+  let locked = false;
+
+  try {
+    lock.waitLock(30000);
+    locked = true;
+
+    const parsed = parseMcDonaldsRemittanceText_(remittanceText);
+    if (!parsed.invoices.length) {
+      throw new Error("No se encontraron invoices en el remittance.");
+    }
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const shEco = ss.getSheetByName(CFG.SHEET_ECONOMY);
+    if (!shEco) throw new Error("No existe la hoja ECONOMY.");
+
+    const result = applyMcDonaldsPaymentToEconomy_(shEco, companyId, parsed, session);
+    const invoiceUpdate = applyMcDonaldsPaymentToInvoices_(ss, companyId, parsed, session);
+
+    result.invoiceRowsUpdated = invoiceUpdate.updatedRows;
+    result.invoiceRowsMissing = invoiceUpdate.missingInvoices;
+    result.paymentNumber = parsed.paymentNumber;
+    result.paymentDate = parsed.paymentDateText;
+    result.paymentAmount = parsed.paymentAmount;
+
+    addAuditLog_("ECONOMY", "MCD_PAYMENT_IMPORTED", companyId, "ECONOMY", parsed.paymentNumber || "", session, {
+      paymentNumber: parsed.paymentNumber || "",
+      paymentDate: parsed.paymentDateText || "",
+      paymentAmount: parsed.paymentAmount,
+      updatedRows: result.updatedRows,
+      alreadyPaidRows: result.alreadyPaidRows,
+      unmatchedInvoices: result.unmatchedInvoices,
+      invoiceRowsUpdated: result.invoiceRowsUpdated
+    });
+
+    return result;
+  } catch (err) {
+    notifySystemError_("MCD_PAYMENT_IMPORT_ERROR", err, {
+      module: "ECONOMY",
+      companyId: companyId,
+      actorEmail: session.email || "",
+      actorRole: session.role || ""
+    });
+    throw err;
+  } finally {
+    if (locked) lock.releaseLock();
+  }
+}
+
+function parseMcDonaldsRemittanceText_(remittanceText) {
+  const text = String(remittanceText || "").replace(/\r/g, "\n");
+  if (!text.trim()) throw new Error("Pegue el texto del remittance primero.");
+
+  const paymentNumberMatch = text.match(/Payment\s+Number\s+([A-Za-z0-9-]+)/i);
+  const paymentDateMatch = text.match(/Payment\s+Date\s+(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i);
+  const paymentAmountMatch = text.match(/Payment\s+Amount\s+([\d,]+(?:\.\d{2})?)/i);
+
+  const parsed = {
+    paymentNumber: paymentNumberMatch ? paymentNumberMatch[1] : "",
+    paymentDateText: paymentDateMatch ? paymentDateMatch[1] : "",
+    paymentDate: paymentDateMatch ? parseMcDonaldsPaymentDate_(paymentDateMatch[1]) : new Date(),
+    paymentAmount: paymentAmountMatch ? parseMoneyFlexible_(paymentAmountMatch[1]) : 0,
+    invoices: []
+  };
+
+  const lines = text.split(/\n+/);
+  const seen = {};
+
+  lines.forEach(function(line) {
+    const entry = parseMcDonaldsRemittanceInvoiceLine_(line);
+    if (!entry || seen[entry.invoiceNumber]) return;
+
+    seen[entry.invoiceNumber] = true;
+    parsed.invoices.push(entry);
+  });
+
+  if (!parsed.invoices.length) {
+    throw new Error("No se encontraron lineas de invoices en el texto pegado.");
+  }
+
+  return parsed;
+}
+
+function parseMcDonaldsRemittanceInvoiceLine_(line) {
+  line = String(line || "").trim();
+  if (!line) return null;
+
+  const tokens = line.split(/\s+/);
+  if (!/^\d{4,}$/.test(tokens[0] || "")) return null;
+
+  const usdIndex = tokens.map(function(t) {
+    return String(t || "").toUpperCase();
+  }).indexOf("USD");
+  if (usdIndex < 1) return null;
+
+  const moneyTokens = [];
+  for (let i = usdIndex + 1; i < tokens.length; i++) {
+    if (/^[\d,]+(?:\.\d{2})?$/.test(tokens[i])) moneyTokens.push(tokens[i]);
+  }
+
+  if (moneyTokens.length < 1) return null;
+
+  let invoiceDateText = "";
+  for (let i = usdIndex - 1; i >= 1; i--) {
+    if (/^\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}$/.test(tokens[i])) {
+      invoiceDateText = tokens[i];
+      break;
+    }
+  }
+
+  return {
+    invoiceNumber: String(tokens[0] || "").trim(),
+    invoiceDateText: invoiceDateText,
+    currency: "USD",
+    invoiceAmount: parseMoneyFlexible_(moneyTokens[0]),
+    amountWithheld: parseMoneyFlexible_(moneyTokens[1] || 0),
+    discountTaken: parseMoneyFlexible_(moneyTokens[2] || 0),
+    paidAmount: parseMoneyFlexible_(moneyTokens[moneyTokens.length - 1] || moneyTokens[0])
+  };
+}
+
+function parseMcDonaldsPaymentDate_(dateText) {
+  const parts = String(dateText || "").trim().split(/[-\/]/).map(Number);
+  if (parts.length !== 3) return new Date();
+
+  let year = parts[2];
+  if (year < 100) year += 2000;
+
+  return new Date(year, parts[1] - 1, parts[0]);
+}
+
+function buildMcDonaldsPaymentPreview_(companyId, parsed) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const shEco = ss.getSheetByName(CFG.SHEET_ECONOMY);
+  if (!shEco) throw new Error("No existe la hoja ECONOMY.");
+
+  const lookup = buildEconomyInvoiceLookup_(shEco, companyId);
+  const rows = parsed.invoices.map(function(inv) {
+    const match = lookup[normalizeInvoiceNumber_(inv.invoiceNumber)] || null;
+    return {
+      invoiceNumber: inv.invoiceNumber,
+      paidAmount: inv.paidAmount,
+      invoiceAmount: inv.invoiceAmount,
+      found: !!match,
+      rowNumber: match ? match.rowNumber : "",
+      currentStatus: match ? match.status : "",
+      currentAmount: match ? match.amount : 0,
+      woNumber: match ? match.woNumber : "",
+      client: match ? match.client : ""
+    };
+  });
+
+  const matchedCount = rows.filter(function(row) { return row.found; }).length;
+
+  return {
+    paymentNumber: parsed.paymentNumber,
+    paymentDate: parsed.paymentDateText,
+    paymentAmount: parsed.paymentAmount,
+    invoiceCount: rows.length,
+    matchedCount: matchedCount,
+    unmatchedCount: rows.length - matchedCount,
+    rows: rows
+  };
+}
+
+function applyMcDonaldsPaymentToEconomy_(sh, companyId, parsed, session) {
+  const headers = ensureSheetColumns_(sh, [
+    "DATE_PAID",
+    "PAID_AMOUNT",
+    "PAYMENT_NUMBER",
+    "PAYMENT_DATE",
+    "PAYMENT_AMOUNT",
+    "PAYMENT_SOURCE",
+    "PAYMENT_IMPORTED_AT",
+    "PAYMENT_IMPORTED_BY",
+    "PAYMENT_IMPORTED_BY_EMAIL",
+    "PAYMENT_NOTES"
+  ]);
+  const lookup = buildEconomyInvoiceLookup_(sh, companyId);
+  const importedAt = new Date();
+  const actor = getSessionActorLabel_(session);
+  const actorEmail = String(session && session.email || "").trim();
+  const unmatchedInvoices = [];
+  let updatedRows = 0;
+  let alreadyPaidRows = 0;
+
+  parsed.invoices.forEach(function(inv) {
+    const match = lookup[normalizeInvoiceNumber_(inv.invoiceNumber)];
+    if (!match) {
+      unmatchedInvoices.push(inv.invoiceNumber);
+      return;
+    }
+
+    const rowNumber = match.rowNumber;
+    const currentStatus = String(getCellByHeader_(sh, rowNumber, headers, "STATUS") || "").trim().toUpperCase();
+    if (currentStatus === "PAID") alreadyPaidRows++;
+
+    setCellByHeader_(sh, rowNumber, headers, "STATUS", "PAID");
+    setCellByHeader_(sh, rowNumber, headers, "DATE_PAID", parsed.paymentDate || new Date());
+    setCellByHeader_(sh, rowNumber, headers, "PAID_AMOUNT", inv.paidAmount);
+    setCellByHeader_(sh, rowNumber, headers, "PAYMENT_NUMBER", parsed.paymentNumber);
+    setCellByHeader_(sh, rowNumber, headers, "PAYMENT_DATE", parsed.paymentDate || new Date());
+    setCellByHeader_(sh, rowNumber, headers, "PAYMENT_AMOUNT", parsed.paymentAmount);
+    setCellByHeader_(sh, rowNumber, headers, "PAYMENT_SOURCE", "MCDONALDS_REMITTANCE");
+    setCellByHeader_(sh, rowNumber, headers, "PAYMENT_IMPORTED_AT", importedAt);
+    setCellByHeader_(sh, rowNumber, headers, "PAYMENT_IMPORTED_BY", actor);
+    setCellByHeader_(sh, rowNumber, headers, "PAYMENT_IMPORTED_BY_EMAIL", actorEmail);
+    setCellByHeader_(sh, rowNumber, headers, "PAYMENT_NOTES", buildMcDonaldsPaymentNote_(inv, parsed));
+    updatedRows++;
+  });
+
+  return {
+    updatedRows: updatedRows,
+    alreadyPaidRows: alreadyPaidRows,
+    unmatchedInvoices: unmatchedInvoices,
+    rows: buildMcDonaldsPaymentPreview_(companyId, parsed).rows
+  };
+}
+
+function applyMcDonaldsPaymentToInvoices_(ss, companyId, parsed, session) {
+  const sh = ss.getSheetByName("INVOICES");
+  if (!sh || sh.getLastRow() < 2) {
+    return {
+      updatedRows: 0,
+      missingInvoices: parsed.invoices.map(function(inv) { return inv.invoiceNumber; })
+    };
+  }
+
+  const headers = ensureSheetColumns_(sh, [
+    "PAYMENT_STATUS",
+    "DATE_PAID",
+    "PAID_AMOUNT",
+    "PAYMENT_NUMBER",
+    "PAYMENT_DATE",
+    "PAYMENT_SOURCE",
+    "PAYMENT_IMPORTED_AT",
+    "PAYMENT_IMPORTED_BY"
+  ]);
+  const data = sh.getDataRange().getValues();
+  const lookup = {};
+  const importedAt = new Date();
+  const actor = getSessionActorLabel_(session);
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (isSoftDeletedRow_(row, headers)) continue;
+
+    const rowCompany = String(getHeaderValueFromRow_(row, headers, "COMPANY_ID") || companyId || CFG.DEFAULT_COMPANY_ID)
+      .trim()
+      .toUpperCase();
+    if (rowCompany !== companyId) continue;
+
+    const invoiceNumber = getInvoiceNumberFromRow_(row, headers);
+    const key = normalizeInvoiceNumber_(invoiceNumber);
+    if (key && !lookup[key]) lookup[key] = i + 1;
+  }
+
+  let updatedRows = 0;
+  const missingInvoices = [];
+
+  parsed.invoices.forEach(function(inv) {
+    const rowNumber = lookup[normalizeInvoiceNumber_(inv.invoiceNumber)];
+    if (!rowNumber) {
+      missingInvoices.push(inv.invoiceNumber);
+      return;
+    }
+
+    setCellByHeader_(sh, rowNumber, headers, "PAYMENT_STATUS", "PAID");
+    setCellByHeader_(sh, rowNumber, headers, "DATE_PAID", parsed.paymentDate || new Date());
+    setCellByHeader_(sh, rowNumber, headers, "PAID_AMOUNT", inv.paidAmount);
+    setCellByHeader_(sh, rowNumber, headers, "PAYMENT_NUMBER", parsed.paymentNumber);
+    setCellByHeader_(sh, rowNumber, headers, "PAYMENT_DATE", parsed.paymentDate || new Date());
+    setCellByHeader_(sh, rowNumber, headers, "PAYMENT_SOURCE", "MCDONALDS_REMITTANCE");
+    setCellByHeader_(sh, rowNumber, headers, "PAYMENT_IMPORTED_AT", importedAt);
+    setCellByHeader_(sh, rowNumber, headers, "PAYMENT_IMPORTED_BY", actor);
+    updatedRows++;
+  });
+
+  return {
+    updatedRows: updatedRows,
+    missingInvoices: missingInvoices
+  };
+}
+
+function buildEconomyInvoiceLookup_(sh, companyId) {
+  const lookup = {};
+  if (!sh || sh.getLastRow() < 2) return lookup;
+
+  const data = sh.getDataRange().getValues();
+  const headers = data[0].map(function(h) { return String(h || "").trim(); });
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (isSoftDeletedRow_(row, headers)) continue;
+
+    const rowCompany = String(getHeaderValueFromRow_(row, headers, "COMPANY_ID") || CFG.DEFAULT_COMPANY_ID)
+      .trim()
+      .toUpperCase();
+    if (rowCompany !== companyId) continue;
+
+    const invoiceNumber = getInvoiceNumberFromRow_(row, headers);
+    const key = normalizeInvoiceNumber_(invoiceNumber);
+    if (!key || lookup[key]) continue;
+
+    lookup[key] = {
+      rowNumber: i + 1,
+      invoiceNumber: invoiceNumber,
+      status: String(getHeaderValueFromRow_(row, headers, "STATUS") || "").trim().toUpperCase(),
+      amount: parseMoneyFlexible_(getHeaderValueFromRow_(row, headers, "AMOUNT")),
+      woNumber: String(getHeaderValueFromRow_(row, headers, "WO_NUMBER") || "").trim(),
+      client: String(getHeaderValueFromRow_(row, headers, "CLIENT") || "").trim()
+    };
+  }
+
+  return lookup;
+}
+
+function getInvoiceNumberFromRow_(row, headers) {
+  const possibleNames = ["INVOICE_NUMBER", "INVOICE #", "INVOICE", "INVOICE_NO"];
+
+  for (let i = 0; i < possibleNames.length; i++) {
+    const value = getHeaderValueFromRow_(row, headers, possibleNames[i]);
+    if (value !== "" && value !== null && value !== undefined) return value;
+  }
+
+  return "";
+}
+
+function normalizeInvoiceNumber_(value) {
+  return String(value || "").replace(/[^\dA-Za-z-]/g, "").trim().toUpperCase();
+}
+
+function buildMcDonaldsPaymentNote_(invoiceEntry, parsed) {
+  return [
+    "McDonalds remittance",
+    "Payment " + (parsed.paymentNumber || ""),
+    "Invoice " + invoiceEntry.invoiceNumber,
+    "Paid $" + Number(invoiceEntry.paidAmount || 0).toFixed(2)
+  ].join(" | ");
+}
+
 function getEconomyRowValueByHeader_(sh, rowNumber, headers, possibleNames) {
   const normalized = headers.map(function(h) {
     return String(h || "").trim().toUpperCase();

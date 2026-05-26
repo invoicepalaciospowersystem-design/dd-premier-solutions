@@ -173,6 +173,44 @@
       color:#4b5563;
       box-shadow:0 3px 10px rgba(0,0,0,0.06);
     }
+
+    .payment-import-actions {
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-top:10px;
+    }
+
+    .payment-preview-table {
+      width:100%;
+      border-collapse:collapse;
+      margin-top:12px;
+      font-size:13px;
+    }
+
+    .payment-preview-table th,
+    .payment-preview-table td {
+      border-bottom:1px solid #e5e7eb;
+      padding:8px;
+      text-align:left;
+      vertical-align:top;
+    }
+
+    .payment-preview-table th {
+      color:#4b5563;
+      background:#f9fafb;
+    }
+
+    .payment-found {
+      color:#15803d;
+      font-weight:bold;
+    }
+
+    .payment-missing {
+      color:#dc2626;
+      font-weight:bold;
+    }
   </style>
   <?!= include("AppWatermark"); ?>
 </head>
@@ -238,6 +276,8 @@
 
   <button id="syncInvoicesBtn" onclick="syncInvoices()">Sync Invoices</button>
 
+  <button id="mcdPaymentBtn" onclick="toggleMcdPaymentImport()">Import McD Payment</button>
+
   <button id="syncOldBtn" onclick="syncOldLog()">Import Old History</button>
 
   <button onclick="loadOldDDSummary()">Histórico D&D</button>
@@ -247,6 +287,20 @@
   </button>
 
   <span id="periodLabel" style="font-weight:bold; align-self:center;"></span>
+</div>
+
+<div id="mcdPaymentBox" class="box" style="display:none;">
+  <h3 style="margin-top:0;">McDonalds Payment Remittance</h3>
+  <div style="color:#4b5563; font-size:13px;">
+    Paste the remittance text from the email or PDF. The system will preview invoices before marking anything as paid.
+  </div>
+  <textarea id="mcdPaymentText" style="min-height:170px;" placeholder="Paste remittance text here..."></textarea>
+  <div class="payment-import-actions">
+    <button id="previewMcdPaymentBtn" onclick="previewMcdPayment()">Preview</button>
+    <button id="applyMcdPaymentBtn" onclick="applyMcdPayment()" style="background:#16a34a;" disabled>Mark Matched Invoices Paid</button>
+    <button onclick="clearMcdPaymentImport()" style="background:#6b7280;">Clear</button>
+  </div>
+  <div id="mcdPaymentPreview"></div>
 </div>
 
 <div class="box">
@@ -322,6 +376,7 @@ let CURRENT_PERIOD_LABEL = "";
 let VIEW_MODE = "REGULAR";
 let ECONOMY_METRIC_FILTER = "all";
 let METRIC_PERIOD_INITIALIZED = false;
+let MCD_PAYMENT_PREVIEW_READY = false;
 
 function getCurrentUser() {
   try {
@@ -404,6 +459,11 @@ function setMode(mode) {
 
   document.getElementById("syncInvoicesBtn").style.display = mode === "REGULAR" ? "inline-block" : "none";
   document.getElementById("syncOldBtn").style.display = mode === "REGULAR" ? "inline-block" : "none";
+  document.getElementById("mcdPaymentBtn").style.display = mode === "REGULAR" ? "inline-block" : "none";
+  if (mode !== "REGULAR") {
+    const mcdBox = document.getElementById("mcdPaymentBox");
+    if (mcdBox) mcdBox.style.display = "none";
+  }
 
   load();
 }
@@ -1375,6 +1435,7 @@ function loadCompanySelector() {
 function activateCompany() {
   ACTIVE_COMPANY_ID = document.getElementById("companySelect").value;
   ECONOMY_METRIC_FILTER = "all";
+  clearMcdPaymentImport(false);
 
   if (!ACTIVE_COMPANY_ID) {
     alert("Seleccione una empresa.");
@@ -1385,6 +1446,180 @@ function activateCompany() {
   updateHeaderCompany(ACTIVE_COMPANY_ID);
   loadPeriod();
   load();
+}
+
+function toggleMcdPaymentImport() {
+  const box = document.getElementById("mcdPaymentBox");
+  if (!box) return;
+
+  box.style.display = box.style.display === "none" ? "block" : "none";
+}
+
+function clearMcdPaymentImport(clearText) {
+  const preview = document.getElementById("mcdPaymentPreview");
+  const applyBtn = document.getElementById("applyMcdPaymentBtn");
+  const text = document.getElementById("mcdPaymentText");
+
+  if (preview) preview.innerHTML = "";
+  if (applyBtn) applyBtn.disabled = true;
+  if (clearText !== false && text) text.value = "";
+  MCD_PAYMENT_PREVIEW_READY = false;
+}
+
+function previewMcdPayment() {
+  if (!ACTIVE_COMPANY_ID) {
+    alert("Primero cargue la compania.");
+    return;
+  }
+
+  const text = String(document.getElementById("mcdPaymentText").value || "").trim();
+  if (!text) {
+    alert("Pegue primero el texto del remittance.");
+    return;
+  }
+
+  const btn = document.getElementById("previewMcdPaymentBtn");
+  const applyBtn = document.getElementById("applyMcdPaymentBtn");
+  const preview = document.getElementById("mcdPaymentPreview");
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = "Checking...";
+  }
+  if (applyBtn) applyBtn.disabled = true;
+  if (preview) preview.innerHTML = "Reading remittance...";
+  MCD_PAYMENT_PREVIEW_READY = false;
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = "Preview";
+      }
+
+      MCD_PAYMENT_PREVIEW_READY = true;
+      if (applyBtn) applyBtn.disabled = !res || !Number(res.matchedCount || 0);
+      renderMcdPaymentPreview(res, false);
+    })
+    .withFailureHandler(function(err) {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = "Preview";
+      }
+      if (preview) preview.innerHTML = "";
+      alertServerError(err);
+    })
+    .previewMcDonaldsPaymentText(ACTIVE_COMPANY_ID, text, getSessionToken());
+}
+
+function applyMcdPayment() {
+  if (!MCD_PAYMENT_PREVIEW_READY) {
+    alert("Primero haga Preview.");
+    return;
+  }
+
+  const text = String(document.getElementById("mcdPaymentText").value || "").trim();
+  if (!text) {
+    alert("Pegue primero el texto del remittance.");
+    return;
+  }
+
+  if (!confirm("Marcar como PAID los invoices encontrados en este remittance?")) return;
+
+  const btn = document.getElementById("applyMcdPaymentBtn");
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = "Applying...";
+  }
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = "Mark Matched Invoices Paid";
+      }
+
+      MCD_PAYMENT_PREVIEW_READY = false;
+      renderMcdPaymentApplyResult(res);
+      load();
+    })
+    .withFailureHandler(function(err) {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = "Mark Matched Invoices Paid";
+      }
+      alertServerError(err);
+    })
+    .applyMcDonaldsPaymentText(ACTIVE_COMPANY_ID, text, getSessionToken());
+}
+
+function renderMcdPaymentApplyResult(res) {
+  renderMcdPaymentPreview(res, true);
+  alert(
+    "Payment processed.\n" +
+    "Economy rows updated: " + Number(res && res.updatedRows || 0) + "\n" +
+    "Invoice rows updated: " + Number(res && res.invoiceRowsUpdated || 0) + "\n" +
+    "Unmatched invoices: " + ((res && res.unmatchedInvoices || []).join(", ") || "None")
+  );
+}
+
+function renderMcdPaymentPreview(res, applied) {
+  const preview = document.getElementById("mcdPaymentPreview");
+  if (!preview) return;
+
+  res = res || {};
+  const rows = res.rows || [];
+
+  const summary = `
+    <div style="margin-top:12px; padding:12px; border-radius:12px; background:${applied ? "#f0fdf4" : "#f9fafb"}; border:1px solid #e5e7eb;">
+      <b>${applied ? "Payment applied" : "Preview ready"}</b><br>
+      Payment Number: <b>${escapeHtmlClient(res.paymentNumber || "")}</b> |
+      Payment Date: <b>${escapeHtmlClient(res.paymentDate || "")}</b> |
+      Payment Amount: <b>${formatMoney(Number(res.paymentAmount || 0))}</b><br>
+      Matched: <b>${Number(res.matchedCount || res.updatedRows || 0)}</b> |
+      Unmatched: <b>${Number(res.unmatchedCount || (res.unmatchedInvoices || []).length || 0)}</b>
+    </div>
+  `;
+
+  const table = rows.length ? `
+    <table class="payment-preview-table">
+      <thead>
+        <tr>
+          <th>Invoice</th>
+          <th>Paid Amount</th>
+          <th>Status</th>
+          <th>WO</th>
+          <th>Current Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(function(row) {
+          const foundClass = row.found ? "payment-found" : "payment-missing";
+          const foundText = row.found ? "FOUND" : "NOT FOUND";
+          return `
+            <tr>
+              <td><b>${escapeHtmlClient(row.invoiceNumber || "")}</b></td>
+              <td>${formatMoney(Number(row.paidAmount || 0))}</td>
+              <td><span class="${foundClass}">${foundText}</span><br>${escapeHtmlClient(row.currentStatus || "")}</td>
+              <td>${escapeHtmlClient(row.woNumber || "")}</td>
+              <td>${formatMoney(Number(row.currentAmount || 0))}</td>
+            </tr>
+          `;
+        }).join("")}
+      </tbody>
+    </table>
+  ` : "";
+
+  preview.innerHTML = summary + table;
+}
+
+function escapeHtmlClient(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 function syncInvoices() {

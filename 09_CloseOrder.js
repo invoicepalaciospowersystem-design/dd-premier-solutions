@@ -379,6 +379,12 @@ function syncCloseOrderToOldSystem_(invoiceRow) {
     logOldSync_(invoiceRow, result);
   } catch (logErr) {
     Logger.log("ERROR guardando sync log: " + logErr);
+    notifySystemError_("OLD_SYSTEM_SYNC_LOG_ERROR", logErr, {
+      module: "INVOICE",
+      companyId: invoiceRow && invoiceRow.COMPANY_ID,
+      woNumber: invoiceRow && invoiceRow.WO_NUMBER,
+      invoiceNumber: invoiceRow && invoiceRow.INVOICE_NUMBER
+    });
   }
 
   return result;

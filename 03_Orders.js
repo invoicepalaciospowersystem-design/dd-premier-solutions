@@ -530,6 +530,12 @@ function createWorkOrderFromApp(data, sessionToken) {
     );
   } catch (err) {
     Logger.log("LOG ERROR createWorkOrderFromApp: " + err);
+    notifySystemError_("CREATE_ORDER_APP_LOG_ERROR", err, {
+      module: "CREATE_ORDER",
+      companyId: companyId || "",
+      woNumber: woNumber || "",
+      nsn: nsn || ""
+    });
   }
 
   addNotification_(

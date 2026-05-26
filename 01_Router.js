@@ -320,6 +320,12 @@ function onFormSubmit(e) {
       addLog_(companyId, woNumber, "ORDER CREATED", "", statusEn, "System", "Order received from form");
     } catch (logErr) {
       Logger.log("LOG ERROR: " + logErr);
+      notifySystemError_("FORM_SUBMIT_LOG_ERROR", logErr, {
+        module: "FORM_SUBMIT",
+        companyId: companyId || "",
+        woNumber: woNumber || "",
+        nsn: nsn || ""
+      });
     }
 
     addNotification_(companyId, "ADMIN", woNumber, "NEW", "🚨 New Work Order " + woNumber + " / NSN " + nsn);

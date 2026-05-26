@@ -647,11 +647,17 @@ function updatePMReportLinks_(payload, report) {
       report.pdfEnUrl
     ]);
 
+    const companyId = getPMReportCell_(sh, rowNumber, headers, "COMPANY_ID") || CFG.DEFAULT_COMPANY_ID;
     try {
-      const companyId = getPMReportCell_(sh, rowNumber, headers, "COMPANY_ID") || CFG.DEFAULT_COMPANY_ID;
       addLog_(companyId, payload.woNumber || "", "PM REPORT GENERATED", "", "GENERATED", payload.technician || "PM Report", report.folderUrl || "");
     } catch (logErr) {
       Logger.log("PM report log error: " + logErr);
+      notifySystemError_("PM_REPORT_LOG_ERROR", logErr, {
+        module: "PM_REPORT",
+        companyId: companyId,
+        woNumber: payload && payload.woNumber,
+        technician: payload && payload.technician
+      });
     }
 
     return true;
@@ -688,6 +694,11 @@ function trashOldPMReportPdfs_(oldUrls, newUrls) {
       DriveApp.getFileById(id).setTrashed(true);
     } catch (err) {
       Logger.log("ERROR trashOldPMReportPdfs_: " + err);
+      notifySystemError_("PM_REPORT_OLD_PDF_TRASH_ERROR", err, {
+        module: "PM_REPORT",
+        fileUrl: url || "",
+        keepIds: Object.keys(keepIds).join(",")
+      });
     }
   });
 }
