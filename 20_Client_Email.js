@@ -146,13 +146,27 @@ function sendClientDocumentEmail_(info) {
   const attachmentInfo = buildClientEmailAttachments_(info.links || []);
   const isTest = isClientEmailTestMode_();
   const subject = (isTest ? "[TEST] " : "") + String(info.subject || info.title || "Document");
-  const htmlBody = buildClientDocumentEmailBody_(info, recipients, attachmentInfo);
+  const batches = attachmentInfo.batches.length ? attachmentInfo.batches : [{
+    attachments: attachmentInfo.attachments,
+    files: attachmentInfo.files
+  }];
 
-  MailApp.sendEmail({
-    to: recipients.to.join(","),
-    subject: subject,
-    htmlBody: htmlBody,
-    attachments: attachmentInfo.attachments
+  batches.forEach(function(batch, index) {
+    const batchInfo = {
+      files: batch.files,
+      batchNumber: index + 1,
+      batchCount: batches.length
+    };
+    const batchSubject = batches.length > 1
+      ? subject + " (" + (index + 1) + "/" + batches.length + ")"
+      : subject;
+
+    MailApp.sendEmail({
+      to: recipients.to.join(","),
+      subject: batchSubject,
+      htmlBody: buildClientDocumentEmailBody_(info, recipients, batchInfo),
+      attachments: batch.attachments
+    });
   });
 
   return {
@@ -160,8 +174,8 @@ function sendClientDocumentEmail_(info) {
     to: recipients.to.join(", "),
     actualTo: recipients.actualTo.join(", "),
     status: isTest
-      ? "TEST_SENT" + (attachmentInfo.omitted ? "_LINKS_ONLY" : "")
-      : "SENT" + (attachmentInfo.omitted ? "_LINKS_ONLY" : "")
+      ? "TEST_SENT_ATTACHMENTS" + (batches.length > 1 ? "_SPLIT_" + batches.length : "")
+      : "SENT_ATTACHMENTS" + (batches.length > 1 ? "_SPLIT_" + batches.length : "")
   };
 }
 
@@ -203,17 +217,20 @@ function resolveClientEmailRecipients_(docType, companyId, nsn) {
 }
 
 function buildClientDocumentEmailBody_(info, recipients, attachmentInfo) {
-  const links = (info.links || []).filter(function(link) {
-    return link && link.url;
-  });
-
-  const linkHtml = links.length
-    ? "<ul>" + links.map(function(link) {
-        return "<li><a href='" + escapeHtmlForEmail_(link.url) + "'>" +
-          escapeHtmlForEmail_(link.label || "Open PDF") +
-          "</a></li>";
+  const files = attachmentInfo.files || [];
+  const attachmentHtml = files.length
+    ? "<ul>" + files.map(function(file) {
+        return "<li>" + escapeHtmlForEmail_(file.name || "PDF") + "</li>";
       }).join("") + "</ul>"
-    : "<p>No PDF links were available.</p>";
+    : "<p>No PDF attachments were prepared.</p>";
+
+  const batchNote = attachmentInfo.batchCount > 1
+    ? "<p><b>Attachment batch:</b> " + attachmentInfo.batchNumber + " of " + attachmentInfo.batchCount + ".</p>"
+    : "";
+
+  const attachmentNote = files.length
+    ? "<p>The PDF file(s) are attached to this email.</p>"
+    : "<p>No PDF files were attached.</p>";
 
   const testBanner = isClientEmailTestMode_()
     ? "<div style='background:#fff7ed;border:1px solid #fed7aa;padding:12px;border-radius:8px;margin-bottom:12px;'>" +
@@ -221,10 +238,6 @@ function buildClientDocumentEmailBody_(info, recipients, attachmentInfo) {
       ". Real recipients would be: " + escapeHtmlForEmail_(recipients.actualTo.join(", ")) +
       "</div>"
     : "";
-
-  const attachmentNote = attachmentInfo.omitted
-    ? "<p><b>Note:</b> PDF attachments were omitted because the total size was too large. Use the links below.</p>"
-    : "<p>The PDF files are attached when size allows. Links are included below as backup.</p>";
 
   return testBanner +
     "<h2>" + escapeHtmlForEmail_(info.title || "Document") + "</h2>" +
@@ -238,7 +251,8 @@ function buildClientDocumentEmailBody_(info, recipients, attachmentInfo) {
     "<p><b>Date:</b> " + escapeHtmlForEmail_(Utilities.formatDate(new Date(), CFG.TIMEZONE, "MM/dd/yyyy hh:mm a")) + "</p>" +
     "<hr>" +
     attachmentNote +
-    linkHtml;
+    batchNote +
+    attachmentHtml;
 }
 
 function isClientEmailTestMode_() {
@@ -247,12 +261,12 @@ function isClientEmailTestMode_() {
 
 function buildClientEmailAttachments_(links) {
   const maxBytes = 20 * 1024 * 1024;
-  const attachments = [];
-  let totalBytes = 0;
-  let omitted = false;
+  const files = [];
+  const failures = [];
+  const oversized = [];
 
   (links || []).forEach(function(link) {
-    if (!link || !link.url || omitted) return;
+    if (!link || !link.url) return;
 
     try {
       const id = extractDriveFileIdForEmail_(link.url);
@@ -260,21 +274,75 @@ function buildClientEmailAttachments_(links) {
       const blob = file.getBlob().setName(file.getName());
       const bytes = blob.getBytes().length;
 
-      if (totalBytes + bytes > maxBytes) {
-        omitted = true;
+      if (bytes > maxBytes) {
+        oversized.push(file.getName() + " (" + Math.round(bytes / 1024 / 1024) + " MB)");
         return;
       }
 
-      totalBytes += bytes;
-      attachments.push(blob);
+      files.push({
+        name: file.getName(),
+        bytes: bytes,
+        blob: blob
+      });
     } catch (err) {
-      Logger.log("Client email attachment skipped: " + err);
+      failures.push((link.label || link.url) + ": " + (err && err.message ? err.message : err));
     }
   });
 
+  if (failures.length) {
+    throw new Error("Could not prepare all PDF attachments: " + failures.join("; "));
+  }
+
+  if (oversized.length) {
+    throw new Error("PDF too large to email as attachment: " + oversized.join(", "));
+  }
+
+  if (!files.length) {
+    throw new Error("No PDF attachments were available for this client email.");
+  }
+
+  const batches = [];
+  let currentBatch = [];
+  let currentBytes = 0;
+
+  files.forEach(function(file) {
+    if (currentBatch.length && currentBytes + file.bytes > maxBytes) {
+      batches.push(currentBatch);
+      currentBatch = [];
+      currentBytes = 0;
+    }
+
+    currentBatch.push(file);
+    currentBytes += file.bytes;
+  });
+
+  if (currentBatch.length) {
+    batches.push(currentBatch);
+  }
+
   return {
-    attachments: omitted ? [] : attachments,
-    omitted: omitted
+    attachments: files.map(function(file) {
+      return file.blob;
+    }),
+    files: files.map(function(file) {
+      return {
+        name: file.name,
+        bytes: file.bytes
+      };
+    }),
+    batches: batches.map(function(batch) {
+      return {
+        attachments: batch.map(function(file) {
+          return file.blob;
+        }),
+        files: batch.map(function(file) {
+          return {
+            name: file.name,
+            bytes: file.bytes
+          };
+        })
+      };
+    })
   };
 }
 
