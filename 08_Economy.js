@@ -845,6 +845,7 @@ if (invType === "PM") continue;
     ecoHeaders = ecoData[0].map(h => String(h).trim());
 
     let targetRow = -1;
+    let foundClosedMatch = false;
 
     for (let j = 1; j < ecoData.length; j++) {
       const ecoWo = String(ecoData[j][ecoWO] || "").trim();
@@ -852,8 +853,8 @@ if (invType === "PM") continue;
 
       if (ecoWo === wo && ecoComp === companyId) {
         if (isEconomyRowClosedForSync_(ecoData[j], ecoHeaders, period.label)) {
-          targetRow = -2;
-          break;
+          foundClosedMatch = true;
+          continue;
         }
 
         targetRow = j + 1;
@@ -861,9 +862,8 @@ if (invType === "PM") continue;
       }
     }
 
-    if (targetRow === -2) {
+    if (foundClosedMatch && targetRow === -1) {
       skippedClosedRows++;
-      continue;
     }
 
     if (targetRow === -1) {
