@@ -1188,11 +1188,17 @@ function card(o) {
     String(o.SOURCE_TYPE || "").toUpperCase() === "OLD_LOG";
   const isLocked = periodLabel && CURRENT_PERIOD_LABEL && periodLabel !== CURRENT_PERIOD_LABEL;
   const lockAttr = (isLocked || isHistory) ? "disabled" : "";
+  const sourceLockAttr = isHistory ? "disabled" : "";
   const lockMsg = isHistory
     ? `<div class="row" style="color:#2563eb; font-weight:bold;">Histórico importado del sistema viejo. Solo lectura.</div>`
     : (isLocked
       ? `<div class="row" style="color:#dc2626; font-weight:bold;">🔒 Mes cerrado: ${periodLabel}</div>`
       : "");
+  const saveButtonHtml = isHistory
+    ? `<button disabled>Historico</button>`
+    : (isLocked && !isPM
+      ? `<button onclick="saveInvestmentSource(${row}, this)">Guardar inversion</button>`
+      : `<button onclick="save(${row}, this)" ${lockAttr}>${isLocked ? "Bloqueado" : "Guardar"}</button>`);
 
   let cls = "pending";
   if (status === "INVOICED") cls = "invoiced";
@@ -1261,7 +1267,7 @@ function card(o) {
 
           <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:5px; align-items:end;">
             <div>
-              <select id="inv_${row}" onchange="updateInvView(${row})" style="width:100%;" ${lockAttr}>
+              <select id="inv_${row}" onchange="updateInvView(${row})" style="width:100%;" ${sourceLockAttr}>
                 <option value="">Seleccione</option>
                 <option value="YOEL" ${String(o.INV_SOURCE || "").toUpperCase() === "YOEL" ? "selected" : ""}>YOEL</option>
                 <option value="DAVID" ${String(o.INV_SOURCE || "").toUpperCase() === "DAVID" ? "selected" : ""}>DAVID</option>
@@ -1306,9 +1312,7 @@ function card(o) {
 
       <textarea id="notes_${row}" placeholder="Notes" ${lockAttr}>${o.NOTES || ""}</textarea>
 
-      <button onclick="save(${row}, this)" ${lockAttr}>
-        ${isHistory ? "Histórico" : (isLocked ? "Bloqueado" : "Guardar")}
-      </button>
+      ${saveButtonHtml}
     </div>
   `;
 }
@@ -1375,6 +1379,33 @@ function save(row, btn) {
   } else {
     runner.updateEconomyRow(row, updates, getSessionToken());
   }
+}
+
+function saveInvestmentSource(row, btn) {
+  const inv = document.getElementById("inv_" + row);
+  if (!inv) return;
+
+  if (!String(inv.value || "").trim()) {
+    alert("Seleccione el origen de inversion.");
+    return;
+  }
+
+  btn.innerText = "Guardando...";
+  btn.disabled = true;
+
+  google.script.run
+    .withSuccessHandler(function() {
+      btn.innerText = "Guardado";
+      btn.classList.add("saved");
+      btn.disabled = false;
+      load();
+    })
+    .withFailureHandler(function(err) {
+      btn.innerText = "Error";
+      btn.disabled = false;
+      alertServerError(err);
+    })
+    .updateEconomyRow(row, { INV_SOURCE: inv.value }, getSessionToken());
 }
 
 function loadCompanySelector() {

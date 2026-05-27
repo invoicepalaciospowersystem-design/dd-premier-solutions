@@ -188,6 +188,7 @@ function getEconomyData(companyId, role, sessionToken) {
 
 function updateEconomyRow(rowNumber, updates, sessionToken) {
   rowNumber = Number(rowNumber);
+  updates = updates || {};
   if (!rowNumber || rowNumber < 2) throw new Error("Fila inválida.");
 
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.SHEET_ECONOMY);
@@ -196,8 +197,10 @@ function updateEconomyRow(rowNumber, updates, sessionToken) {
   const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
   const companyId = getCellByHeader_(sh, rowNumber, headers, "COMPANY_ID") || CFG.DEFAULT_COMPANY_ID;
   const session = requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"], companyId);
+  updates = restrictEconomyClosedRowUpdates_(sh, rowNumber, headers, updates);
+  const updateKeys = Object.keys(updates);
 
-  Object.keys(updates).forEach(function(key) {
+  updateKeys.forEach(function(key) {
     const col = headers.indexOf(key) + 1;
     if (col > 0) sh.getRange(rowNumber, col).setValue(updates[key]);
   });
@@ -224,12 +227,15 @@ function updateEconomyRow(rowNumber, updates, sessionToken) {
   const status = statusCol > 0
     ? String(sh.getRange(rowNumber, statusCol).getValue() || "").toUpperCase()
     : "";
+  const statusWasUpdated = updateKeys.map(function(key) {
+    return String(key || "").trim().toUpperCase();
+  }).indexOf("STATUS") >= 0;
 
-  if (status === "INVOICED" && dateInvoiceCol > 0 && !sh.getRange(rowNumber, dateInvoiceCol).getValue()) {
+  if (statusWasUpdated && status === "INVOICED" && dateInvoiceCol > 0 && !sh.getRange(rowNumber, dateInvoiceCol).getValue()) {
     sh.getRange(rowNumber, dateInvoiceCol).setValue(new Date());
   }
 
-  if (status === "PAID" && datePaidCol > 0 && !sh.getRange(rowNumber, datePaidCol).getValue()) {
+  if (statusWasUpdated && status === "PAID" && datePaidCol > 0 && !sh.getRange(rowNumber, datePaidCol).getValue()) {
     sh.getRange(rowNumber, datePaidCol).setValue(new Date());
   }
 
@@ -239,6 +245,46 @@ function updateEconomyRow(rowNumber, updates, sessionToken) {
   });
 
   return true;
+}
+
+function restrictEconomyClosedRowUpdates_(sh, rowNumber, headers, updates) {
+  updates = updates || {};
+  if (!isEconomyRowClosedForManualEdit_(sh, rowNumber, headers)) return updates;
+
+  const allowed = {};
+  const blocked = [];
+
+  Object.keys(updates).forEach(function(key) {
+    const normalizedKey = String(key || "").trim().toUpperCase();
+    if (normalizedKey === "INV_SOURCE") {
+      allowed[key] = updates[key];
+    } else {
+      blocked.push(key);
+    }
+  });
+
+  if (blocked.length || !Object.keys(allowed).length) {
+    throw new Error("Mes contable cerrado. Solo se permite actualizar INV_SOURCE.");
+  }
+
+  return allowed;
+}
+
+function isEconomyRowClosedForManualEdit_(sh, rowNumber, headers) {
+  const row = sh.getRange(rowNumber, 1, 1, sh.getLastColumn()).getValues()[0];
+  const closedPeriod = String(getHeaderValueFromRow_(row, headers, "CLOSED_PERIOD") || "").trim();
+  const closedAt = getHeaderValueFromRow_(row, headers, "MONTH_CLOSED_AT");
+  if (closedPeriod || closedAt) return true;
+
+  const rowPeriod = getEconomyRowPeriodLabelFromData_(row, headers);
+  let currentPeriodLabel = "";
+  try {
+    currentPeriodLabel = getCurrentEconomyPeriod().label;
+  } catch (err) {
+    currentPeriodLabel = "";
+  }
+
+  return !!(rowPeriod && currentPeriodLabel && rowPeriod !== currentPeriodLabel);
 }
 
 function previewMcDonaldsPaymentText(companyId, remittanceText, sessionToken) {
