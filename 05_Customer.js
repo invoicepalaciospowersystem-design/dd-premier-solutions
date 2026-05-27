@@ -74,11 +74,11 @@ function getCustomerOrdersBySupervisor(supervisorName, sessionToken, companyId) 
     obj.PDF_EN_URL = getInvoicePdfByWO(obj.WO_NUMBER);
     obj.HAS_INVOICE_PDF = obj.PDF_EN_URL ? "YES" : "NO";
 
-    obj.QUOTE_EN_URL = obj.QUOTE_EN_URL || "";
-    obj.QUOTE_ES_URL = obj.QUOTE_ES_URL || "";
+    obj.QUOTE_EN_URL = ensurePdfUrlViewableForPortal_(obj.QUOTE_EN_URL || "");
+    obj.QUOTE_ES_URL = ensurePdfUrlViewableForPortal_(obj.QUOTE_ES_URL || "");
     obj.QUOTE_STATUS = obj.QUOTE_STATUS || "";
-    obj.PM_REPORT_ES_URL = obj.PM_REPORT_ES_URL || "";
-    obj.PM_REPORT_EN_URL = obj.PM_REPORT_EN_URL || "";
+    obj.PM_REPORT_ES_URL = ensurePdfUrlViewableForPortal_(obj.PM_REPORT_ES_URL || "");
+    obj.PM_REPORT_EN_URL = ensurePdfUrlViewableForPortal_(obj.PM_REPORT_EN_URL || "");
     obj.HAS_PM_REPORT_PDF = (obj.PM_REPORT_ES_URL || obj.PM_REPORT_EN_URL) ? "YES" : "NO";
 
     sanitizeSupervisorOrderPayload_(obj);
@@ -298,7 +298,7 @@ function getInvoicePdfByWO(woNumber) {
       const pdfEn = idxPdfEn >= 0 ? String(data[i][idxPdfEn] || "").trim() : "";
       const pdfEs = idxPdfEs >= 0 ? String(data[i][idxPdfEs] || "").trim() : "";
 
-      return pdfEn || pdfEs || "";
+      return ensurePdfUrlViewableForPortal_(pdfEn || pdfEs || "");
     }
   }
 

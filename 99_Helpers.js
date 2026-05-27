@@ -379,6 +379,47 @@ function hardenGeneratedPdfFile_(file) {
   return file;
 }
 
+function ensurePdfUrlViewableForPortal_(url) {
+  url = String(url || "").trim();
+  if (!url) return "";
+
+  try {
+    const fileId = extractDriveFileIdForPortal_(url);
+    const cache = CacheService.getScriptCache();
+    const cacheKey = "PDF_VIEWABLE_" + fileId;
+
+    if (cache.get(cacheKey)) {
+      return url;
+    }
+
+    const file = DriveApp.getFileById(fileId);
+    hardenGeneratedPdfFile_(file);
+    cache.put(cacheKey, "1", 21600);
+
+    return file.getUrl();
+  } catch (err) {
+    Logger.log("WARN ensurePdfUrlViewableForPortal_: " + err);
+    return url;
+  }
+}
+
+function extractDriveFileIdForPortal_(urlOrId) {
+  const s = String(urlOrId || "").trim();
+
+  if (/^[a-zA-Z0-9_-]{25,}$/.test(s)) return s;
+
+  let m = s.match(/\/d\/([a-zA-Z0-9_-]{25,})/);
+  if (m && m[1]) return m[1];
+
+  m = s.match(/[?&]id=([a-zA-Z0-9_-]{25,})/);
+  if (m && m[1]) return m[1];
+
+  m = s.match(/[-\w]{25,}/);
+  if (m && m[0]) return m[0];
+
+  throw new Error("Could not extract Drive file ID.");
+}
+
 function createOrderFolders_(companyId, nsn, woNumber) {
   const root = DriveApp.getFolderById(CFG.ROOT_FOLDER_ID);
   const companyFolder = getOrCreateFolder_(root, companyId || CFG.DEFAULT_COMPANY_ID);
