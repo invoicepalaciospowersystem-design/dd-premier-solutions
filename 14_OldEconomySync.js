@@ -384,6 +384,7 @@ function getEconomyHistoryObjectsForCompany_(companyId, existingInvoiceKeys) {
     obj.ROW_NUMBER = i + 2;
     obj.SOURCE_TYPE = obj.SOURCE_TYPE || "OLD_LOG";
     obj.READ_ONLY = "YES";
+    normalizeEconomyObjectPeriodFields_(obj);
     rows.push(obj);
   }
 

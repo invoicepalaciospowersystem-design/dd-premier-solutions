@@ -653,7 +653,7 @@ function render() {
 
     return (!search || text.includes(search)) &&
            (!status || String(o.STATUS || "").toUpperCase() === status) &&
-           (periodMode !== "period" || !period || String(o.PERIOD_LABEL || "") === period) &&
+           (periodMode !== "period" || !period || getEconomyPeriodLabel(o) === period) &&
            economyRecordMatchesMetricPeriod(o);
   });
 
@@ -707,7 +707,7 @@ function economyRecordMatchesMetricPeriod(row) {
   const month = Number(document.getElementById("metricPeriodMonth").value || (new Date().getMonth() + 1));
   const periodYear = Number(row.PERIOD_YEAR || 0);
   const periodMonth = Number(row.PERIOD_MONTH || 0);
-  const periodLabel = String(row.PERIOD_LABEL || "").trim();
+  const periodLabel = getEconomyPeriodLabel(row);
 
   if (mode === "annual") {
     if (periodYear && periodYear === year) return true;
@@ -1817,7 +1817,7 @@ function loadPeriodFilter() {
   if (isValidEconomyPeriodLabel(CURRENT_PERIOD_LABEL)) periodSet[CURRENT_PERIOD_LABEL] = true;
 
   ECONOMY.forEach(function(o) {
-    const label = String(o.PERIOD_LABEL || o.ACCOUNTING_PERIOD || "").trim();
+    const label = getEconomyPeriodLabel(o);
     if (isValidEconomyPeriodLabel(label)) periodSet[label] = true;
   });
 
@@ -1841,6 +1841,34 @@ function loadPeriodFilter() {
 function isValidEconomyPeriodLabel(label) {
   label = String(label || "").trim();
   return !!label && /^\d{4}-\d{2}$/.test(label);
+}
+
+function getEconomyPeriodLabel(row) {
+  row = row || {};
+
+  const directLabels = [
+    row.PERIOD_LABEL,
+    row.ACCOUNTING_PERIOD,
+    row.CLOSED_PERIOD
+  ];
+
+  for (let i = 0; i < directLabels.length; i++) {
+    const label = String(directLabels[i] || "").trim();
+    if (isValidEconomyPeriodLabel(label)) return label;
+  }
+
+  const year = Number(row.PERIOD_YEAR || 0);
+  const month = Number(row.PERIOD_MONTH || 0);
+  if (year && month >= 1 && month <= 12) {
+    return year + "-" + String(month).padStart(2, "0");
+  }
+
+  const date = getEconomyRecordDate(row);
+  if (date) {
+    return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0");
+  }
+
+  return "";
 }
 
 function syncOldLog() {

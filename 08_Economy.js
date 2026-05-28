@@ -175,6 +175,8 @@ function getEconomyData(companyId, role, sessionToken) {
     });
 
     obj.ROW_NUMBER = i + 2;
+    normalizeEconomyObjectPeriodFields_(obj);
+
     const invoiceKey = getEconomyHistoryInvoiceKey_(obj.COMPANY_ID || companyId, obj.INVOICE_NUMBER || obj.INVOICE || "");
     if (invoiceKey) activeInvoiceKeys[invoiceKey] = true;
     return obj;
@@ -185,6 +187,50 @@ function getEconomyData(companyId, role, sessionToken) {
 
   const historyRows = getEconomyHistoryObjectsForCompany_(companyId, activeInvoiceKeys);
   return activeRows.concat(historyRows);
+}
+
+function normalizeEconomyObjectPeriodFields_(obj) {
+  obj = obj || {};
+
+  const label = getEconomyObjectPeriodLabel_(obj);
+  if (!label) return obj;
+
+  obj.PERIOD_LABEL = label;
+  if (!obj.ACCOUNTING_PERIOD) obj.ACCOUNTING_PERIOD = label;
+
+  const parts = label.split("-");
+  if (!obj.PERIOD_YEAR) obj.PERIOD_YEAR = Number(parts[0]);
+  if (!obj.PERIOD_MONTH) obj.PERIOD_MONTH = Number(parts[1]);
+
+  return obj;
+}
+
+function getEconomyObjectPeriodLabel_(obj) {
+  obj = obj || {};
+
+  const directLabels = [
+    obj.PERIOD_LABEL,
+    obj.ACCOUNTING_PERIOD,
+    obj.CLOSED_PERIOD
+  ];
+
+  for (let i = 0; i < directLabels.length; i++) {
+    const label = String(directLabels[i] || "").trim();
+    if (label && isValidEconomyPeriodLabel_(label)) return label;
+  }
+
+  const year = Number(obj.PERIOD_YEAR || 0);
+  const month = Number(obj.PERIOD_MONTH || 0);
+  if (year && month >= 1 && month <= 12) {
+    return buildEconomyPeriodLabel_(year, month);
+  }
+
+  const date = normalizeEconomyDateForCompare_(obj.DATE_INVOICE || obj.DATE_COMPLETED || obj.DATE_PAID || obj.CREATED_AT || obj.DATE_CREATED);
+  if (date) {
+    return buildEconomyPeriodLabel_(date.getFullYear(), date.getMonth() + 1);
+  }
+
+  return "";
 }
 
 function updateEconomyRow(rowNumber, updates, sessionToken) {
