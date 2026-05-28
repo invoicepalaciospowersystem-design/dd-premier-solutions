@@ -171,6 +171,11 @@ function syncOldEconomyLogToHistory(companyId, sessionToken) {
 
   for (let i = 1; i < oldData.length; i++) {
     const oldRow = oldData[i];
+    if (isMonthCloseMarkerRow_(oldRow, oldHeaders)) {
+      skippedNoInvoice++;
+      continue;
+    }
+
     const normalized = buildEconomyHistoryRowFromOldLog_(oldRow, oldHeaders, companyId, i + 1, now);
     const invoiceKey = getEconomyHistoryInvoiceKey_(companyId, normalized.INVOICE_NUMBER);
 

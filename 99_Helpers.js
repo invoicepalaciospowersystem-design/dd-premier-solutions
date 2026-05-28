@@ -88,6 +88,8 @@ function ensureSheetColumns_(sh, requiredColumns) {
 }
 
 function isSoftDeletedRow_(row, headers) {
+  if (isMonthCloseMarkerRow_(row, headers)) return true;
+
   const normalized = headers.map(function(h) {
     return String(h || "").trim().toUpperCase();
   });
@@ -101,6 +103,43 @@ function isSoftDeletedRow_(row, headers) {
   const status = idxStatus >= 0 ? String(row[idxStatus] || "").trim().toUpperCase() : "";
 
   return active === "NO" || !!deletedAt || status === "DELETED";
+}
+
+function getMonthCloseMarkerText_() {
+  return "CIERRE DE MES";
+}
+
+function isMonthCloseMarkerRow_(row, headers) {
+  row = row || [];
+  const marker = getMonthCloseMarkerText_();
+  const normalizedMarker = marker.toUpperCase();
+  const values = row.map(function(value) {
+    return String(value || "").trim().toUpperCase();
+  });
+  const nonEmptyValues = values.filter(Boolean);
+
+  if (nonEmptyValues.length && nonEmptyValues.every(function(value) {
+    return value === normalizedMarker;
+  })) {
+    return true;
+  }
+
+  if (!headers || !headers.length) return false;
+
+  const normalizedHeaders = headers.map(function(header) {
+    return String(header || "").trim().toUpperCase();
+  });
+
+  return [
+    "ROW_TYPE",
+    "INVOICE_NUMBER",
+    "INVOICE",
+    "WO_NUMBER",
+    "STATUS"
+  ].some(function(headerName) {
+    const idx = normalizedHeaders.indexOf(headerName);
+    return idx >= 0 && values[idx] === normalizedMarker;
+  });
 }
 
 function isSoftDeletedObject_(obj) {

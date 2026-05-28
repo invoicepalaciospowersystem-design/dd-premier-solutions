@@ -1783,6 +1783,8 @@ function closeMonth() {
         "Mes cerrado.\n" +
         "Periodo archivado: " + (p.previousLabel || "") + "\n" +
         "Registros archivados: " + (p.closedRows || 0) + "\n" +
+        "Separador ECONOMY: fila " + (p.economyMarkerRow || 0) + "\n" +
+        "Separador INVOICES: fila " + (p.invoiceMarkerRow || 0) + "\n" +
         "Nuevo periodo: " + p.label
       );
       if (btn) {

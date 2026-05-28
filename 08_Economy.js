@@ -1326,10 +1326,17 @@ function closeEconomyMonth(sessionToken) {
     const previousLabel = buildEconomyPeriodLabel_(year, month);
     const closedAt = new Date();
 
-    const shEco = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.SHEET_ECONOMY);
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const shEco = ss.getSheetByName(CFG.SHEET_ECONOMY);
     if (!shEco) throw new Error("No existe la hoja ECONOMY.");
 
     const closedRows = closeEconomyRowsForPeriod_(shEco, previousLabel, closedAt, session);
+    const economyMarkerRow = appendMonthCloseMarkerRow_(shEco, previousLabel, closedAt, session);
+
+    const shInv = ss.getSheetByName("INVOICES");
+    const invoiceMarkerRow = shInv
+      ? appendMonthCloseMarkerRow_(shInv, previousLabel, closedAt, session)
+      : 0;
 
     month++;
 
@@ -1352,7 +1359,9 @@ function closeEconomyMonth(sessionToken) {
       newMonth: month,
       newYear: year,
       label: newLabel,
-      closedRows: closedRows
+      closedRows: closedRows,
+      economyMarkerRow: economyMarkerRow,
+      invoiceMarkerRow: invoiceMarkerRow
     });
 
     return {
@@ -1360,7 +1369,9 @@ function closeEconomyMonth(sessionToken) {
       year: year,
       previousLabel: previousLabel,
       label: newLabel,
-      closedRows: closedRows
+      closedRows: closedRows,
+      economyMarkerRow: economyMarkerRow,
+      invoiceMarkerRow: invoiceMarkerRow
     };
   } catch (err) {
     notifySystemError_("ECONOMY_CLOSE_MONTH_ERROR", err, {
@@ -1372,6 +1383,38 @@ function closeEconomyMonth(sessionToken) {
   } finally {
     if (locked) lock.releaseLock();
   }
+}
+
+function appendMonthCloseMarkerRow_(sh, periodLabel, closedAt, session) {
+  if (!sh || sh.getLastColumn() < 1) return 0;
+
+  const lastCol = sh.getLastColumn();
+  const lastRow = sh.getLastRow();
+
+  if (lastRow >= 2) {
+    const lastValues = sh.getRange(lastRow, 1, 1, lastCol).getValues()[0];
+    if (isMonthCloseMarkerRow_(lastValues)) return lastRow;
+  }
+
+  const marker = getMonthCloseMarkerText_();
+  const values = Array(lastCol).fill(marker);
+  sh.appendRow(values);
+
+  const rowNumber = sh.getLastRow();
+  const range = sh.getRange(rowNumber, 1, 1, lastCol);
+  range
+    .setBackground("#111827")
+    .setFontColor("#ffffff")
+    .setFontWeight("bold")
+    .setHorizontalAlignment("center");
+
+  sh.getRange(rowNumber, 1).setNote([
+    "Period: " + String(periodLabel || ""),
+    "Closed at: " + String(closedAt || ""),
+    "Closed by: " + getSessionActorLabel_(session)
+  ].join("\n"));
+
+  return rowNumber;
 }
 
 function closeEconomyRowsForPeriod_(sh, periodLabel, closedAt, session) {
