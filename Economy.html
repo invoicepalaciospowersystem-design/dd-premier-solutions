@@ -1677,6 +1677,7 @@ function syncInvoices() {
         "Invoices sincronizados\n" +
         "Periodo: " + ((res && res.period) || "") + "\n" +
         "Creados: " + Number(res && res.createdRows || 0) + "\n" +
+        "Ignorados antes del ultimo cierre: " + Number(res && res.skippedBeforeMarkerRows || 0) + "\n" +
         "Reparados: " + Number(res && res.repairedRows || 0) + "\n" +
         "Periodos invalidos removidos: " + Number(res && res.invalidPeriodRowsRemoved || 0)
       );

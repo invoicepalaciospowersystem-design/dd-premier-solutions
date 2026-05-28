@@ -780,12 +780,20 @@ function syncInvoicesToEconomy(companyId, sessionToken) {
   }
 
   const period = getCurrentEconomyPeriod();
+  const lastInvoiceMarkerIndex = getLastMonthCloseMarkerDataIndex_(invData, invHeaders);
   let syncedRows = 0;
   let createdRows = 0;
   let skippedClosedRows = 0;
+  let skippedBeforeMarkerRows = 0;
 
   for (let i = 1; i < invData.length; i++) {
     const invRow = invData[i];
+    if (isMonthCloseMarkerRow_(invRow, invHeaders)) continue;
+    if (lastInvoiceMarkerIndex >= 1 && i <= lastInvoiceMarkerIndex) {
+      skippedBeforeMarkerRows++;
+      continue;
+    }
+
     const wo = String(invRow[idxInvWO] || "").trim();
 
     const idxInvoiceType = invHeaders.indexOf("INVOICE_TYPE");
@@ -846,7 +854,9 @@ if (invType === "PM") continue;
     ecoHeaders = ecoData[0].map(h => String(h).trim());
 
     let targetRow = -1;
+    let targetRowByWo = -1;
     let foundClosedSameInvoiceMatch = false;
+    const currentInvoiceNumber = normalizeInvoiceNumber_(invoiceNumber);
 
     for (let j = 1; j < ecoData.length; j++) {
       if (isSoftDeletedRow_(ecoData[j], ecoHeaders)) continue;
@@ -854,22 +864,32 @@ if (invType === "PM") continue;
 
       const ecoWo = String(ecoData[j][ecoWO] || "").trim();
       const ecoComp = String(ecoData[j][ecoCompany] || "").trim().toUpperCase();
+      const existingInvoiceNumber = normalizeInvoiceNumber_(getHeaderValueFromRow_(ecoData[j], ecoHeaders, "INVOICE_NUMBER"));
+      const invoiceMatches = !!(currentInvoiceNumber && existingInvoiceNumber && currentInvoiceNumber === existingInvoiceNumber);
+      const woMatches = ecoWo === wo;
 
-      if (ecoWo === wo && ecoComp === companyId) {
+      if ((invoiceMatches || woMatches) && ecoComp === companyId) {
         if (isEconomyRowClosedForSync_(ecoData[j], ecoHeaders, period.label)) {
-          const existingInvoiceNumber = normalizeInvoiceNumber_(getHeaderValueFromRow_(ecoData[j], ecoHeaders, "INVOICE_NUMBER"));
-          const currentInvoiceNumber = normalizeInvoiceNumber_(invoiceNumber);
-
-          if (existingInvoiceNumber && currentInvoiceNumber && existingInvoiceNumber === currentInvoiceNumber) {
+          if (invoiceMatches) {
             foundClosedSameInvoiceMatch = true;
           }
 
           continue;
         }
 
-        targetRow = j + 1;
-        break;
+        if (invoiceMatches) {
+          targetRow = j + 1;
+          break;
+        }
+
+        if (targetRowByWo === -1) {
+          targetRowByWo = j + 1;
+        }
       }
+    }
+
+    if (targetRow === -1 && targetRowByWo !== -1) {
+      targetRow = targetRowByWo;
     }
 
     if (foundClosedSameInvoiceMatch && targetRow === -1) {
@@ -930,6 +950,7 @@ if (invType === "PM") continue;
       syncedRows: syncedRows,
       createdRows: createdRows,
       skippedClosedRows: skippedClosedRows,
+      skippedBeforeMarkerRows: skippedBeforeMarkerRows,
       repairedRows: repairResult.repairedRows,
       duplicateRowsRemoved: repairResult.duplicateRowsRemoved,
       invalidPeriodRowsRemoved: repairResult.invalidPeriodRowsRemoved,
@@ -941,11 +962,25 @@ if (invType === "PM") continue;
     syncedRows: syncedRows,
     createdRows: createdRows,
     skippedClosedRows: skippedClosedRows,
+    skippedBeforeMarkerRows: skippedBeforeMarkerRows,
     repairedRows: repairResult.repairedRows,
     duplicateRowsRemoved: repairResult.duplicateRowsRemoved,
     invalidPeriodRowsRemoved: repairResult.invalidPeriodRowsRemoved,
     period: period.label
   };
+}
+
+function getLastMonthCloseMarkerDataIndex_(data, headers) {
+  data = data || [];
+  let lastIndex = -1;
+
+  for (let i = 1; i < data.length; i++) {
+    if (isMonthCloseMarkerRow_(data[i], headers)) {
+      lastIndex = i;
+    }
+  }
+
+  return lastIndex;
 }
 
 function isEconomyRowClosedForSync_(row, headers, currentPeriodLabel) {
@@ -1064,6 +1099,27 @@ function repairEconomyRowsAfterClose_(sh, companyId, session, period) {
     });
   });
 
+  const woGroups = {};
+  currentRows.forEach(function(item) {
+    if (rowsToDelete[item.rowNumber]) return;
+    const woKey = getEconomyWoDedupeKeyFromRow_(item.row, headers, companyId);
+    if (!woKey) return;
+    if (!woGroups[woKey]) woGroups[woKey] = [];
+    woGroups[woKey].push(item);
+  });
+
+  Object.keys(woGroups).forEach(function(key) {
+    const group = woGroups[key];
+    if (group.length <= 1) return;
+
+    const keep = chooseEconomyRowToKeep_(group, headers);
+    group.forEach(function(item) {
+      if (item.rowNumber !== keep.rowNumber) {
+        rowsToDelete[item.rowNumber] = "Duplicate current economy WO row";
+      }
+    });
+  });
+
   const actor = getSessionActorLabel_(session);
   const rowNumbers = Object.keys(rowsToDelete).map(Number).sort(function(a, b) { return a - b; });
 
@@ -1111,6 +1167,16 @@ function getEconomyDedupeKeyFromRow_(row, headers, fallbackCompanyId) {
   if (invoiceNumber) return companyId + "|INV|" + invoiceNumber;
   if (woNumber) return companyId + "|WO|" + woNumber;
   return "";
+}
+
+function getEconomyWoDedupeKeyFromRow_(row, headers, fallbackCompanyId) {
+  const companyId = String(getHeaderValueFromRow_(row, headers, "COMPANY_ID") || fallbackCompanyId || "")
+    .trim()
+    .toUpperCase();
+  const woNumber = String(getHeaderValueFromRow_(row, headers, "WO_NUMBER") || "").trim().toUpperCase();
+
+  if (!companyId || !woNumber) return "";
+  return companyId + "|WO|" + woNumber;
 }
 
 function chooseEconomyRowToKeep_(group, headers) {
