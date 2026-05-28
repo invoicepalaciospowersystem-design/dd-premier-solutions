@@ -845,7 +845,7 @@ if (invType === "PM") continue;
     ecoHeaders = ecoData[0].map(h => String(h).trim());
 
     let targetRow = -1;
-    let foundClosedMatch = false;
+    let foundClosedSameInvoiceMatch = false;
 
     for (let j = 1; j < ecoData.length; j++) {
       if (isSoftDeletedRow_(ecoData[j], ecoHeaders)) continue;
@@ -855,7 +855,13 @@ if (invType === "PM") continue;
 
       if (ecoWo === wo && ecoComp === companyId) {
         if (isEconomyRowClosedForSync_(ecoData[j], ecoHeaders, period.label)) {
-          foundClosedMatch = true;
+          const existingInvoiceNumber = normalizeInvoiceNumber_(getHeaderValueFromRow_(ecoData[j], ecoHeaders, "INVOICE_NUMBER"));
+          const currentInvoiceNumber = normalizeInvoiceNumber_(invoiceNumber);
+
+          if (existingInvoiceNumber && currentInvoiceNumber && existingInvoiceNumber === currentInvoiceNumber) {
+            foundClosedSameInvoiceMatch = true;
+          }
+
           continue;
         }
 
@@ -864,7 +870,7 @@ if (invType === "PM") continue;
       }
     }
 
-    if (foundClosedMatch && targetRow === -1) {
+    if (foundClosedSameInvoiceMatch && targetRow === -1) {
       skippedClosedRows++;
       if (!shouldCreateEconomyRowForClosedMatch_(invoiceDate, period)) {
         continue;
