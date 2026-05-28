@@ -157,10 +157,12 @@ function getEconomyData(companyId, role, sessionToken) {
     throw new Error("ECONOMY debe tener columna COMPANY_ID.");
   }
 
+  const currentPeriod = getCurrentEconomyPeriod();
+  const lastCloseMarkerIndex = findLastMonthCloseMarkerIndex_(data, headers);
   const activeInvoiceKeys = {};
   const activeRows = data.slice(1).map(function(row, i) {
     if (isSoftDeletedRow_(row, headers)) return null;
-    if (isInvalidEconomyPeriodLabel_(getEconomyRowPeriodLabelFromData_(row, headers))) return null;
+    if (isMonthCloseMarkerRow_(row, headers)) return null;
 
     const obj = {};
 
@@ -175,7 +177,22 @@ function getEconomyData(companyId, role, sessionToken) {
     });
 
     obj.ROW_NUMBER = i + 2;
+
+    const rawPeriodLabel = getEconomyObjectRawPeriodLabel_(obj);
+    const isAfterLastCloseMarker = lastCloseMarkerIndex >= 0 && (i + 1) > lastCloseMarkerIndex;
+
+    if (currentPeriod && isAfterLastCloseMarker && (!rawPeriodLabel || isInvalidEconomyPeriodLabel_(rawPeriodLabel))) {
+      obj.PERIOD_LABEL = currentPeriod.label;
+      obj.ACCOUNTING_PERIOD = currentPeriod.label;
+      obj.PERIOD_MONTH = currentPeriod.month;
+      obj.PERIOD_YEAR = currentPeriod.year;
+    } else {
+      normalizeEconomyObjectPeriodFields_(obj);
+    }
+
     normalizeEconomyObjectPeriodFields_(obj);
+
+    if (isInvalidEconomyPeriodLabel_(rawPeriodLabel) && !obj.PERIOD_LABEL) return null;
 
     const invoiceKey = getEconomyHistoryInvoiceKey_(obj.COMPANY_ID || companyId, obj.INVOICE_NUMBER || obj.INVOICE || "");
     if (invoiceKey) activeInvoiceKeys[invoiceKey] = true;
@@ -228,6 +245,22 @@ function getEconomyObjectPeriodLabel_(obj) {
   const date = normalizeEconomyDateForCompare_(obj.DATE_INVOICE || obj.DATE_COMPLETED || obj.DATE_PAID || obj.CREATED_AT || obj.DATE_CREATED);
   if (date) {
     return buildEconomyPeriodLabel_(date.getFullYear(), date.getMonth() + 1);
+  }
+
+  return "";
+}
+
+function getEconomyObjectRawPeriodLabel_(obj) {
+  obj = obj || {};
+  const candidates = [
+    obj.PERIOD_LABEL,
+    obj.ACCOUNTING_PERIOD,
+    obj.CLOSED_PERIOD
+  ];
+
+  for (let i = 0; i < candidates.length; i++) {
+    const label = String(candidates[i] || "").trim();
+    if (label) return label;
   }
 
   return "";
@@ -1593,13 +1626,22 @@ function closeEconomyRowsForPeriod_(sh, periodLabel, closedAt, session) {
 }
 
 function getEconomyRowPeriodLabelFromData_(row, headers) {
+  let firstInvalidLabel = "";
+
   const idxLabel = headers.indexOf("PERIOD_LABEL");
   const label = idxLabel >= 0 ? String(row[idxLabel] || "").trim() : "";
-  if (label) return label;
+  if (label && isValidEconomyPeriodLabel_(label)) return label;
+  if (label && !firstInvalidLabel) firstInvalidLabel = label;
 
   const idxAccountingPeriod = headers.indexOf("ACCOUNTING_PERIOD");
   const accountingPeriod = idxAccountingPeriod >= 0 ? String(row[idxAccountingPeriod] || "").trim() : "";
-  if (accountingPeriod) return accountingPeriod;
+  if (accountingPeriod && isValidEconomyPeriodLabel_(accountingPeriod)) return accountingPeriod;
+  if (accountingPeriod && !firstInvalidLabel) firstInvalidLabel = accountingPeriod;
+
+  const idxClosedPeriod = headers.indexOf("CLOSED_PERIOD");
+  const closedPeriod = idxClosedPeriod >= 0 ? String(row[idxClosedPeriod] || "").trim() : "";
+  if (closedPeriod && isValidEconomyPeriodLabel_(closedPeriod)) return closedPeriod;
+  if (closedPeriod && !firstInvalidLabel) firstInvalidLabel = closedPeriod;
 
   const idxYear = headers.indexOf("PERIOD_YEAR");
   const idxMonth = headers.indexOf("PERIOD_MONTH");
@@ -1610,7 +1652,17 @@ function getEconomyRowPeriodLabelFromData_(row, headers) {
     return year + "-" + String(month).padStart(2, "0");
   }
 
-  return "";
+  const dateValue = getHeaderValueFromRow_(row, headers, "DATE_INVOICE") ||
+    getHeaderValueFromRow_(row, headers, "DATE_COMPLETED") ||
+    getHeaderValueFromRow_(row, headers, "DATE_PAID") ||
+    getHeaderValueFromRow_(row, headers, "CREATED_AT") ||
+    getHeaderValueFromRow_(row, headers, "DATE_CREATED");
+  const date = normalizeEconomyDateForCompare_(dateValue);
+  if (date) {
+    return buildEconomyPeriodLabel_(date.getFullYear(), date.getMonth() + 1);
+  }
+
+  return firstInvalidLabel || "";
 }
 
 function isValidEconomyPeriodLabel_(periodLabel) {
