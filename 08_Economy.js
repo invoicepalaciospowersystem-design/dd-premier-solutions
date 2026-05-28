@@ -992,6 +992,7 @@ function getCurrentEconomyPeriod() {
 
   let month = 0;
   let year = 0;
+  let lastClosedPeriod = "";
 
   for (let i = 1; i < data.length; i++) {
     const key = String(data[i][0] || "").trim();
@@ -999,16 +1000,58 @@ function getCurrentEconomyPeriod() {
 
     if (key === "ECONOMY_MONTH") month = Number(value);
     if (key === "ECONOMY_YEAR") year = Number(value);
+    if (key === "ECONOMY_LAST_CLOSED_PERIOD") lastClosedPeriod = value;
   }
 
   if (!month || !year) {
     throw new Error("APP_SETTINGS no tiene ECONOMY_MONTH / ECONOMY_YEAR");
   }
 
+  return normalizeOpenEconomyPeriod_(month, year, lastClosedPeriod);
+}
+
+function normalizeOpenEconomyPeriod_(month, year, lastClosedPeriod) {
+  month = Number(month || 0);
+  year = Number(year || 0);
+  let label = buildEconomyPeriodLabel_(year, month);
+  lastClosedPeriod = String(lastClosedPeriod || "").trim();
+
+  if (lastClosedPeriod && label && label <= lastClosedPeriod) {
+    const next = getNextEconomyPeriodAfterLabel_(lastClosedPeriod);
+    if (next) return next;
+  }
+
   return {
     month: month,
     year: year,
-    label: year + "-" + String(month).padStart(2, "0")
+    label: label
+  };
+}
+
+function buildEconomyPeriodLabel_(year, month) {
+  year = Number(year || 0);
+  month = Number(month || 0);
+  if (!year || !month) return "";
+  return year + "-" + String(month).padStart(2, "0");
+}
+
+function getNextEconomyPeriodAfterLabel_(label) {
+  label = String(label || "").trim();
+  const match = label.match(/^(\d{4})-(\d{1,2})$/);
+  if (!match) return null;
+
+  let year = Number(match[1]);
+  let month = Number(match[2]) + 1;
+
+  if (month > 12) {
+    month = 1;
+    year++;
+  }
+
+  return {
+    month: month,
+    year: year,
+    label: buildEconomyPeriodLabel_(year, month)
   };
 }
 
@@ -1027,12 +1070,14 @@ function closeEconomyMonth(sessionToken) {
     const data = sh.getDataRange().getValues();
     let monthRow = -1;
     let yearRow = -1;
+    let lastClosedPeriod = "";
 
     for (let i = 1; i < data.length; i++) {
       const key = String(data[i][0] || "").trim();
 
       if (key === "ECONOMY_MONTH") monthRow = i + 1;
       if (key === "ECONOMY_YEAR") yearRow = i + 1;
+      if (key === "ECONOMY_LAST_CLOSED_PERIOD") lastClosedPeriod = String(data[i][1] || "").trim();
     }
 
     if (monthRow === -1 || yearRow === -1) {
@@ -1046,7 +1091,11 @@ function closeEconomyMonth(sessionToken) {
       throw new Error("Periodo economico invalido en APP_SETTINGS.");
     }
 
-    const previousLabel = year + "-" + String(month).padStart(2, "0");
+    const openPeriod = normalizeOpenEconomyPeriod_(month, year, lastClosedPeriod);
+    month = openPeriod.month;
+    year = openPeriod.year;
+
+    const previousLabel = buildEconomyPeriodLabel_(year, month);
     const closedAt = new Date();
 
     const shEco = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.SHEET_ECONOMY);
