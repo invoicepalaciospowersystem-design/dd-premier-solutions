@@ -381,7 +381,11 @@ function getStoredUser() {
 
 function getSessionToken() {
   try {
-    return localStorage.getItem("pps_session_token") || "";
+    const directToken = localStorage.getItem("pps_session_token") || "";
+    if (directToken) return directToken;
+
+    const user = getStoredUser();
+    return String(user.sessionToken || user.SESSION_TOKEN || "").trim();
   } catch (err) {
     return "";
   }
