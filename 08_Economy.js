@@ -850,6 +850,7 @@ if (invType === "PM") continue;
 
     for (let j = 1; j < ecoData.length; j++) {
       if (isSoftDeletedRow_(ecoData[j], ecoHeaders)) continue;
+      if (isInvalidEconomyPeriodLabel_(getEconomyRowPeriodLabelFromData_(ecoData[j], ecoHeaders))) continue;
 
       const ecoWo = String(ecoData[j][ecoWO] || "").trim();
       const ecoComp = String(ecoData[j][ecoCompany] || "").trim().toUpperCase();
