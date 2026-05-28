@@ -2492,6 +2492,7 @@
         <input id="economyDashboardPeriodYear" class="admin-period-input" type="number" min="2020" max="2100" step="1" onchange="loadEconomyModuleDashboard()">
         <button class="dash-refresh" onclick="loadEconomyModuleDashboard()">Actualizar</button>
         <button class="dash-refresh" onclick="openModule('?view=economy')">Abrir Economia</button>
+        <button class="dash-refresh" onclick="openModule('?view=accounting')">Abrir Contabilidad</button>
       </div>
     </div>
 
@@ -2628,6 +2629,13 @@ const MODULES = [
     desc: "Facturacion, costos, pagos y profit.",
     roles: ["OWNER", "ADMIN", "ECONOMIA"],
     url: "?view=economy"
+  },
+  {
+    title: "Contabilidad",
+    icon: "CT",
+    desc: "Cortes contables, taxes, pagos e inversionistas.",
+    roles: ["OWNER", "ADMIN", "ECONOMIA"],
+    url: "?view=accounting"
   },
   {
     title: "Tiendas / Direcciones",

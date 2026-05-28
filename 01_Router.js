@@ -84,6 +84,18 @@ function doGet(e) {
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
 
+    if (p.view === "accounting") {
+      const template = HtmlService.createTemplateFromFile("Contabilidad");
+      applyTemplateDefaults_(template, p, baseUrl);
+      template.baseUrl = baseUrl;
+      template.companyId = p.companyId || "";
+      template.ownerOnly = ownerPortal ? "true" : "";
+
+      return template.evaluate()
+        .setTitle("Contabilidad")
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
+
     if (p.view === "stores") {
       const template = HtmlService.createTemplateFromFile("Stores");
       applyTemplateDefaults_(template, p, baseUrl);
