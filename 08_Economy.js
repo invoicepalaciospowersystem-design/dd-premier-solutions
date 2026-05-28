@@ -158,7 +158,7 @@ function getEconomyData(companyId, role, sessionToken) {
   }
 
   const currentPeriod = getCurrentEconomyPeriod();
-  const lastCloseMarkerIndex = findLastMonthCloseMarkerIndex_(data, headers);
+  const lastCloseMarkerIndex = getLastMonthCloseMarkerDataIndex_(data, headers);
   const activeInvoiceKeys = {};
   const activeRows = data.slice(1).map(function(row, i) {
     if (isSoftDeletedRow_(row, headers)) return null;
