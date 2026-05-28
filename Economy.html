@@ -275,6 +275,7 @@
   <button onclick="load()">Refresh</button>
 
   <button id="syncInvoicesBtn" onclick="syncInvoices()">Sync Invoices</button>
+  <button id="repairEconomyBtn" onclick="repairEconomyDuplicates()">Repair Duplicates</button>
 
   <button id="mcdPaymentBtn" onclick="toggleMcdPaymentImport()">Import McD Payment</button>
 
@@ -458,6 +459,7 @@ function setMode(mode) {
   document.getElementById("pmBtn").classList.toggle("mode-active", mode === "PM");
 
   document.getElementById("syncInvoicesBtn").style.display = mode === "REGULAR" ? "inline-block" : "none";
+  document.getElementById("repairEconomyBtn").style.display = mode === "REGULAR" ? "inline-block" : "none";
   document.getElementById("syncOldBtn").style.display = mode === "REGULAR" ? "inline-block" : "none";
   document.getElementById("mcdPaymentBtn").style.display = mode === "REGULAR" ? "inline-block" : "none";
   if (mode !== "REGULAR") {
@@ -1659,15 +1661,73 @@ function syncInvoices() {
     return;
   }
 
+  const btn = document.getElementById("syncInvoicesBtn");
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = "Syncing...";
+  }
+
   google.script.run
-    .withSuccessHandler(function() {
-      alert("Invoices sincronizados");
+    .withSuccessHandler(function(res) {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = "Sync Invoices";
+      }
+      alert(
+        "Invoices sincronizados\n" +
+        "Periodo: " + ((res && res.period) || "") + "\n" +
+        "Creados: " + Number(res && res.createdRows || 0) + "\n" +
+        "Reparados: " + Number(res && res.repairedRows || 0)
+      );
       load();
     })
     .withFailureHandler(function(err) {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = "Sync Invoices";
+      }
       alertServerError(err);
     })
     .syncInvoicesToEconomy(ACTIVE_COMPANY_ID, getSessionToken());
+}
+
+function repairEconomyDuplicates() {
+  if (!ACTIVE_COMPANY_ID) {
+    alert("Primero cargue la compania.");
+    return;
+  }
+
+  if (!confirm("Reparar duplicados creados por sync despues del cierre contable?")) return;
+
+  const btn = document.getElementById("repairEconomyBtn");
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = "Repairing...";
+  }
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = "Repair Duplicates";
+      }
+      alert(
+        "Reparacion lista\n" +
+        "Periodo: " + ((res && res.period) || "") + "\n" +
+        "Filas reparadas: " + Number(res && res.repairedRows || 0) + "\n" +
+        "Copias viejas removidas: " + Number(res && res.oldCopiesRemoved || 0) + "\n" +
+        "Duplicados removidos: " + Number(res && res.duplicateRowsRemoved || 0)
+      );
+      load();
+    })
+    .withFailureHandler(function(err) {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = "Repair Duplicates";
+      }
+      alertServerError(err);
+    })
+    .repairEconomyDuplicatesAfterClose(ACTIVE_COMPANY_ID, getSessionToken());
 }
 
 function updateInvView(row) {

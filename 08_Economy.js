@@ -848,6 +848,8 @@ if (invType === "PM") continue;
     let foundClosedMatch = false;
 
     for (let j = 1; j < ecoData.length; j++) {
+      if (isSoftDeletedRow_(ecoData[j], ecoHeaders)) continue;
+
       const ecoWo = String(ecoData[j][ecoWO] || "").trim();
       const ecoComp = String(ecoData[j][ecoCompany] || "").trim().toUpperCase();
 
@@ -864,6 +866,9 @@ if (invType === "PM") continue;
 
     if (foundClosedMatch && targetRow === -1) {
       skippedClosedRows++;
+      if (!shouldCreateEconomyRowForClosedMatch_(invoiceDate, period)) {
+        continue;
+      }
     }
 
     if (targetRow === -1) {
@@ -910,16 +915,27 @@ if (invType === "PM") continue;
     syncedRows++;
   }
 
+  const repairResult = repairEconomyRowsAfterClose_(shEco, companyId, session, period);
+
   if (session) {
     addAuditLog_("ECONOMY", "INVOICES_SYNCED_TO_ECONOMY", companyId, "ECONOMY", period.label, session, {
       syncedRows: syncedRows,
       createdRows: createdRows,
       skippedClosedRows: skippedClosedRows,
+      repairedRows: repairResult.repairedRows,
+      duplicateRowsRemoved: repairResult.duplicateRowsRemoved,
       period: period.label
     });
   }
 
-  return true;
+  return {
+    syncedRows: syncedRows,
+    createdRows: createdRows,
+    skippedClosedRows: skippedClosedRows,
+    repairedRows: repairResult.repairedRows,
+    duplicateRowsRemoved: repairResult.duplicateRowsRemoved,
+    period: period.label
+  };
 }
 
 function isEconomyRowClosedForSync_(row, headers, currentPeriodLabel) {
@@ -930,6 +946,208 @@ function isEconomyRowClosedForSync_(row, headers, currentPeriodLabel) {
   const rowPeriod = getEconomyRowPeriodLabelFromData_(row, headers);
   currentPeriodLabel = String(currentPeriodLabel || "").trim();
   return !!(rowPeriod && currentPeriodLabel && rowPeriod !== currentPeriodLabel);
+}
+
+function repairEconomyDuplicatesAfterClose(companyId, sessionToken) {
+  companyId = String(companyId || "").trim().toUpperCase();
+  const session = requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"], companyId);
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.SHEET_ECONOMY);
+  if (!sh) throw new Error("No existe la hoja ECONOMY.");
+
+  const period = getCurrentEconomyPeriod();
+  const result = repairEconomyRowsAfterClose_(sh, companyId, session, period);
+
+  addAuditLog_("ECONOMY", "ECONOMY_DUPLICATES_REPAIRED", companyId, "ECONOMY", period.label, session, result);
+  return result;
+}
+
+function repairEconomyRowsAfterClose_(sh, companyId, session, period) {
+  const emptyResult = {
+    repairedRows: 0,
+    duplicateRowsRemoved: 0,
+    oldCopiesRemoved: 0,
+    period: period && period.label || ""
+  };
+
+  period = period || {};
+  const currentPeriodLabel = String(period.label || "").trim();
+  const lastClosedAt = period.lastClosedAt;
+  const lastClosedPeriod = String(period.lastClosedPeriod || "").trim();
+
+  if (!currentPeriodLabel || !lastClosedAt || sh.getLastRow() < 2) return emptyResult;
+
+  let headers = ensureSheetColumns_(sh, [
+    "ACTIVE",
+    "DELETED_AT",
+    "DELETED_BY",
+    "DELETED_REASON"
+  ]);
+
+  const data = sh.getRange(1, 1, sh.getLastRow(), sh.getLastColumn()).getValues();
+  headers = data[0].map(function(h) {
+    return String(h || "").trim();
+  });
+
+  const closedKeys = {};
+  const currentRows = [];
+  const rowsToDelete = {};
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (isSoftDeletedRow_(row, headers)) continue;
+
+    const rowCompany = String(getHeaderValueFromRow_(row, headers, "COMPANY_ID") || companyId).trim().toUpperCase();
+    if (rowCompany !== companyId) continue;
+
+    const key = getEconomyDedupeKeyFromRow_(row, headers, companyId);
+    if (!key) continue;
+
+    const rowNumber = i + 1;
+    const rowPeriod = getEconomyRowPeriodLabelFromData_(row, headers);
+    const closedPeriod = String(getHeaderValueFromRow_(row, headers, "CLOSED_PERIOD") || "").trim();
+    const closedAt = getHeaderValueFromRow_(row, headers, "MONTH_CLOSED_AT");
+    const isClosedRow = !!(closedPeriod || closedAt || (lastClosedPeriod && rowPeriod === lastClosedPeriod));
+
+    if (isClosedRow && rowPeriod !== currentPeriodLabel) {
+      closedKeys[key] = true;
+      continue;
+    }
+
+    if (rowPeriod === currentPeriodLabel) {
+      currentRows.push({
+        rowNumber: rowNumber,
+        row: row,
+        key: key
+      });
+    }
+  }
+
+  currentRows.forEach(function(item) {
+    const invoiceDate = getHeaderValueFromRow_(item.row, headers, "DATE_INVOICE");
+    if (closedKeys[item.key] && !shouldCreateEconomyRowForClosedMatch_(invoiceDate, period)) {
+      rowsToDelete[item.rowNumber] = "Old invoice copied into current closed period sync";
+    }
+  });
+
+  const groups = {};
+  currentRows.forEach(function(item) {
+    if (rowsToDelete[item.rowNumber]) return;
+    if (!groups[item.key]) groups[item.key] = [];
+    groups[item.key].push(item);
+  });
+
+  Object.keys(groups).forEach(function(key) {
+    const group = groups[key];
+    if (group.length <= 1) return;
+
+    const keep = chooseEconomyRowToKeep_(group, headers);
+    group.forEach(function(item) {
+      if (item.rowNumber !== keep.rowNumber) {
+        rowsToDelete[item.rowNumber] = "Duplicate current economy row";
+      }
+    });
+  });
+
+  const actor = getSessionActorLabel_(session);
+  const rowNumbers = Object.keys(rowsToDelete).map(Number).sort(function(a, b) { return a - b; });
+
+  rowNumbers.forEach(function(rowNumber) {
+    setCellByHeader_(sh, rowNumber, headers, "ACTIVE", "NO");
+    setCellByHeader_(sh, rowNumber, headers, "DELETED_AT", new Date());
+    setCellByHeader_(sh, rowNumber, headers, "DELETED_BY", actor || "repairEconomyRowsAfterClose");
+    setCellByHeader_(sh, rowNumber, headers, "DELETED_REASON", rowsToDelete[rowNumber]);
+  });
+
+  const oldCopiesRemoved = rowNumbers.filter(function(rowNumber) {
+    return String(rowsToDelete[rowNumber] || "").indexOf("Old invoice") === 0;
+  }).length;
+
+  return {
+    repairedRows: rowNumbers.length,
+    duplicateRowsRemoved: rowNumbers.length - oldCopiesRemoved,
+    oldCopiesRemoved: oldCopiesRemoved,
+    period: currentPeriodLabel
+  };
+}
+
+function shouldCreateEconomyRowForClosedMatch_(invoiceDate, period) {
+  period = period || {};
+  const closeDate = normalizeEconomyDateForCompare_(period.lastClosedAt);
+  if (!closeDate) return false;
+
+  const invDate = normalizeEconomyDateForCompare_(invoiceDate);
+  if (!invDate) return false;
+
+  return invDate.getTime() > closeDate.getTime();
+}
+
+function getEconomyDedupeKeyFromRow_(row, headers, fallbackCompanyId) {
+  const companyId = String(getHeaderValueFromRow_(row, headers, "COMPANY_ID") || fallbackCompanyId || "")
+    .trim()
+    .toUpperCase();
+  const invoiceNumber = normalizeInvoiceNumber_(getHeaderValueFromRow_(row, headers, "INVOICE_NUMBER"));
+  const woNumber = String(getHeaderValueFromRow_(row, headers, "WO_NUMBER") || "").trim().toUpperCase();
+
+  if (invoiceNumber) return companyId + "|INV|" + invoiceNumber;
+  if (woNumber) return companyId + "|WO|" + woNumber;
+  return "";
+}
+
+function chooseEconomyRowToKeep_(group, headers) {
+  let best = group[0];
+  let bestScore = scoreEconomyRowForKeep_(best, headers);
+
+  for (let i = 1; i < group.length; i++) {
+    const score = scoreEconomyRowForKeep_(group[i], headers);
+    if (score > bestScore) {
+      best = group[i];
+      bestScore = score;
+    }
+  }
+
+  return best;
+}
+
+function scoreEconomyRowForKeep_(item, headers) {
+  const row = item.row;
+  let score = Number(item.rowNumber || 0);
+
+  const invSource = String(getHeaderValueFromRow_(row, headers, "INV_SOURCE") || "").trim();
+  if (invSource) score += 1000000;
+
+  const status = String(getHeaderValueFromRow_(row, headers, "STATUS") || "").trim().toUpperCase();
+  if (status === "PAID") score += 200000;
+  if (status === "INVOICED") score += 100000;
+
+  return score;
+}
+
+function normalizeEconomyDateForCompare_(value) {
+  if (!value) return null;
+
+  if (Object.prototype.toString.call(value) === "[object Date]" && !isNaN(value.getTime())) {
+    return value;
+  }
+
+  const text = String(value || "").trim();
+  if (!text) return null;
+
+  const direct = new Date(text);
+  if (!isNaN(direct.getTime())) return direct;
+
+  const match = text.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})/);
+  if (!match) return null;
+
+  let first = Number(match[1]);
+  let second = Number(match[2]);
+  let year = Number(match[3]);
+  if (year < 100) year += 2000;
+
+  const month = first > 12 ? second : first;
+  const day = first > 12 ? first : second;
+  const parsed = new Date(year, month - 1, day);
+
+  return isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function getHeaderValueFromRow_(row, headers, headerName) {
@@ -993,6 +1211,7 @@ function getCurrentEconomyPeriod() {
   let month = 0;
   let year = 0;
   let lastClosedPeriod = "";
+  let lastClosedAt = "";
 
   for (let i = 1; i < data.length; i++) {
     const key = String(data[i][0] || "").trim();
@@ -1001,16 +1220,17 @@ function getCurrentEconomyPeriod() {
     if (key === "ECONOMY_MONTH") month = Number(value);
     if (key === "ECONOMY_YEAR") year = Number(value);
     if (key === "ECONOMY_LAST_CLOSED_PERIOD") lastClosedPeriod = value;
+    if (key === "ECONOMY_LAST_CLOSED_AT") lastClosedAt = data[i][1];
   }
 
   if (!month || !year) {
     throw new Error("APP_SETTINGS no tiene ECONOMY_MONTH / ECONOMY_YEAR");
   }
 
-  return normalizeOpenEconomyPeriod_(month, year, lastClosedPeriod);
+  return normalizeOpenEconomyPeriod_(month, year, lastClosedPeriod, lastClosedAt);
 }
 
-function normalizeOpenEconomyPeriod_(month, year, lastClosedPeriod) {
+function normalizeOpenEconomyPeriod_(month, year, lastClosedPeriod, lastClosedAt) {
   month = Number(month || 0);
   year = Number(year || 0);
   let label = buildEconomyPeriodLabel_(year, month);
@@ -1018,13 +1238,19 @@ function normalizeOpenEconomyPeriod_(month, year, lastClosedPeriod) {
 
   if (lastClosedPeriod && label && label <= lastClosedPeriod) {
     const next = getNextEconomyPeriodAfterLabel_(lastClosedPeriod);
-    if (next) return next;
+    if (next) {
+      next.lastClosedPeriod = lastClosedPeriod;
+      next.lastClosedAt = lastClosedAt || "";
+      return next;
+    }
   }
 
   return {
     month: month,
     year: year,
-    label: label
+    label: label,
+    lastClosedPeriod: lastClosedPeriod,
+    lastClosedAt: lastClosedAt || ""
   };
 }
 
@@ -1071,6 +1297,7 @@ function closeEconomyMonth(sessionToken) {
     let monthRow = -1;
     let yearRow = -1;
     let lastClosedPeriod = "";
+    let lastClosedAt = "";
 
     for (let i = 1; i < data.length; i++) {
       const key = String(data[i][0] || "").trim();
@@ -1078,6 +1305,7 @@ function closeEconomyMonth(sessionToken) {
       if (key === "ECONOMY_MONTH") monthRow = i + 1;
       if (key === "ECONOMY_YEAR") yearRow = i + 1;
       if (key === "ECONOMY_LAST_CLOSED_PERIOD") lastClosedPeriod = String(data[i][1] || "").trim();
+      if (key === "ECONOMY_LAST_CLOSED_AT") lastClosedAt = data[i][1];
     }
 
     if (monthRow === -1 || yearRow === -1) {
@@ -1091,7 +1319,7 @@ function closeEconomyMonth(sessionToken) {
       throw new Error("Periodo economico invalido en APP_SETTINGS.");
     }
 
-    const openPeriod = normalizeOpenEconomyPeriod_(month, year, lastClosedPeriod);
+    const openPeriod = normalizeOpenEconomyPeriod_(month, year, lastClosedPeriod, lastClosedAt);
     month = openPeriod.month;
     year = openPeriod.year;
 
