@@ -160,6 +160,7 @@ function getEconomyData(companyId, role, sessionToken) {
   const activeInvoiceKeys = {};
   const activeRows = data.slice(1).map(function(row, i) {
     if (isSoftDeletedRow_(row, headers)) return null;
+    if (isInvalidEconomyPeriodLabel_(getEconomyRowPeriodLabelFromData_(row, headers))) return null;
 
     const obj = {};
 
@@ -930,6 +931,7 @@ if (invType === "PM") continue;
       skippedClosedRows: skippedClosedRows,
       repairedRows: repairResult.repairedRows,
       duplicateRowsRemoved: repairResult.duplicateRowsRemoved,
+      invalidPeriodRowsRemoved: repairResult.invalidPeriodRowsRemoved,
       period: period.label
     });
   }
@@ -940,6 +942,7 @@ if (invType === "PM") continue;
     skippedClosedRows: skippedClosedRows,
     repairedRows: repairResult.repairedRows,
     duplicateRowsRemoved: repairResult.duplicateRowsRemoved,
+    invalidPeriodRowsRemoved: repairResult.invalidPeriodRowsRemoved,
     period: period.label
   };
 }
@@ -972,6 +975,7 @@ function repairEconomyRowsAfterClose_(sh, companyId, session, period) {
     repairedRows: 0,
     duplicateRowsRemoved: 0,
     oldCopiesRemoved: 0,
+    invalidPeriodRowsRemoved: 0,
     period: period && period.label || ""
   };
 
@@ -1010,6 +1014,11 @@ function repairEconomyRowsAfterClose_(sh, companyId, session, period) {
 
     const rowNumber = i + 1;
     const rowPeriod = getEconomyRowPeriodLabelFromData_(row, headers);
+    if (isInvalidEconomyPeriodLabel_(rowPeriod)) {
+      rowsToDelete[rowNumber] = "Invalid economy period label: " + rowPeriod;
+      continue;
+    }
+
     const closedPeriod = String(getHeaderValueFromRow_(row, headers, "CLOSED_PERIOD") || "").trim();
     const closedAt = getHeaderValueFromRow_(row, headers, "MONTH_CLOSED_AT");
     const isClosedRow = !!(closedPeriod || closedAt || (lastClosedPeriod && rowPeriod === lastClosedPeriod));
@@ -1067,11 +1076,15 @@ function repairEconomyRowsAfterClose_(sh, companyId, session, period) {
   const oldCopiesRemoved = rowNumbers.filter(function(rowNumber) {
     return String(rowsToDelete[rowNumber] || "").indexOf("Old invoice") === 0;
   }).length;
+  const invalidPeriodRowsRemoved = rowNumbers.filter(function(rowNumber) {
+    return String(rowsToDelete[rowNumber] || "").indexOf("Invalid economy period label") === 0;
+  }).length;
 
   return {
     repairedRows: rowNumbers.length,
-    duplicateRowsRemoved: rowNumbers.length - oldCopiesRemoved,
+    duplicateRowsRemoved: rowNumbers.length - oldCopiesRemoved - invalidPeriodRowsRemoved,
     oldCopiesRemoved: oldCopiesRemoved,
+    invalidPeriodRowsRemoved: invalidPeriodRowsRemoved,
     period: currentPeriodLabel
   };
 }
@@ -1485,6 +1498,16 @@ function getEconomyRowPeriodLabelFromData_(row, headers) {
   }
 
   return "";
+}
+
+function isValidEconomyPeriodLabel_(periodLabel) {
+  periodLabel = String(periodLabel || "").trim();
+  return !periodLabel || /^\d{4}-\d{2}$/.test(periodLabel);
+}
+
+function isInvalidEconomyPeriodLabel_(periodLabel) {
+  periodLabel = String(periodLabel || "").trim();
+  return !!periodLabel && !isValidEconomyPeriodLabel_(periodLabel);
 }
 
 function setAppSettingValue_(sh, key, value) {

@@ -1677,7 +1677,8 @@ function syncInvoices() {
         "Invoices sincronizados\n" +
         "Periodo: " + ((res && res.period) || "") + "\n" +
         "Creados: " + Number(res && res.createdRows || 0) + "\n" +
-        "Reparados: " + Number(res && res.repairedRows || 0)
+        "Reparados: " + Number(res && res.repairedRows || 0) + "\n" +
+        "Periodos invalidos removidos: " + Number(res && res.invalidPeriodRowsRemoved || 0)
       );
       load();
     })
@@ -1697,7 +1698,7 @@ function repairEconomyDuplicates() {
     return;
   }
 
-  if (!confirm("Reparar duplicados creados por sync despues del cierre contable?")) return;
+  if (!confirm("Reparar duplicados y periodos invalidos creados por sync despues del cierre contable?")) return;
 
   const btn = document.getElementById("repairEconomyBtn");
   if (btn) {
@@ -1716,6 +1717,7 @@ function repairEconomyDuplicates() {
         "Periodo: " + ((res && res.period) || "") + "\n" +
         "Filas reparadas: " + Number(res && res.repairedRows || 0) + "\n" +
         "Copias viejas removidas: " + Number(res && res.oldCopiesRemoved || 0) + "\n" +
+        "Periodos invalidos removidos: " + Number(res && res.invalidPeriodRowsRemoved || 0) + "\n" +
         "Duplicados removidos: " + Number(res && res.duplicateRowsRemoved || 0)
       );
       load();
@@ -1811,11 +1813,11 @@ function loadPeriodFilter() {
   const current = select.value;
 
   const periodSet = {};
-  if (CURRENT_PERIOD_LABEL) periodSet[CURRENT_PERIOD_LABEL] = true;
+  if (isValidEconomyPeriodLabel(CURRENT_PERIOD_LABEL)) periodSet[CURRENT_PERIOD_LABEL] = true;
 
   ECONOMY.forEach(function(o) {
     const label = String(o.PERIOD_LABEL || o.ACCOUNTING_PERIOD || "").trim();
-    if (label) periodSet[label] = true;
+    if (isValidEconomyPeriodLabel(label)) periodSet[label] = true;
   });
 
   const periods = Object.keys(periodSet).sort().reverse();
@@ -1833,6 +1835,11 @@ function loadPeriodFilter() {
   }
 
   syncMetricPeriodControlVisibility();
+}
+
+function isValidEconomyPeriodLabel(label) {
+  label = String(label || "").trim();
+  return !!label && /^\d{4}-\d{2}$/.test(label);
 }
 
 function syncOldLog() {
