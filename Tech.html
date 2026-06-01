@@ -139,6 +139,16 @@
       margin:6px 0;
     }
 
+    .map-link {
+      color:#2563eb;
+      font-weight:bold;
+      text-decoration:none;
+    }
+
+    .map-link:hover {
+      text-decoration:underline;
+    }
+
     .tech-metric-grid {
       display:grid;
       grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));
@@ -516,6 +526,7 @@ function card(o) {
   const row = Number(o.ROW_NUMBER);
   const equipment = o.REPORTED_EQUIPMENT || o.REPORTED_EQUIPMENT_EN || o["REPORTED EQUIPMENT"] || "No especificado";
   const problem = o.REPORTED_PROBLEM_ES || o.REPORTED_PROBLEM_EN || o.REPORTED_PROBLEM_ORIGINAL || "";
+  const address = o.STORE_ADDRESS || "No disponible";
 
   const assignedAge = getAssignedAgeText(o);
 
@@ -534,7 +545,7 @@ function card(o) {
 
       <div class="small"><b>Company:</b> ${o.COMPANY_ID || ""}</div>
       <div class="small"><b>Técnico:</b> ${o.TECHNICIAN || TECH_NAME}</div>
-      <div class="small"><b>Dirección:</b> ${o.STORE_ADDRESS || "No disponible"}</div>
+      <div class="small"><b>Dirección:</b> ${renderAddressMapLink(address)}</div>
       <div class="small"><b>Equipo:</b> ${equipment}</div>
       <div class="small"><b>Prioridad:</b> ${o.ORDER_PRIORITY || ""}</div>
 
@@ -581,6 +592,26 @@ function card(o) {
 </div>
     </div>
   `;
+}
+
+function renderAddressMapLink(address) {
+  address = String(address || "").trim();
+  if (!address || address === "No disponible") return "No disponible";
+
+  return `<a class="map-link" href="${buildGoogleMapsUrl(address)}" target="_blank" rel="noopener noreferrer">${escapeHtmlTech(address)}</a>`;
+}
+
+function buildGoogleMapsUrl(address) {
+  return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(address);
+}
+
+function escapeHtmlTech(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function updateStatus(row, status) {
