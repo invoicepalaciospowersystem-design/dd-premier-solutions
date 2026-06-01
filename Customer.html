@@ -307,13 +307,6 @@
     </label>
 
     <label class="filter-field">
-      Technician
-      <select id="techFilter" onchange="applyFilters()">
-        <option value="">All Technicians</option>
-      </select>
-    </label>
-
-    <label class="filter-field">
       Priority
       <select id="priorityFilter" onchange="applyFilters()">
         <option value="">All Priorities</option>
@@ -489,7 +482,6 @@ function clearFilters() {
   [
     "searchFilter",
     "statusFilter",
-    "techFilter",
     "priorityFilter",
     "typeFilter",
     "dateFromFilter",
@@ -505,7 +497,6 @@ function clearFilters() {
 function getFilteredOrders() {
   const search = normalizeSearch(document.getElementById("searchFilter").value);
   const statusFilter = String(document.getElementById("statusFilter").value || "");
-  const techFilter = String(document.getElementById("techFilter").value || "");
   const priorityFilter = String(document.getElementById("priorityFilter").value || "");
   const typeFilter = String(document.getElementById("typeFilter").value || "");
   const dateFrom = parseDateOnly(document.getElementById("dateFromFilter").value);
@@ -514,7 +505,6 @@ function getFilteredOrders() {
   return ALL_ORDERS.filter(function(o) {
     if (search && normalizeSearch(getOrderSearchText(o)).indexOf(search) === -1) return false;
     if (statusFilter && !matchesStatusFilter(o, statusFilter)) return false;
-    if (techFilter && normalizeSearch(o.TECHNICIAN || "Not assigned") !== techFilter) return false;
     if (priorityFilter && normalizeSearch(getOrderDisplayPriority(o)) !== priorityFilter) return false;
     if (typeFilter && normalizeSearch(getOrderDisplayType(o)) !== typeFilter) return false;
 
@@ -546,12 +536,6 @@ function matchesStatusFilter(o, filter) {
 }
 
 function populateFilterOptions(data) {
-  setFilterOptions(
-    "techFilter",
-    "All Technicians",
-    uniqueSorted(data.map(function(o) { return o.TECHNICIAN || "Not assigned"; }))
-  );
-
   setFilterOptions(
     "priorityFilter",
     "All Priorities",
@@ -616,6 +600,7 @@ function getOrderSearchText(o) {
     o.STORE_ADDRESS,
     o.CLIENT,
     o.TECHNICIAN,
+    getOrderReportedBy(o),
     getOrderDisplayStatus(o),
     getOrderDisplayPriority(o),
     getOrderDisplayType(o),
@@ -674,6 +659,7 @@ function card(o) {
   const pmTypeLabel = getOrderDisplayPMType(o);
   const equipmentLabel = getOrderDisplayEquipment(o);
   const problemText = getOrderDisplayProblem(o);
+  const reportedBy = getOrderReportedBy(o);
   const p = String(priorityLabel || o.ORDER_PRIORITY || "").toLowerCase();
 
   let cls = "";
@@ -699,6 +685,7 @@ function card(o) {
     </div>
 
     <div class="small"><b>Technician:</b> ${esc(o.TECHNICIAN || "Not assigned")}</div>
+    ${reportedBy ? `<div class="small"><b>Reported by:</b> ${esc(reportedBy)}</div>` : ""}
     ${typeLabel ? `<div class="small"><b>Type:</b> ${esc(typeLabel)}</div>` : ""}
     ${pmTypeLabel ? `<div class="small"><b>PM Type:</b> ${esc(pmTypeLabel)}</div>` : ""}
     <div class="small"><b>Address:</b> ${esc(o.STORE_ADDRESS || "")}</div>
@@ -883,6 +870,16 @@ function getOrderDisplayProblem(o) {
     o.REPORTED_PROBLEM_EN ||
     o.REPORTED_PROBLEM_ES ||
     o.REPORTED_PROBLEM_ORIGINAL ||
+    "";
+}
+
+function getOrderReportedBy(o) {
+  return o.MANAGER_NAME ||
+    o.REPORTED_BY ||
+    o.REPORTER_NAME ||
+    o.REQUESTED_BY ||
+    o.REQUESTER_NAME ||
+    o.CONTACT_NAME ||
     "";
 }
 

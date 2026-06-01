@@ -4107,6 +4107,7 @@ function renderSupervisorOrderPreviewCard(order) {
   const nsn = order.NSN || order["NSN #"] || "";
   const address = order.STORE_ADDRESS || order.ADDRESS || "";
   const problem = getSupervisorDisplayProblem(order);
+  const reportedBy = getSupervisorReportedBy(order);
 
   return `
     <div class="supervisor-order-card ${escapeHtmlMain(tone)}">
@@ -4118,6 +4119,7 @@ function renderSupervisorOrderPreviewCard(order) {
         <div class="supervisor-order-pill">${escapeHtmlMain(status || "NO STATUS")}</div>
       </div>
       <div class="supervisor-order-meta"><b>Technician:</b> ${escapeHtmlMain(order.TECHNICIAN || "Not assigned")}</div>
+      ${reportedBy ? `<div class="supervisor-order-meta"><b>Reported by:</b> ${escapeHtmlMain(reportedBy)}</div>` : ""}
       ${type ? `<div class="supervisor-order-meta"><b>Type:</b> ${escapeHtmlMain(type)}</div>` : ""}
       ${equipment ? `<div class="supervisor-order-meta"><b>Equipment:</b> ${escapeHtmlMain(equipment)}</div>` : ""}
       <div class="supervisor-order-meta"><b>Priority:</b> ${escapeHtmlMain(priority || "")}</div>
@@ -4203,6 +4205,16 @@ function getSupervisorDisplayProblem(order) {
     order.REPORTED_PROBLEM_EN ||
     order.REPORTED_PROBLEM_ES ||
     order.REPORTED_PROBLEM_ORIGINAL ||
+    "";
+}
+
+function getSupervisorReportedBy(order) {
+  return order.MANAGER_NAME ||
+    order.REPORTED_BY ||
+    order.REPORTER_NAME ||
+    order.REQUESTED_BY ||
+    order.REQUESTER_NAME ||
+    order.CONTACT_NAME ||
     "";
 }
 
