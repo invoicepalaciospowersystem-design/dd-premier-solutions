@@ -200,6 +200,59 @@
       font-size:14px;
     }
 
+    .filters {
+      background:white;
+      border-radius:14px;
+      padding:14px;
+      margin:12px 0 15px;
+      box-shadow:0 3px 10px rgba(0,0,0,0.08);
+      border-top:4px solid #111827;
+    }
+
+    .filter-grid {
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(170px, 1fr));
+      gap:10px;
+      align-items:end;
+    }
+
+    .filter-field {
+      display:grid;
+      gap:5px;
+      font-size:12px;
+      font-weight:bold;
+      color:#374151;
+    }
+
+    .filter-field input,
+    .filter-field select {
+      width:100%;
+      min-height:40px;
+      border:1px solid #d1d5db;
+      border-radius:10px;
+      padding:9px 10px;
+      font-size:14px;
+      background:#ffffff;
+      color:#111827;
+    }
+
+    .filter-actions {
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      align-items:end;
+    }
+
+    .clear-btn {
+      background:#6b7280;
+    }
+
+    .filter-summary {
+      margin-top:10px;
+      font-size:13px;
+      color:#4b5563;
+    }
+
     @media (max-width:420px) {
       .grid { grid-template-columns:1fr; }
       .card { width:100%; }
@@ -229,6 +282,67 @@
 
 <div class="topbar">
   <button onclick="loadOrders()">Refresh</button>
+</div>
+
+<div class="filters">
+  <div class="filter-grid">
+    <label class="filter-field">
+      Search
+      <input id="searchFilter" type="search" placeholder="WO, NSN, address, issue..." oninput="applyFilters()">
+    </label>
+
+    <label class="filter-field">
+      Status
+      <select id="statusFilter" onchange="applyFilters()">
+        <option value="">All Statuses</option>
+        <option value="open">Open Orders</option>
+        <option value="completed">Completed / Closed</option>
+        <option value="invoiced">Invoiced</option>
+        <option value="parts">Buying / Parts</option>
+        <option value="emergency">Emergency / Urgent</option>
+        <option value="invoicePdf">Has Invoice PDF</option>
+        <option value="quote">Has Quote</option>
+        <option value="pmReport">Has PM Report</option>
+      </select>
+    </label>
+
+    <label class="filter-field">
+      Technician
+      <select id="techFilter" onchange="applyFilters()">
+        <option value="">All Technicians</option>
+      </select>
+    </label>
+
+    <label class="filter-field">
+      Priority
+      <select id="priorityFilter" onchange="applyFilters()">
+        <option value="">All Priorities</option>
+      </select>
+    </label>
+
+    <label class="filter-field">
+      Type
+      <select id="typeFilter" onchange="applyFilters()">
+        <option value="">All Types</option>
+      </select>
+    </label>
+
+    <label class="filter-field">
+      Created From
+      <input id="dateFromFilter" type="date" onchange="applyFilters()">
+    </label>
+
+    <label class="filter-field">
+      Created To
+      <input id="dateToFilter" type="date" onchange="applyFilters()">
+    </label>
+
+    <div class="filter-actions">
+      <button type="button" onclick="applyFilters()">Apply</button>
+      <button type="button" class="clear-btn" onclick="clearFilters()">Clear</button>
+    </div>
+  </div>
+  <div id="filterSummary" class="filter-summary"></div>
 </div>
 
 <div id="stats" class="stats"></div>
@@ -268,6 +382,7 @@ const TOP_NAV = {
 
 const SUPERVISOR = "<?= supervisor ?>";
 const BASE_URL = "<?= baseUrl ?>";
+let ALL_ORDERS = [];
 
 function requireLogin() {
   const user = localStorage.getItem("pps_user");
@@ -344,7 +459,9 @@ function loadOrders() {
 
   google.script.run
     .withSuccessHandler(function(data) {
-      render(data || []);
+      ALL_ORDERS = Array.isArray(data) ? data : [];
+      populateFilterOptions(ALL_ORDERS);
+      applyFilters();
     })
     .withFailureHandler(function(err) {
       document.getElementById("orders").innerHTML = "ERROR: " + err.message;
@@ -353,7 +470,8 @@ function loadOrders() {
 }
 
 function render(data) {
-  renderStats(data);
+  renderStats(data, ALL_ORDERS.length);
+  renderFilterSummary(data.length, ALL_ORDERS.length);
 
   if (!data.length) {
     document.getElementById("orders").innerHTML = "No orders found.";
@@ -363,7 +481,172 @@ function render(data) {
   document.getElementById("orders").innerHTML = data.map(card).join("");
 }
 
-function renderStats(data) {
+function applyFilters() {
+  render(getFilteredOrders());
+}
+
+function clearFilters() {
+  [
+    "searchFilter",
+    "statusFilter",
+    "techFilter",
+    "priorityFilter",
+    "typeFilter",
+    "dateFromFilter",
+    "dateToFilter"
+  ].forEach(function(id) {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+
+  applyFilters();
+}
+
+function getFilteredOrders() {
+  const search = normalizeSearch(document.getElementById("searchFilter").value);
+  const statusFilter = String(document.getElementById("statusFilter").value || "");
+  const techFilter = String(document.getElementById("techFilter").value || "");
+  const priorityFilter = String(document.getElementById("priorityFilter").value || "");
+  const typeFilter = String(document.getElementById("typeFilter").value || "");
+  const dateFrom = parseDateOnly(document.getElementById("dateFromFilter").value);
+  const dateTo = parseDateOnly(document.getElementById("dateToFilter").value);
+
+  return ALL_ORDERS.filter(function(o) {
+    if (search && normalizeSearch(getOrderSearchText(o)).indexOf(search) === -1) return false;
+    if (statusFilter && !matchesStatusFilter(o, statusFilter)) return false;
+    if (techFilter && normalizeSearch(o.TECHNICIAN || "Not assigned") !== techFilter) return false;
+    if (priorityFilter && normalizeSearch(getOrderDisplayPriority(o)) !== priorityFilter) return false;
+    if (typeFilter && normalizeSearch(getOrderDisplayType(o)) !== typeFilter) return false;
+
+    const created = parseOrderDate(o.DATE_CREATED || o.CREATED_AT || o.CREATED_DATE);
+    if (dateFrom && (!created || created < dateFrom)) return false;
+    if (dateTo) {
+      const end = new Date(dateTo);
+      end.setHours(23, 59, 59, 999);
+      if (!created || created > end) return false;
+    }
+
+    return true;
+  });
+}
+
+function matchesStatusFilter(o, filter) {
+  const status = normalizeStatus(o.STATUS);
+
+  if (filter === "open") return !isClosedStatus(status);
+  if (filter === "completed") return isClosedStatus(status);
+  if (filter === "invoiced") return status.includes("INVOICED") || String(o.HAS_INVOICE_PDF || "").toUpperCase() === "YES";
+  if (filter === "parts") return isPartsStatus(status);
+  if (filter === "emergency") return isEmergencyPriority(o.ORDER_PRIORITY);
+  if (filter === "invoicePdf") return String(o.HAS_INVOICE_PDF || "").toUpperCase() === "YES";
+  if (filter === "quote") return Boolean(o.QUOTE_EN_URL || o.QUOTE_ES_URL);
+  if (filter === "pmReport") return String(o.HAS_PM_REPORT_PDF || "").toUpperCase() === "YES";
+
+  return true;
+}
+
+function populateFilterOptions(data) {
+  setFilterOptions(
+    "techFilter",
+    "All Technicians",
+    uniqueSorted(data.map(function(o) { return o.TECHNICIAN || "Not assigned"; }))
+  );
+
+  setFilterOptions(
+    "priorityFilter",
+    "All Priorities",
+    uniqueSorted(data.map(getOrderDisplayPriority).filter(Boolean))
+  );
+
+  setFilterOptions(
+    "typeFilter",
+    "All Types",
+    uniqueSorted(data.map(getOrderDisplayType).filter(Boolean))
+  );
+}
+
+function setFilterOptions(id, firstLabel, values) {
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  const current = el.value;
+  el.innerHTML =
+    "<option value=''>" + esc(firstLabel) + "</option>" +
+    values.map(function(value) {
+      const key = normalizeSearch(value);
+      return "<option value='" + esc(key) + "'>" + esc(value) + "</option>";
+    }).join("");
+
+  if ([].slice.call(el.options).some(function(option) { return option.value === current; })) {
+    el.value = current;
+  }
+}
+
+function uniqueSorted(values) {
+  const seen = {};
+
+  values.forEach(function(value) {
+    value = String(value || "").trim();
+    if (!value) return;
+    seen[normalizeSearch(value)] = value;
+  });
+
+  return Object.keys(seen)
+    .sort(function(a, b) { return seen[a].localeCompare(seen[b]); })
+    .map(function(key) { return seen[key]; });
+}
+
+function renderFilterSummary(visible, total) {
+  const summary = document.getElementById("filterSummary");
+  if (!summary) return;
+
+  if (!total) {
+    summary.innerText = "No assigned orders loaded.";
+    return;
+  }
+
+  summary.innerText = "Showing " + visible + " of " + total + " assigned orders.";
+}
+
+function getOrderSearchText(o) {
+  return [
+    o.WO_NUMBER,
+    o.NSN,
+    o.STORE_NAME,
+    o.STORE_ADDRESS,
+    o.CLIENT,
+    o.TECHNICIAN,
+    getOrderDisplayStatus(o),
+    getOrderDisplayPriority(o),
+    getOrderDisplayType(o),
+    getOrderDisplayEquipment(o),
+    getOrderDisplayProblem(o)
+  ].join(" ");
+}
+
+function normalizeSearch(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function parseDateOnly(value) {
+  if (!value) return null;
+  const parts = String(value).split("-");
+  if (parts.length !== 3) return null;
+  const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  return isNaN(d) ? null : d;
+}
+
+function parseOrderDate(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  return isNaN(d) ? null : d;
+}
+
+function renderStats(data, totalAll) {
   const total = data.length;
   const completed = data.filter(o => isClosedStatus(o.STATUS)).length;
   const parts = data.filter(o => isPartsStatus(o.STATUS)).length;
@@ -373,7 +656,7 @@ function renderStats(data) {
   const pmReports = data.filter(o => String(o.HAS_PM_REPORT_PDF || "").toUpperCase() === "YES").length;
 
   document.getElementById("stats").innerHTML = `
-    <div class="stat"><b>Total Orders:</b> ${total}</div>
+    <div class="stat"><b>Showing:</b> ${total}${totalAll && totalAll !== total ? " / " + totalAll : ""}</div>
     <div class="stat"><b>Completed:</b> ${completed}</div>
     <div class="stat"><b>Buying Parts:</b> ${parts}</div>
     <div class="stat"><b>Invoiced:</b> ${invoiced}</div>
