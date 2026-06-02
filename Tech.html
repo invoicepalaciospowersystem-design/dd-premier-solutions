@@ -434,6 +434,7 @@ if (!requireLogin()) {
 
 const TECH_NAME = "<?= techName ?>";
 const BASE_URL = "<?= baseUrl ?>";
+const PAGE_COMPANY_ID = String("<?= companyId ?>").trim().toUpperCase();
 const UNITED_REFRIGERATION_ACCOUNT =
   String("<?= unitedRefrigerationAccount ?>").trim() || "11437479";
 
@@ -451,7 +452,7 @@ function getCurrentUser() {
 
 function getCurrentCompanyId() {
   const user = getCurrentUser();
-  return String(user.companyId || "").toUpperCase();
+  return String(user.companyId || user.COMPANY_ID || PAGE_COMPANY_ID || "").toUpperCase();
 }
 
 function getSessionToken() {
@@ -475,6 +476,13 @@ function loadSupplierAccountBanner() {
 
 function loadHeader() {
   const companyId = getCurrentCompanyId();
+  const title = document.getElementById("companyTitle");
+
+  if (title) {
+    title.innerText = "Company: " + (companyId || "Not selected");
+  }
+
+  if (!companyId) return;
 
   google.script.run
     .withSuccessHandler(function(name) {
@@ -494,6 +502,13 @@ function loadOrders() {
     return;
   }
 
+  const companyId = getCurrentCompanyId();
+  if (!companyId) {
+    document.getElementById("orders").innerHTML =
+      "No se pudo detectar la compania. Salga y entre nuevamente.";
+    return;
+  }
+
   document.getElementById("orders").innerHTML = "Cargando...";
 
   google.script.run
@@ -503,7 +518,7 @@ function loadOrders() {
     .withFailureHandler(function(err) {
       document.getElementById("orders").innerHTML = "ERROR: " + err.message;
     })
-    .getTechnicianOrders(TECH_NAME, getSessionToken(), getCurrentCompanyId());
+    .getTechnicianOrders(TECH_NAME, getSessionToken(), companyId);
 }
 
 function renderOrders(data) {
