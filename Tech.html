@@ -139,57 +139,14 @@
       margin:6px 0;
     }
 
-    .map-address {
-      display:inline-block;
-      margin-right:8px;
-    }
-
-    .map-control {
-      display:inline-block;
-      position:relative;
-      margin-top:6px;
-    }
-
-    .map-button {
-      width:auto;
-      padding:6px 10px;
-      border-radius:8px;
-      background:#2563eb;
-      font-size:12px;
-      line-height:1;
-    }
-
-    .map-menu {
-      display:none;
-      position:absolute;
-      z-index:20;
-      left:0;
-      top:calc(100% + 6px);
-      min-width:150px;
-      background:#ffffff;
-      border:1px solid #d1d5db;
-      border-radius:10px;
-      box-shadow:0 10px 24px rgba(15,23,42,.18);
-      overflow:hidden;
-    }
-
-    .map-menu.open {
-      display:block;
-    }
-
-    .map-menu a {
-      display:block;
-      padding:10px 12px;
-      color:#111827;
-      font-size:13px;
+    .map-link {
+      color:#2563eb;
       font-weight:bold;
       text-decoration:none;
-      white-space:nowrap;
     }
 
-    .map-menu a:hover {
-      background:#eff6ff;
-      color:#1d4ed8;
+    .map-link:hover {
+      text-decoration:underline;
     }
 
     .tech-metric-grid {
@@ -603,7 +560,7 @@ function card(o) {
 
       <div class="small"><b>Company:</b> ${o.COMPANY_ID || ""}</div>
       <div class="small"><b>Técnico:</b> ${o.TECHNICIAN || TECH_NAME}</div>
-      <div class="small"><b>Dirección:</b> ${renderAddressMapControl(address, row)}</div>
+      <div class="small"><b>Dirección:</b> ${renderAddressMapLink(address)}</div>
       <div class="small"><b>Equipo:</b> ${equipment}</div>
       <div class="small"><b>Prioridad:</b> ${o.ORDER_PRIORITY || ""}</div>
 
@@ -652,52 +609,16 @@ function card(o) {
   `;
 }
 
-function renderAddressMapControl(address, row) {
+function renderAddressMapLink(address) {
   address = String(address || "").trim();
   if (!address || address === "No disponible") return "No disponible";
 
-  const menuId = "mapmenu_" + row;
-  const googleUrl = buildGoogleMapsUrl(address);
-  const appleUrl = buildAppleMapsUrl(address);
-
-  return `
-    <span class="map-address">${escapeHtmlTech(address)}</span>
-    <span class="map-control">
-      <button type="button" class="map-button" onclick="toggleMapMenu('${escapeHtmlTech(menuId)}', event)">Mapa</button>
-      <span id="${escapeHtmlTech(menuId)}" class="map-menu">
-        <a href="${escapeHtmlTech(googleUrl)}" target="_blank" rel="noopener noreferrer">Google Maps</a>
-        <a href="${escapeHtmlTech(appleUrl)}" target="_blank" rel="noopener noreferrer">Apple Maps</a>
-      </span>
-    </span>
-  `;
+  return `<a class="map-link" href="${buildGoogleMapsUrl(address)}" target="_blank" rel="noopener noreferrer">${escapeHtmlTech(address)}</a>`;
 }
 
 function buildGoogleMapsUrl(address) {
   return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(address);
 }
-
-function buildAppleMapsUrl(address) {
-  return "https://maps.apple.com/?q=" + encodeURIComponent(address);
-}
-
-function toggleMapMenu(menuId, event) {
-  if (event && event.stopPropagation) event.stopPropagation();
-
-  const menu = document.getElementById(menuId);
-  if (!menu) return;
-
-  const shouldOpen = !menu.classList.contains("open");
-  closeMapMenus();
-  if (shouldOpen) menu.classList.add("open");
-}
-
-function closeMapMenus() {
-  document.querySelectorAll(".map-menu.open").forEach(function(menu) {
-    menu.classList.remove("open");
-  });
-}
-
-document.addEventListener("click", closeMapMenus);
 
 function escapeHtmlTech(value) {
   return String(value || "")
