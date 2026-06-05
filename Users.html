@@ -106,7 +106,7 @@ const COMPANY_ID_FROM_URL = String("<?= companyId ?>").trim().toUpperCase();
 const OWNER_PORTAL = String("<?= ownerOnly ?>").trim().toLowerCase() === "true";
 
 function redirectToLogin() {
-  localStorage.removeItem("pps_user");
+  removeAppSessionItem("pps_user");
   TOP_NAV.href = OWNER_PORTAL ? BASE_URL + "?ownerOnly=1" : BASE_URL;
 }
 
@@ -138,7 +138,7 @@ function renderServerError(err, elementId, prefix) {
 }
 
 function requireLogin() {
-  const user = localStorage.getItem("pps_user");
+  const user = getAppSessionItem("pps_user");
 
   if (!user) {
     TOP_NAV.href = OWNER_PORTAL ? BASE_URL + "?ownerOnly=1" : BASE_URL;
@@ -172,7 +172,7 @@ let DATA = [];
 let CURRENT_ROW = null;
 
 function getUser() {
-  return JSON.parse(localStorage.getItem("pps_user") || "{}");
+  return JSON.parse(getAppSessionItem("pps_user") || "{}");
 }
 
 function getSessionToken() {

@@ -381,7 +381,7 @@ let MCD_PAYMENT_PREVIEW_READY = false;
 
 function getCurrentUser() {
   try {
-    return JSON.parse(localStorage.getItem("pps_user") || "{}");
+    return JSON.parse(getAppSessionItem("pps_user") || "{}");
   } catch (e) {
     return {};
   }
@@ -394,7 +394,7 @@ function getSessionToken() {
 
 function getSavedOwnerCompanyId() {
   try {
-    return String(localStorage.getItem("owner_selected_company_ALL") || "").trim().toUpperCase();
+    return String(getAppSessionItem("owner_selected_company_ALL") || "").trim().toUpperCase();
   } catch (err) {
     return "";
   }
@@ -405,7 +405,7 @@ function saveOwnerCompanyId(companyId) {
   if (!companyId) return;
 
   try {
-    localStorage.setItem("owner_selected_company_ALL", companyId);
+    setAppSessionItem("owner_selected_company_ALL", companyId);
   } catch (err) {}
 }
 
@@ -420,7 +420,7 @@ function isSessionExpiredError(err) {
 
 function handleSessionFailure(err) {
   if (!isSessionExpiredError(err)) return false;
-  localStorage.removeItem("pps_user");
+  removeAppSessionItem("pps_user");
   alert("Sesion expirada. Inicie sesion nuevamente.");
   TOP_NAV.href = OWNER_PORTAL ? BASE_URL + "?ownerOnly=1" : BASE_URL;
   return true;
@@ -443,7 +443,7 @@ function requireEconomyLogin() {
   const expiresAt = Number(user.sessionExpiresAt || user.SESSION_EXPIRES_AT || 0);
 
   if (!token || (expiresAt && expiresAt <= Date.now()) || ["OWNER", "ADMIN", "ECONOMIA"].indexOf(role) === -1) {
-    localStorage.removeItem("pps_user");
+    removeAppSessionItem("pps_user");
     TOP_NAV.href = OWNER_PORTAL ? BASE_URL + "?ownerOnly=1" : BASE_URL;
     return false;
   }

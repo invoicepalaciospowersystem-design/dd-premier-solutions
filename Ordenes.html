@@ -166,7 +166,7 @@ const URL_COMPANY_ID = String("<?= companyId ?>").trim().toUpperCase();
 const OWNER_PORTAL = String("<?= ownerOnly ?>").trim().toLowerCase() === "true";
 
 function clearStoredSession() {
-  localStorage.removeItem("pps_user");
+  removeAppSessionItem("pps_user");
 }
 
 function redirectToLogin(message) {
@@ -201,7 +201,7 @@ function alertServerError(err) {
 }
 
 function requireLogin() {
-  const user = localStorage.getItem("pps_user");
+  const user = getAppSessionItem("pps_user");
 
   if (!user) {
     TOP_NAV.href = BASE_URL;
@@ -237,7 +237,7 @@ let ACTIVE_COMPANY_ID = URL_COMPANY_ID;
 
 function getCurrentUser() {
   try {
-    return JSON.parse(localStorage.getItem("pps_user") || "{}");
+    return JSON.parse(getAppSessionItem("pps_user") || "{}");
   } catch (e) {
     return {};
   }
@@ -729,7 +729,7 @@ function deleteWO(row, woNumber) {
 }
 
 function scrollToLastWO() {
-  const lastWO = localStorage.getItem("lastWO");
+  const lastWO = getAppSessionItem("lastWO");
 
   if (!lastWO) return;
 
@@ -741,16 +741,16 @@ function scrollToLastWO() {
       block: "center"
     });
 
-    localStorage.removeItem("lastWO");
+    removeAppSessionItem("lastWO");
   }
 }
 
 function showLastWOMessage() {
-  const msg = localStorage.getItem("lastWOMessage");
+  const msg = getAppSessionItem("lastWOMessage");
 
   if (msg) {
     alert(msg);
-    localStorage.removeItem("lastWOMessage");
+    removeAppSessionItem("lastWOMessage");
   }
 }
 

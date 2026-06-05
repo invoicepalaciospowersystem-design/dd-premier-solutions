@@ -378,7 +378,7 @@ const BASE_URL = "<?= baseUrl ?>";
 let ALL_ORDERS = [];
 
 function requireLogin() {
-  const user = localStorage.getItem("pps_user");
+  const user = getAppSessionItem("pps_user");
 
   if (!user) {
     TOP_NAV.href = BASE_URL;
@@ -388,12 +388,12 @@ function requireLogin() {
   try {
     const parsed = JSON.parse(user);
     if ((!parsed.role && !parsed.ROLE) || (!parsed.sessionToken && !parsed.SESSION_TOKEN)) {
-      localStorage.removeItem("pps_user");
+      removeAppSessionItem("pps_user");
       TOP_NAV.href = BASE_URL;
       return false;
     }
   } catch (e) {
-    localStorage.removeItem("pps_user");
+    removeAppSessionItem("pps_user");
     TOP_NAV.href = BASE_URL;
     return false;
   }
@@ -407,7 +407,7 @@ if (!requireLogin()) {
 
 function getCurrentUser() {
   try {
-    return JSON.parse(localStorage.getItem("pps_user") || "{}");
+    return JSON.parse(getAppSessionItem("pps_user") || "{}");
   } catch (e) {
     return {};
   }

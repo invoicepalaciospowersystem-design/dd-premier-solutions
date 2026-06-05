@@ -105,7 +105,7 @@ const TOP_NAV = {
 };
 
 function requireLogin() {
-  const user = localStorage.getItem("pps_user");
+  const user = getAppSessionItem("pps_user");
 
   if (!user) {
     TOP_NAV.href = "<?= baseUrl ?>";
@@ -115,19 +115,19 @@ function requireLogin() {
   try {
     const parsed = JSON.parse(user);
     if ((!parsed.role && !parsed.ROLE) || (!parsed.sessionToken && !parsed.SESSION_TOKEN)) {
-      localStorage.removeItem("pps_user");
+      removeAppSessionItem("pps_user");
       TOP_NAV.href = "<?= baseUrl ?>";
       return false;
     }
 
     const expiresAt = Number(parsed.sessionExpiresAt || parsed.SESSION_EXPIRES_AT || 0);
     if (expiresAt && expiresAt <= Date.now()) {
-      localStorage.removeItem("pps_user");
+      removeAppSessionItem("pps_user");
       TOP_NAV.href = "<?= baseUrl ?>";
       return false;
     }
   } catch (e) {
-    localStorage.removeItem("pps_user");
+    removeAppSessionItem("pps_user");
     TOP_NAV.href = "<?= baseUrl ?>";
     return false;
   }
@@ -146,7 +146,7 @@ let IS_CREATING_ORDER = false;
 
 function getCurrentUser() {
   try {
-    return JSON.parse(localStorage.getItem("pps_user") || "{}");
+    return JSON.parse(getAppSessionItem("pps_user") || "{}");
   } catch (e) {
     return {};
   }
@@ -229,8 +229,8 @@ function saveOrder() {
 
   google.script.run
     .withSuccessHandler(function(res) {
-      localStorage.setItem("lastWO", res.woNumber);
-      localStorage.setItem("lastWOMessage", "Orden creada: " + res.woNumber);
+      setAppSessionItem("lastWO", res.woNumber);
+      setAppSessionItem("lastWOMessage", "Orden creada: " + res.woNumber);
 
       TOP_NAV.href = getReturnUrl();
     })

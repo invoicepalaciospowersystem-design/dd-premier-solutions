@@ -167,7 +167,7 @@ let IS_SAVING_QUOTE = false;
 
 function getCurrentUser() {
   try {
-    return JSON.parse(localStorage.getItem("pps_user") || "{}");
+    return JSON.parse(getAppSessionItem("pps_user") || "{}");
   } catch (e) {
     return {};
   }
@@ -409,8 +409,8 @@ function goBack() {
 
 function returnToPreviousScreen(message) {
   if (message) {
-    localStorage.setItem("lastWOMessage", message);
-    localStorage.setItem("lastWO", WO_PARAM);
+    setAppSessionItem("lastWOMessage", message);
+    setAppSessionItem("lastWO", WO_PARAM);
   }
 
   showQuoteReturnLink(getQuoteReturnUrl());

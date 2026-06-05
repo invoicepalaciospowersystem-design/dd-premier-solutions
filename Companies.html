@@ -233,7 +233,7 @@ let EDIT_ROW = "";
 
 function getCurrentUser() {
   try {
-    return JSON.parse(localStorage.getItem("pps_user") || "{}");
+    return JSON.parse(getAppSessionItem("pps_user") || "{}");
   } catch(e) {
     return {};
   }

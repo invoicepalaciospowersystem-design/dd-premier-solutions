@@ -110,7 +110,7 @@ let SELECTED = {};
 let ACTIVE_COMPANY_ID = "";
 
 function requireLogin() {
-  const raw = localStorage.getItem("pps_user");
+  const raw = getAppSessionItem("pps_user");
   if (!raw) {
     TOP_NAV.href = BASE_URL;
     return false;
@@ -129,7 +129,7 @@ function requireLogin() {
       return false;
     }
   } catch (e) {
-    localStorage.removeItem("pps_user");
+    removeAppSessionItem("pps_user");
     TOP_NAV.href = BASE_URL;
     return false;
   }
@@ -140,7 +140,7 @@ function requireLogin() {
 if (!requireLogin()) throw new Error("No autorizado");
 
 function getUser() {
-  try { return JSON.parse(localStorage.getItem("pps_user") || "{}"); }
+  try { return JSON.parse(getAppSessionItem("pps_user") || "{}"); }
   catch(e) { return {}; }
 }
 

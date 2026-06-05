@@ -373,7 +373,7 @@ function navigateApp(url) {
 
 function getStoredUser() {
   try {
-    return JSON.parse(localStorage.getItem("pps_user") || "{}");
+    return JSON.parse(getAppSessionItem("pps_user") || "{}");
   } catch (err) {
     return {};
   }
@@ -381,7 +381,7 @@ function getStoredUser() {
 
 function getSessionToken() {
   try {
-    const directToken = localStorage.getItem("pps_session_token") || "";
+    const directToken = getAppSessionItem("pps_session_token") || "";
     if (directToken) return directToken;
 
     const user = getStoredUser();
@@ -393,7 +393,7 @@ function getSessionToken() {
 
 function redirectLogin() {
   try {
-    localStorage.removeItem("pps_user");
+    removeAppSessionItem("pps_user");
   } catch (err) {}
 
   let url = BASE_URL || window.location.href.split("?")[0];
@@ -429,7 +429,7 @@ function getInitialCompanyId() {
   if (role === "OWNER") {
     if (LOGIN_COMPANY_ID) return LOGIN_COMPANY_ID;
     try {
-      return String(localStorage.getItem(getOwnerSelectionStorageKey()) || "").trim().toUpperCase();
+      return String(getAppSessionItem(getOwnerSelectionStorageKey()) || "").trim().toUpperCase();
     } catch (err) {
       return "";
     }
@@ -511,7 +511,7 @@ function activateCompany() {
   const select = document.getElementById("companySelect");
   ACTIVE_COMPANY_ID = String(select && select.value || "").trim().toUpperCase();
   try {
-    localStorage.setItem(getOwnerSelectionStorageKey(), ACTIVE_COMPANY_ID);
+    setAppSessionItem(getOwnerSelectionStorageKey(), ACTIVE_COMPANY_ID);
   } catch (err) {}
   loadAccounting();
 }

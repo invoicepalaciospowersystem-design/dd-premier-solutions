@@ -2598,7 +2598,36 @@ function safeLocalStorageRemove(key) {
   }
 }
 
+function safeSessionStorageGet(key, fallback) {
+  try {
+    const value = sessionStorage.getItem(key);
+    return value == null ? fallback : value;
+  } catch (err) {
+    return fallback;
+  }
+}
+
+function safeSessionStorageSet(key, value) {
+  try {
+    sessionStorage.setItem(key, value);
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+function safeSessionStorageRemove(key) {
+  try {
+    sessionStorage.removeItem(key);
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
 function clearStoredLoginSession() {
+  safeSessionStorageRemove("pps_user");
+  safeSessionStorageRemove("pps_login_company");
   safeLocalStorageRemove("pps_user");
   safeLocalStorageRemove("pps_login_company");
 }
@@ -2823,8 +2852,10 @@ function login() {
     .withSuccessHandler(function(user) {
       CURRENT_USER = normalizeUser(user || {});
       markActiveBrowserSession();
-      safeLocalStorageSet("pps_user", JSON.stringify(CURRENT_USER));
-      safeLocalStorageSet("pps_login_company", LOGIN_COMPANY_ID || "");
+      safeSessionStorageSet("pps_user", JSON.stringify(CURRENT_USER));
+      safeSessionStorageSet("pps_login_company", LOGIN_COMPANY_ID || "");
+      safeLocalStorageRemove("pps_user");
+      safeLocalStorageRemove("pps_login_company");
       updateRememberedEmail(email);
       showPanel();
     })
@@ -3315,7 +3346,7 @@ function getInitialOwnerCompanySelection() {
 
   if (LOGIN_COMPANY_ID) return LOGIN_COMPANY_ID;
 
-  return String(safeLocalStorageGet(getOwnerSelectionStorageKey(), "") || "").trim().toUpperCase();
+  return String(safeSessionStorageGet(getOwnerSelectionStorageKey(), "") || "").trim().toUpperCase();
 }
 
 function getOwnerSelectionStorageKey() {
@@ -3417,7 +3448,7 @@ function onOwnerCompanyChange() {
   SELECTED_OWNER_COMPANY_ID = String(select && select.value || "").trim().toUpperCase();
 
   if (!LOGIN_COMPANY_ID) {
-    safeLocalStorageSet(getOwnerSelectionStorageKey(), SELECTED_OWNER_COMPANY_ID);
+    safeSessionStorageSet(getOwnerSelectionStorageKey(), SELECTED_OWNER_COMPANY_ID);
   }
 
   updateOwnerScopeText();
@@ -4776,7 +4807,7 @@ window.onload = function() {
     return;
   }
 
-  const saved = safeLocalStorageGet("pps_user", "");
+  const saved = safeSessionStorageGet("pps_user", "");
 
   if (saved) {
     try {
@@ -4786,10 +4817,10 @@ window.onload = function() {
         CURRENT_USER = parsed;
         showPanel();
       } else {
-        safeLocalStorageRemove("pps_user");
+        safeSessionStorageRemove("pps_user");
       }
     } catch (e) {
-      safeLocalStorageRemove("pps_user");
+      safeSessionStorageRemove("pps_user");
     }
   }
 };

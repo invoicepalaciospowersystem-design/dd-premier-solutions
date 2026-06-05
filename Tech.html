@@ -362,7 +362,7 @@ const TOP_NAV = {
 };
 
 function requireLogin() {
-  const user = localStorage.getItem("pps_user");
+  const user = getAppSessionItem("pps_user");
 
   if (!user) {
     TOP_NAV.href = "<?= baseUrl ?>";
@@ -372,12 +372,12 @@ function requireLogin() {
   try {
     const parsed = JSON.parse(user);
     if ((!parsed.role && !parsed.ROLE) || (!parsed.sessionToken && !parsed.SESSION_TOKEN)) {
-      localStorage.removeItem("pps_user");
+      removeAppSessionItem("pps_user");
       TOP_NAV.href = "<?= baseUrl ?>";
       return false;
     }
   } catch (e) {
-    localStorage.removeItem("pps_user");
+    removeAppSessionItem("pps_user");
     TOP_NAV.href = "<?= baseUrl ?>";
     return false;
   }
@@ -401,7 +401,7 @@ let CURRENT_TECH_INVOICE_SUMMARY = null;
 
 function getCurrentUser() {
   try {
-    return JSON.parse(localStorage.getItem("pps_user") || "{}");
+    return JSON.parse(getAppSessionItem("pps_user") || "{}");
   } catch (e) {
     return {};
   }
@@ -693,11 +693,11 @@ function openCloseOrder(row, woNumber) {
 }
 
 function showTechMessage() {
-  const msg = localStorage.getItem("lastTechMessage");
+  const msg = getAppSessionItem("lastTechMessage");
 
   if (msg) {
     alert(msg);
-    localStorage.removeItem("lastTechMessage");
+    removeAppSessionItem("lastTechMessage");
   }
 }
 

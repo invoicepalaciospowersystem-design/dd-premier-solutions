@@ -60,6 +60,38 @@
 </div>
 
 <script>
+function getAppSessionItem(key) {
+  try {
+    const value = sessionStorage.getItem(key);
+    if (value !== null && value !== undefined) return value;
+  } catch (err) {}
+
+  try {
+    return localStorage.getItem(key) || "";
+  } catch (err) {
+    return "";
+  }
+}
+
+function setAppSessionItem(key, value) {
+  try {
+    sessionStorage.setItem(key, value);
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+function removeAppSessionItem(key) {
+  try {
+    sessionStorage.removeItem(key);
+  } catch (err) {}
+
+  try {
+    localStorage.removeItem(key);
+  } catch (err) {}
+}
+
 (function() {
   var APP_BACK_PUBLIC_URLS = {
     PPS: "https://app.palaciospowersystems.com/",
@@ -76,7 +108,7 @@
 
   function getStoredUser() {
     try {
-      return JSON.parse(localStorage.getItem("pps_user") || "{}");
+      return JSON.parse(getAppSessionItem("pps_user") || "{}");
     } catch (err) {
       return {};
     }
@@ -88,8 +120,8 @@
 
     var companyId =
       String(params.get("companyId") || "").trim().toUpperCase() ||
-      String(localStorage.getItem("pps_login_company") || "").trim().toUpperCase() ||
-      String(localStorage.getItem("owner_selected_company_ALL") || "").trim().toUpperCase() ||
+      String(getAppSessionItem("pps_login_company") || "").trim().toUpperCase() ||
+      String(getAppSessionItem("owner_selected_company_ALL") || "").trim().toUpperCase() ||
       String(user.companyId || user.COMPANY_ID || "").trim().toUpperCase();
 
     return companyId;
