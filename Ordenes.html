@@ -276,10 +276,26 @@ function canDeleteWO() {
   return ["ADMIN", "SYSTEM", "ORDENES"].includes(role);
 }
 
+function canCreateInvoiceFromOrders() {
+  const role = normalizeRole(getCurrentRole());
+  return ["ADMIN", "OWNER", "ORDENES"].includes(role);
+}
+
 function openQuote(row, woNumber, companyId) {
   TOP_NAV.href =
     BASE_URL +
     "?view=quote" +
+    "&row=" + encodeURIComponent(row) +
+    "&wo=" + encodeURIComponent(woNumber || "") +
+    "&companyId=" + encodeURIComponent(companyId || ACTIVE_COMPANY_ID) +
+    ownerPortalParam() +
+    "&returnTo=" + encodeURIComponent(getOrdersReturnUrl(companyId || ACTIVE_COMPANY_ID));
+}
+
+function openCloseOrder(row, woNumber, companyId) {
+  TOP_NAV.href =
+    BASE_URL +
+    "?view=close" +
     "&row=" + encodeURIComponent(row) +
     "&wo=" + encodeURIComponent(woNumber || "") +
     "&companyId=" + encodeURIComponent(companyId || ACTIVE_COMPANY_ID) +
@@ -620,6 +636,14 @@ function card(o) {
 
       <div class="actions">
         <button onclick="saveNotes(${row})">Guardar Notas</button>
+
+        ${canCreateInvoiceFromOrders() ? `
+          <button
+            style="background:#7f1d1d;color:white;font-weight:bold;"
+            onclick="openCloseOrder(${row}, '${o.WO_NUMBER || ""}', '${o.COMPANY_ID || ""}')">
+            Crear Invoice
+          </button>
+        ` : ""}
 
         ${canCreateQuote() ? `
   <button
