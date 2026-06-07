@@ -14,6 +14,11 @@
     .row { font-size:14px; margin:5px 0; }
     .pm-note { background:#ede9fe; color:#4c1d95; padding:12px; border-radius:10px; margin:10px 0; font-weight:bold; }
     .return-btn { display:inline-block; width:100%; box-sizing:border-box; background:#111827; color:white; padding:11px; border-radius:9px; font-weight:bold; text-align:center; text-decoration:none; margin:6px 0; }
+    .special-invoice-box { display:none; border-left:5px solid #dc2626; background:#fff7ed; }
+    .special-invoice-toggle { display:flex; align-items:center; gap:10px; font-weight:bold; color:#7f1d1d; }
+    .special-invoice-toggle input { width:auto; margin:0; }
+    .special-invoice-fields { display:none; margin-top:10px; }
+    .special-invoice-help { color:#7c2d12; font-size:13px; margin:6px 0 10px; line-height:1.35; }
   </style>
   <?!= include("AppWatermark"); ?>
 </head>
@@ -34,6 +39,21 @@
     <h3>Trabajo realizado</h3>
     <textarea id="WORK_PERFORMED" placeholder="Describa el trabajo realizado"></textarea>
     <input id="HORAS" type="number" step="0.25" placeholder="Horas trabajadas">
+  </div>
+
+  <div id="specialInvoiceBox" class="box special-invoice-box">
+    <label class="special-invoice-toggle">
+      <input id="SPECIAL_INVOICE" type="checkbox" onchange="toggleSpecialInvoiceFields()">
+      Invoice especial / cobro manual
+    </label>
+    <div class="special-invoice-help">
+      Solo Admin / Ordenes. Usa esto cuando el invoice se cobre diferente:
+      escribes manualmente el total de materiales cobrados y el subtotal antes de tax.
+    </div>
+    <div id="specialInvoiceFields" class="special-invoice-fields">
+      <input id="MANUAL_PARTS_TOTAL" type="number" step="0.01" min="0" placeholder="Materiales cobrados manualmente">
+      <input id="MANUAL_SUB_TOTAL" type="number" step="0.01" min="0" placeholder="Sub total manual antes de tax">
+    </div>
   </div>
 
   <h3>Materiales / Piezas usadas</h3>
@@ -180,6 +200,41 @@ function getSessionToken() {
   return user.sessionToken || user.SESSION_TOKEN || "";
 }
 
+function getCurrentRole() {
+  const user = getCurrentUser();
+  return String(user.role || user.ROLE || "").trim().toUpperCase();
+}
+
+function canUseSpecialInvoice() {
+  return ["OWNER", "ADMIN", "ORDENES"].indexOf(getCurrentRole()) !== -1;
+}
+
+function setupSpecialInvoiceBox() {
+  const box = document.getElementById("specialInvoiceBox");
+  if (!box) return;
+
+  const allowed = canUseSpecialInvoice() && !isPMOrder();
+  box.style.display = allowed ? "block" : "none";
+
+  if (!allowed) {
+    const check = document.getElementById("SPECIAL_INVOICE");
+    if (check) check.checked = false;
+    toggleSpecialInvoiceFields();
+  }
+}
+
+function toggleSpecialInvoiceFields() {
+  const check = document.getElementById("SPECIAL_INVOICE");
+  const fields = document.getElementById("specialInvoiceFields");
+  if (!fields) return;
+  fields.style.display = check && check.checked ? "block" : "none";
+}
+
+function isSpecialInvoiceEnabled() {
+  const check = document.getElementById("SPECIAL_INVOICE");
+  return !!(check && check.checked && canUseSpecialInvoice() && !isPMOrder());
+}
+
 function isPMOrder() {
   return String((ORDER && ORDER.WO_TYPE) || "").toUpperCase() === "PM_FORM";
 }
@@ -208,6 +263,7 @@ function load() {
       ORDER_READY = true;
       renderOrder();
       applyPMMode();
+      setupSpecialInvoiceBox();
 
       document.getElementById("saveBtn").disabled = false;
       document.getElementById("saveBtn").innerText = "Guardar y completar orden";
@@ -260,6 +316,7 @@ function applyPMMode() {
 
   document.getElementById("WORK_PERFORMED").value = "";
   document.getElementById("HORAS").value = "";
+  setupSpecialInvoiceBox();
 }
 
 function money(v) {
@@ -295,12 +352,37 @@ function saveClose() {
 
   const isPM = isPMOrder();
   const hours = isPM ? "" : document.getElementById("HORAS").value;
-  const parts = isPM ? 0 : getPartsTotal();
+  let parts = isPM ? 0 : getPartsTotal();
   const work = isPM ? "" : document.getElementById("WORK_PERFORMED").value.trim();
+  const specialInvoice = isSpecialInvoiceEnabled();
+  let manualPartsTotal = "";
+  let manualSubTotal = "";
 
   if (!isPM && (!hours || !work)) {
     alert("Horas y Trabajo Realizado son obligatorios.");
     return;
+  }
+
+  if (specialInvoice) {
+    manualPartsTotal = money(document.getElementById("MANUAL_PARTS_TOTAL").value);
+    manualSubTotal = money(document.getElementById("MANUAL_SUB_TOTAL").value);
+
+    if (manualSubTotal <= 0) {
+      alert("En invoice especial debes poner un Sub Total manual mayor que 0.");
+      return;
+    }
+
+    if (manualPartsTotal < 0) {
+      alert("Los materiales cobrados no pueden ser negativos.");
+      return;
+    }
+
+    if (manualSubTotal < manualPartsTotal) {
+      alert("El Sub Total manual no puede ser menor que los materiales cobrados.");
+      return;
+    }
+
+    parts = manualPartsTotal;
   }
 
   IS_SAVING_CLOSE_ORDER = true;
@@ -332,6 +414,9 @@ function saveClose() {
 
     HORAS: hours,
     PARTS_TOTAL: parts,
+    SPECIAL_INVOICE: specialInvoice ? "YES" : "",
+    MANUAL_PARTS_TOTAL: specialInvoice ? manualPartsTotal : "",
+    MANUAL_SUB_TOTAL: specialInvoice ? manualSubTotal : "",
 
     I1_QTY: getItem(1).qty,
     I1_PART: getItem(1).part,

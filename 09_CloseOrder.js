@@ -121,16 +121,24 @@ function saveCloseOrder_(data) {
 
   addAuditLog_("INVOICE", "CLOSE_ORDER_STARTED", companyId, "WORK_ORDER", woNumber, session, {
     rowNumber: rowNumber,
-    woType: woType
+    woType: woType,
+    specialInvoice: data && data.SPECIAL_INVOICE === "YES" ? "YES" : ""
   });
 
   const hours = Number(data.LABOR_HOURS || data.HORAS || data.HOURS || 0);
-  const partsTotal = Number(data.MATERIAL_COST || data.PARTS_TOTAL || data.INVERSION || data.COMPRA || data.PARTS || 0);
+  let partsTotal = Number(data.MATERIAL_COST || data.PARTS_TOTAL || data.INVERSION || data.COMPRA || data.PARTS || 0);
+  const requestedSpecialInvoice = String(data.SPECIAL_INVOICE || "").trim().toUpperCase() === "YES";
+  const sessionRole = String(session.role || "").trim().toUpperCase();
+  const canUseSpecialInvoice = ["OWNER", "ADMIN", "ORDENES"].indexOf(sessionRole) !== -1;
+
+  if (requestedSpecialInvoice && !canUseSpecialInvoice) {
+    throw new Error("No autorizado para crear invoice especial.");
+  }
 
   const normalizedAddress = normalizeCloseOrderAddress_(data);
 
-  const firstHourRate = 200;
-  const additionalHourRate = 130;
+  let firstHourRate = 200;
+  let additionalHourRate = 130;
   const taxRate = 0.07;
 
   let laborTotal = 0;
@@ -147,9 +155,36 @@ function saveCloseOrder_(data) {
     laborTotal = labor1Amount + labor2Amount;
   }
 
-  const subTotal = partsTotal + laborTotal;
-  const tax = subTotal * taxRate;
-  const total = subTotal + tax;
+  let isSpecialInvoice = false;
+  let manualSubTotal = 0;
+
+  if (requestedSpecialInvoice) {
+    partsTotal = roundCloseOrderMoney_(Number(data.MANUAL_PARTS_TOTAL || data.PARTS_TOTAL || 0));
+    manualSubTotal = roundCloseOrderMoney_(Number(data.MANUAL_SUB_TOTAL || 0));
+
+    if (manualSubTotal <= 0) {
+      throw new Error("El sub total manual del invoice especial debe ser mayor que 0.");
+    }
+    if (partsTotal < 0) {
+      throw new Error("Los materiales manuales no pueden ser negativos.");
+    }
+    if (manualSubTotal < partsTotal) {
+      throw new Error("El sub total manual no puede ser menor que los materiales.");
+    }
+
+    isSpecialInvoice = true;
+    laborTotal = roundCloseOrderMoney_(manualSubTotal - partsTotal);
+    labor1Qty = laborTotal > 0 ? 1 : 0;
+    labor2Qty = 0;
+    firstHourRate = laborTotal;
+    additionalHourRate = 0;
+    labor1Amount = laborTotal;
+    labor2Amount = 0;
+  }
+
+  const subTotal = isSpecialInvoice ? manualSubTotal : roundCloseOrderMoney_(partsTotal + laborTotal);
+  const tax = roundCloseOrderMoney_(subTotal * taxRate);
+  const total = roundCloseOrderMoney_(subTotal + tax);
 
   const invoiceNumber = generateInvoiceNumber_(companyId);
 
@@ -165,7 +200,10 @@ function saveCloseOrder_(data) {
 
     WO_TYPE: woType,
     WO_TYPO: woType,
-    INVOICE_TYPE: "REPAIR",
+    INVOICE_TYPE: isSpecialInvoice ? "SPECIAL_REPAIR" : "REPAIR",
+    SPECIAL_INVOICE: isSpecialInvoice ? "YES" : "",
+    MANUAL_PARTS_TOTAL: isSpecialInvoice ? partsTotal : "",
+    MANUAL_SUB_TOTAL: isSpecialInvoice ? subTotal : "",
 
     INVOICE_NUMBER: invoiceNumber,
     Invoice: invoiceNumber,
@@ -531,4 +569,8 @@ function generateInvoiceNumber_(companyId) {
   } finally {
     lock.releaseLock();
   }
+}
+
+function roundCloseOrderMoney_(value) {
+  return Math.round(Number(value || 0) * 100) / 100;
 }
