@@ -173,6 +173,7 @@ const TOP_NAV = {
 const BASE_URL = "<?= baseUrl ?>";
 const URL_COMPANY_ID = String("<?= companyId ?>").trim().toUpperCase();
 const OWNER_PORTAL = String("<?= ownerOnly ?>").trim().toLowerCase() === "true";
+const OWNER_SELECTION_KEY = "owner_selected_company_" + (URL_COMPANY_ID || "ALL");
 
 function clearStoredSession() {
   removeAppSessionItem("pps_user");
@@ -242,7 +243,7 @@ if (!requireLogin()) {
 }
 
 let data = [];
-let ACTIVE_COMPANY_ID = URL_COMPANY_ID;
+let ACTIVE_COMPANY_ID = URL_COMPANY_ID || getStoredCompanyId();
 
 function getCurrentUser() {
   try {
@@ -258,8 +259,29 @@ function getSessionToken() {
 }
 
 function getCurrentCompanyId() {
+  return getEffectiveCompanyId();
+}
+
+function getStoredCompanyId() {
+  return String(
+    getAppSessionItem(OWNER_SELECTION_KEY) ||
+    getAppSessionItem("owner_selected_company_ALL") ||
+    getAppSessionItem("pps_login_company") ||
+    ""
+  ).trim().toUpperCase();
+}
+
+function getEffectiveCompanyId() {
   const user = getCurrentUser();
-  return String(user.companyId || "").toUpperCase();
+  return String(
+    URL_COMPANY_ID ||
+    ACTIVE_COMPANY_ID ||
+    user.companyId ||
+    user.COMPANY_ID ||
+    user.companyID ||
+    getStoredCompanyId() ||
+    ""
+  ).trim().toUpperCase();
 }
 
 function getCurrentRole() {
@@ -390,13 +412,23 @@ function load() {
   const role = normalizeRole(user.role || user.ROLE);
 
   if (role === "OWNER") {
+    if (!ACTIVE_COMPANY_ID) {
+      ACTIVE_COMPANY_ID = getStoredCompanyId();
+    }
+
     loadCompanySelector(!!ACTIVE_COMPANY_ID);
 
     if (!ACTIVE_COMPANY_ID) {
       return;
     }
   } else if (!ACTIVE_COMPANY_ID) {
-    ACTIVE_COMPANY_ID = String(user.companyId || "").toUpperCase();
+    ACTIVE_COMPANY_ID = getEffectiveCompanyId();
+  }
+
+  if (!ACTIVE_COMPANY_ID) {
+    document.getElementById("companyTitle").innerText = "Company: Sin empresa";
+    document.getElementById("cards").innerHTML = "No se pudo determinar la empresa del usuario. Salga y entre nuevamente.";
+    return;
   }
 
   updateHeaderCompany(ACTIVE_COMPANY_ID);
@@ -435,7 +467,7 @@ function loadCompanySelector(keepCurrentCards) {
     .withFailureHandler(function(err) {
       renderServerError(err, "cards", "ERROR companies: ");
     })
-    .getCompaniesForUser(user.companyId, user.role || user.ROLE, getSessionToken());
+    .getCompaniesForUser(getEffectiveCompanyId(), user.role || user.ROLE, getSessionToken());
 }
 
 function renderCompanySelector(companies, keepCurrentCards) {
@@ -480,6 +512,8 @@ function activateCompany() {
     return;
   }
 
+  setAppSessionItem(OWNER_SELECTION_KEY, ACTIVE_COMPANY_ID);
+  setAppSessionItem("owner_selected_company_ALL", ACTIVE_COMPANY_ID);
   updateHeaderCompany(ACTIVE_COMPANY_ID);
   load();
 }
