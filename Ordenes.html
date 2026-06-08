@@ -50,6 +50,15 @@
     .btn-red { background:#dc2626; color:white; }
     .btn-green { background:#16a34a; color:white; }
     .btn-black { background:#111827; color:white; }
+    .edit-panel { display:none; background:#f8fafc; border:1px solid #d1d5db; border-radius:12px; padding:12px; margin-top:10px; }
+    .edit-grid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px; }
+    .edit-panel input, .edit-panel select, .edit-panel textarea { width:100%; box-sizing:border-box; margin:0; }
+    .edit-panel label { display:block; font-size:12px; font-weight:bold; color:#374151; margin-bottom:4px; }
+    .edit-field { display:flex; flex-direction:column; gap:4px; }
+    .edit-field.full { grid-column:1 / -1; }
+    @media (max-width: 700px) {
+      .edit-grid { grid-template-columns:1fr; }
+    }
 
     #notificationsBox,
     #companyBox {
@@ -266,6 +275,25 @@ function normalizeRole(role) {
     .trim();
 }
 
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value);
+}
+
+function selectedAttr(value, option) {
+  return String(value || "").trim().toUpperCase() === String(option || "").trim().toUpperCase()
+    ? "selected"
+    : "";
+}
+
 function canCreateQuote() {
   const role = normalizeRole(getCurrentRole());
   return ["ADMIN", "SYSTEM", "ORDENES", "OWNER"].includes(role);
@@ -277,6 +305,11 @@ function canDeleteWO() {
 }
 
 function canCreateInvoiceFromOrders() {
+  const role = normalizeRole(getCurrentRole());
+  return ["ADMIN", "OWNER", "ORDENES"].includes(role);
+}
+
+function canEditWorkOrder() {
   const role = normalizeRole(getCurrentRole());
   return ["ADMIN", "OWNER", "ORDENES"].includes(role);
 }
@@ -589,6 +622,11 @@ function card(o) {
   }
 
   const age = getCreatedAgeText(o);
+  const problem = o.REPORTED_PROBLEM_ORIGINAL || o.REPORTED_PROBLEM_ES || "";
+  const managerName = o.MANAGER_NAME || o.MANAGER || "";
+  const pmType = o.PM_TYPE || "";
+  const woType = o.WO_TYPE || "REPAIR_FORM";
+  const priority = o.ORDER_PRIORITY || "";
 
   return `
     <div class="card ${cls}" id="wo_${o.WO_NUMBER}">
@@ -613,6 +651,69 @@ function card(o) {
 
       <textarea id="note_${row}" placeholder="Notas internas">${o.NOTES || ""}</textarea>
 
+      ${canEditWorkOrder() ? `
+        <div id="edit_${row}" class="edit-panel">
+          <div class="edit-grid">
+            <div class="edit-field">
+              <label>Tipo de orden</label>
+              <select id="edit_WO_TYPE_${row}">
+                <option value="REPAIR_FORM" ${selectedAttr(woType, "REPAIR_FORM")}>REPAIR_FORM</option>
+                <option value="PM_FORM" ${selectedAttr(woType, "PM_FORM")}>PM_FORM</option>
+              </select>
+            </div>
+
+            <div class="edit-field">
+              <label>PM Type</label>
+              <select id="edit_PM_TYPE_${row}">
+                <option value="">No aplica</option>
+                <option value="MENSUAL" ${selectedAttr(pmType, "MENSUAL")}>MENSUAL</option>
+                <option value="TRIMESTRAL" ${selectedAttr(pmType, "TRIMESTRAL")}>TRIMESTRAL</option>
+                <option value="ANNUAL" ${selectedAttr(pmType, "ANNUAL")}>ANNUAL</option>
+              </select>
+            </div>
+
+            <div class="edit-field">
+              <label>NSN</label>
+              <input id="edit_NSN_${row}" value="${escapeAttr(o.NSN || "")}">
+            </div>
+
+            <div class="edit-field">
+              <label>Prioridad</label>
+              <select id="edit_PRIORITY_${row}">
+                <option value="Normal" ${selectedAttr(priority, "Normal")}>Normal</option>
+                <option value="Urgent" ${selectedAttr(priority, "Urgent")}>Urgent</option>
+                <option value="Emergency" ${selectedAttr(priority, "Emergency")}>Emergency</option>
+              </select>
+            </div>
+
+            <div class="edit-field">
+              <label>Equipo</label>
+              <input id="edit_EQUIPMENT_${row}" value="${escapeAttr(equipment)}">
+            </div>
+
+            <div class="edit-field">
+              <label>Reportado por / Manager</label>
+              <input id="edit_MANAGER_${row}" value="${escapeAttr(managerName)}">
+            </div>
+
+            <div class="edit-field full">
+              <label>Problema reportado</label>
+              <textarea id="edit_PROBLEM_${row}">${escapeHtml(problem)}</textarea>
+            </div>
+
+            <div class="edit-field full">
+              <label>Notas internas</label>
+              <textarea id="edit_NOTES_${row}">${escapeHtml(o.NOTES || "")}</textarea>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="btn-green" onclick="saveOrderEdits(${row})">Guardar cambios</button>
+            <button class="btn-black" onclick="toggleEditOrder(${row})">Cancelar</button>
+          </div>
+        </div>
+      ` : ""}
+
       <div class="tech-box" id="techbox_${row}">
         <label><input type="checkbox" value="David Dominguez" ${checked("David Dominguez")}> David Dominguez</label>
         <label><input type="checkbox" value="Miguel Rodriguez" ${checked("Miguel Rodriguez")}> Miguel Rodriguez</label>
@@ -636,6 +737,14 @@ function card(o) {
 
       <div class="actions">
         <button onclick="saveNotes(${row})">Guardar Notas</button>
+
+        ${canEditWorkOrder() ? `
+          <button
+            style="background:#2563eb;color:white;font-weight:bold;"
+            onclick="toggleEditOrder(${row})">
+            Editar
+          </button>
+        ` : ""}
 
         ${canCreateInvoiceFromOrders() ? `
           <button
@@ -663,6 +772,57 @@ function card(o) {
       </div>
     </div>
   `;
+}
+
+function toggleEditOrder(row) {
+  const panel = document.getElementById("edit_" + row);
+  if (!panel) return;
+  panel.style.display = panel.style.display === "block" ? "none" : "block";
+}
+
+function getEditValue(row, field) {
+  const el = document.getElementById("edit_" + field + "_" + row);
+  return el ? String(el.value || "").trim() : "";
+}
+
+function saveOrderEdits(row) {
+  const woType = getEditValue(row, "WO_TYPE");
+  const pmType = getEditValue(row, "PM_TYPE");
+  const nsn = getEditValue(row, "NSN");
+  const equipment = getEditValue(row, "EQUIPMENT");
+  const priority = getEditValue(row, "PRIORITY");
+  const manager = getEditValue(row, "MANAGER");
+  const problem = getEditValue(row, "PROBLEM");
+  const notes = getEditValue(row, "NOTES");
+
+  if (!woType) return alert("Seleccione tipo de orden.");
+  if (woType === "PM_FORM" && !pmType) return alert("Seleccione PM Type.");
+  if (!nsn) return alert("NSN es obligatorio.");
+  if (!equipment) return alert("Equipo es obligatorio.");
+  if (!priority) return alert("Prioridad es obligatoria.");
+  if (!manager) return alert("Reportado por / Manager es obligatorio.");
+  if (!problem) return alert("Problema reportado es obligatorio.");
+
+  const updates = {
+    WO_TYPE: woType,
+    PM_TYPE: pmType,
+    NSN: nsn,
+    REPORTED_EQUIPMENT: equipment,
+    ORDER_PRIORITY: priority,
+    REPORTED_PROBLEM_ORIGINAL: problem,
+    MANAGER_NAME: manager,
+    NOTES: notes
+  };
+
+  google.script.run
+    .withSuccessHandler(function() {
+      alert("Orden actualizada correctamente.");
+      load();
+    })
+    .withFailureHandler(function(err) {
+      alertServerError(err);
+    })
+    .updateWorkOrderFromDashboard(row, updates, getSessionToken());
 }
 
 function getSelectedTechs(row) {

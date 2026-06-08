@@ -144,14 +144,15 @@ function updateWorkOrderFromDashboard(rowNumber, updates, sessionToken) {
   const woNumber = getCellByHeader_(sh, rowNumber, headers, "WO_NUMBER");
   const oldStatus = getCellByHeader_(sh, rowNumber, headers, "STATUS");
   const session = requireSession_(sessionToken, ["OWNER", "ADMIN", "ORDENES"], companyId);
+  const sanitizedUpdates = sanitizeWorkOrderDashboardUpdates_(updates, companyId);
 
-  Object.keys(updates).forEach(function(key) {
-    setCellByHeader_(sh, rowNumber, headers, key, updates[key]);
+  Object.keys(sanitizedUpdates).forEach(function(key) {
+    setCellByHeader_(sh, rowNumber, headers, key, sanitizedUpdates[key]);
   });
 
-  if (updates.STATUS) {
+  if (sanitizedUpdates.STATUS) {
 
-    if (updates.STATUS === "COMPLETED") {
+    if (sanitizedUpdates.STATUS === "COMPLETED") {
       setCellByHeader_(sh, rowNumber, headers, "DATE_COMPLETED", new Date());
 
       createEconomyFromWO(companyId, woNumber);
@@ -161,15 +162,15 @@ function updateWorkOrderFromDashboard(rowNumber, updates, sessionToken) {
       addNotification_(companyId, "Sarahi", woNumber, "BILLING", "💰 Ready for billing " + woNumber);
     }
 
-    if (updates.STATUS === "CLOSED") {
+    if (sanitizedUpdates.STATUS === "CLOSED") {
       setCellByHeader_(sh, rowNumber, headers, "DATE_CLOSED", new Date());
     }
 
-    if (updates.STATUS === "REQUEST PARTS") {
+    if (sanitizedUpdates.STATUS === "REQUEST PARTS") {
       addNotification_(companyId, "Dayre", woNumber, "PARTS", "🔧 Parts requested for " + woNumber);
     }
 
-    if (updates.STATUS === "PARTS IN TRANSIT") {
+    if (sanitizedUpdates.STATUS === "PARTS IN TRANSIT") {
       addNotification_(companyId, "Dayre", woNumber, "TRANSIT", "🚚 Parts in transit for " + woNumber);
     }
 
@@ -178,7 +179,7 @@ function updateWorkOrderFromDashboard(rowNumber, updates, sessionToken) {
       woNumber,
       "STATUS UPDATED FROM DASHBOARD",
       oldStatus,
-      updates.STATUS,
+      sanitizedUpdates.STATUS,
       getSessionActorLabel_(session),
       ""
     );
@@ -186,10 +187,115 @@ function updateWorkOrderFromDashboard(rowNumber, updates, sessionToken) {
 
   addAuditLog_("ORDERS", "WORK_ORDER_UPDATED", companyId, "WORK_ORDER", woNumber, session, {
     rowNumber: rowNumber,
-    updates: updates
+    updates: sanitizedUpdates
   });
 
   return true;
+}
+
+function sanitizeWorkOrderDashboardUpdates_(updates, companyId) {
+  const allowed = {
+    TECHNICIAN: true,
+    STATUS: true,
+    NOTES: true,
+    WO_TYPE: true,
+    PM_TYPE: true,
+    NSN: true,
+    REPORTED_EQUIPMENT: true,
+    REPORTED_EQUIPMENT_EN: true,
+    ORDER_PRIORITY: true,
+    REPORTED_PROBLEM_ORIGINAL: true,
+    REPORTED_PROBLEM_EN: true,
+    REPORTED_PROBLEM_ES: true,
+    MANAGER_NAME: true,
+    MANAGER_EMAIL: true
+  };
+
+  const sanitized = {};
+  Object.keys(updates || {}).forEach(function(key) {
+    key = String(key || "").trim();
+    if (!allowed[key]) {
+      throw new Error("Campo no permitido para editar orden: " + key);
+    }
+    sanitized[key] = updates[key];
+  });
+
+  if (!Object.keys(sanitized).length) {
+    throw new Error("No llegaron cambios validos para la orden.");
+  }
+
+  if (sanitized.STATUS) {
+    const status = String(sanitized.STATUS || "").trim().toUpperCase();
+    const allowedStatus = [
+      "ORDER RECEIVED",
+      "SENT TO TECH",
+      "IN PROGRESS",
+      "REQUEST PARTS",
+      "PARTS IN TRANSIT",
+      "PARTS IN STORE",
+      "COMPLETED",
+      "CLOSED"
+    ];
+
+    if (allowedStatus.indexOf(status) === -1) {
+      throw new Error("Status no permitido: " + sanitized.STATUS);
+    }
+
+    sanitized.STATUS = status;
+  }
+
+  if (sanitized.WO_TYPE) {
+    const woType = String(sanitized.WO_TYPE || "").trim().toUpperCase();
+    if (["REPAIR_FORM", "PM_FORM"].indexOf(woType) === -1) {
+      throw new Error("Tipo de orden no permitido: " + sanitized.WO_TYPE);
+    }
+    sanitized.WO_TYPE = woType;
+
+    if (woType !== "PM_FORM") {
+      sanitized.PM_TYPE = "";
+    }
+  }
+
+  if (sanitized.PM_TYPE) {
+    sanitized.PM_TYPE = String(sanitized.PM_TYPE || "").trim().toUpperCase();
+  }
+
+  if (sanitized.NSN) {
+    const nsn = normalizeNSN_(sanitized.NSN);
+    const store = getStoreByNSN_(nsn, companyId);
+    if (!store || !store.fullAddress) {
+      throw new Error("No se encontro tienda/direccion para NSN: " + nsn + " en empresa " + companyId);
+    }
+    sanitized.NSN = nsn;
+    if (store.client) sanitized.CLIENT = store.client;
+  }
+
+  if (sanitized.ORDER_PRIORITY) {
+    sanitized.ORDER_PRIORITY = normalizePriorityEn_(sanitized.ORDER_PRIORITY);
+  }
+
+  if (sanitized.REPORTED_EQUIPMENT) {
+    const equipment = String(sanitized.REPORTED_EQUIPMENT || "").trim();
+    sanitized.REPORTED_EQUIPMENT = equipment;
+    sanitized.REPORTED_EQUIPMENT_EN = safeTranslate_(equipment, "auto", "en");
+  }
+
+  if (sanitized.REPORTED_PROBLEM_ORIGINAL) {
+    const problem = String(sanitized.REPORTED_PROBLEM_ORIGINAL || "").trim();
+    sanitized.REPORTED_PROBLEM_ORIGINAL = problem;
+    sanitized.REPORTED_PROBLEM_ES = problem;
+    sanitized.REPORTED_PROBLEM_EN = safeTranslate_(problem, "auto", "en");
+  }
+
+  if (sanitized.MANAGER_NAME) {
+    sanitized.MANAGER_NAME = String(sanitized.MANAGER_NAME || "").trim();
+  }
+
+  if (sanitized.MANAGER_EMAIL) {
+    sanitized.MANAGER_EMAIL = String(sanitized.MANAGER_EMAIL || "").trim().toLowerCase();
+  }
+
+  return sanitized;
 }
 
 function sendWorkOrderFromDashboard(rowNumber, sessionToken) {
