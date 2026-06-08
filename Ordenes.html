@@ -173,6 +173,7 @@ const TOP_NAV = {
 const BASE_URL = "<?= baseUrl ?>";
 const URL_COMPANY_ID = String("<?= companyId ?>").trim().toUpperCase();
 const OWNER_PORTAL = String("<?= ownerOnly ?>").trim().toLowerCase() === "true";
+const URL_NAV_TOKEN = String("<?= navToken ?>").trim();
 const OWNER_SELECTION_KEY = "owner_selected_company_" + (URL_COMPANY_ID || "ALL");
 
 function clearStoredSession() {
@@ -210,20 +211,14 @@ function alertServerError(err) {
   alert(getErrorMessage(err));
 }
 
-function requireLogin() {
+function hasStoredLogin() {
   const user = getAppSessionItem("pps_user");
 
-  if (!user) {
-    TOP_NAV.href = BASE_URL;
-    return false;
-  }
+  if (!user) return false;
 
   try {
     const parsed = JSON.parse(user);
-    if ((!parsed.role && !parsed.ROLE) || (!parsed.sessionToken && !parsed.SESSION_TOKEN)) {
-      redirectToLogin();
-      return false;
-    }
+    if ((!parsed.role && !parsed.ROLE) || (!parsed.sessionToken && !parsed.SESSION_TOKEN)) return false;
 
     const expiresAt = Number(parsed.sessionExpiresAt || parsed.SESSION_EXPIRES_AT || 0);
     if (expiresAt && expiresAt <= Date.now()) {
@@ -231,11 +226,17 @@ function requireLogin() {
       return false;
     }
   } catch (e) {
-    redirectToLogin();
     return false;
   }
 
   return true;
+}
+
+function requireLogin() {
+  if (URL_NAV_TOKEN) return true;
+  if (hasStoredLogin()) return true;
+  TOP_NAV.href = OWNER_PORTAL ? BASE_URL + "?ownerOnly=1" : BASE_URL;
+  return false;
 }
 
 if (!requireLogin()) {
@@ -244,6 +245,7 @@ if (!requireLogin()) {
 
 let data = [];
 let ACTIVE_COMPANY_ID = URL_COMPANY_ID || getStoredCompanyId();
+let ORDERS_BOOTSTRAPPED = false;
 
 function getCurrentUser() {
   try {
@@ -457,6 +459,41 @@ function load() {
       renderServerError(err, "cards", "ERROR loading dashboard: ");
     })
     .getDashboardData(ACTIVE_COMPANY_ID, user.role || user.ROLE, getSessionToken());
+}
+
+function bootstrapOrdersModule() {
+  if (ORDERS_BOOTSTRAPPED) return;
+  ORDERS_BOOTSTRAPPED = true;
+
+  if (!URL_NAV_TOKEN) {
+    if (hasStoredLogin()) {
+      load();
+      return;
+    }
+
+    requireLogin();
+    return;
+  }
+
+  document.getElementById("cards").innerHTML = "Restaurando sesion...";
+
+  google.script.run
+    .withSuccessHandler(function(user) {
+      user = user || {};
+      setAppSessionItem("pps_user", JSON.stringify(user));
+      if (user.companyId || user.COMPANY_ID) {
+        setAppSessionItem("pps_login_company", String(user.companyId || user.COMPANY_ID || "").trim().toUpperCase());
+      }
+
+      ACTIVE_COMPANY_ID = URL_COMPANY_ID || getStoredCompanyId();
+      load();
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById("cards").innerHTML =
+        "ERROR restaurando sesion: " + getErrorMessage(err);
+      redirectToLogin("La sesion del modulo expiro. Abra Ordenes nuevamente desde el dashboard.");
+    })
+    .resolveNavigationSession(URL_NAV_TOKEN);
 }
 
 function loadCompanySelector(keepCurrentCards) {
@@ -1013,9 +1050,10 @@ function openPartsTown() {
   window.open("https://www.partstown.com/", "_blank");
 }
 
-load();
+bootstrapOrdersModule();
 
-window.addEventListener("pageshow", function() {
+window.addEventListener("pageshow", function(event) {
+  if (event && !event.persisted) return;
   load();
 });
 </script>

@@ -4685,7 +4685,21 @@ function openModule(url) {
   finalUrl = appendCompanyParam(finalUrl, companyId);
   finalUrl = appendOwnerPortalParam(finalUrl);
   markActiveBrowserSession();
-  TOP_NAV.href = finalUrl;
+
+  const sessionToken = getSessionToken();
+  if (!sessionToken) {
+    TOP_NAV.href = finalUrl;
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function(navToken) {
+      TOP_NAV.href = appendUrlParam(finalUrl, "navToken", navToken);
+    })
+    .withFailureHandler(function(err) {
+      alert("No se pudo abrir el modulo: " + (err && err.message ? err.message : err));
+    })
+    .createNavigationSessionToken(sessionToken, companyId);
 }
 
 function getActiveCompanyId() {
@@ -4716,6 +4730,14 @@ function appendOwnerPortalParam(url) {
   if (/[?&](ownerOnly|portal)=/.test(url)) return url;
 
   return url + (url.indexOf("?") === -1 ? "?" : "&") + "ownerOnly=1";
+}
+
+function appendUrlParam(url, key, value) {
+  value = String(value || "").trim();
+  if (!value || new RegExp("[?&]" + key + "=").test(url)) return url;
+
+  return url + (url.indexOf("?") === -1 ? "?" : "&") +
+    encodeURIComponent(key) + "=" + encodeURIComponent(value);
 }
 
 function updateHeaderCompany(companyId) {

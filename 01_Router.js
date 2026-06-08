@@ -42,7 +42,6 @@ function doGet(e) {
       template.baseUrl = baseUrl;
       template.companyId = p.companyId || "";
       template.ownerOnly = ownerPortal ? "true" : "";
-
       return template.evaluate()
         .setTitle("Admin Technician Portal")
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
@@ -233,6 +232,7 @@ function applyTemplateDefaults_(template, params, baseUrl) {
   template.companyId = params.companyId || "";
   template.ownerOnly = isOwnerPortalRequest_(params) ? "true" : "";
   template.returnTo = params.returnTo || "";
+  template.navToken = params.navToken || "";
   template.watermarkLogoCss = getCompanyWatermarkLogoCss_(params.companyId || "");
 }
 

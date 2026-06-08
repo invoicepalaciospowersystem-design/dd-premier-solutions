@@ -5,6 +5,7 @@
 const AUTH_SESSION_PREFIX = "SESSION_";
 const AUTH_HASH_PREFIX = "sha256$";
 const AUTH_LOGIN_FAIL_PREFIX = "LOGIN_FAIL_";
+const AUTH_NAV_SESSION_PREFIX = "NAV_SESSION_";
 
 function loginUser(email, password) {
   email = String(email || "").trim().toLowerCase();
@@ -368,6 +369,70 @@ function destroySession(sessionToken) {
   return true;
 }
 
+function createNavigationSessionToken(sessionToken, companyId) {
+  companyId = String(companyId || "").trim().toUpperCase();
+
+  const session = requireSession_(sessionToken, [], companyId);
+  const token = Utilities.getUuid() + "-" + Utilities.getUuid();
+  const now = Date.now();
+  const ttlSeconds = 120;
+
+  const payload = JSON.stringify({
+    sessionToken: String(sessionToken || "").trim(),
+    companyId: companyId || String(session.companyId || "").trim().toUpperCase(),
+    createdAt: now,
+    expiresAt: now + ttlSeconds * 1000
+  });
+
+  const key = getNavigationSessionStorageKey_(token);
+  CacheService.getScriptCache().put(key, payload, ttlSeconds);
+  PropertiesService.getScriptProperties().setProperty(key, payload);
+
+  return token;
+}
+
+function resolveNavigationSession(navToken) {
+  navToken = String(navToken || "").trim();
+  if (!navToken) throw new Error("Token de navegacion requerido.");
+
+  const key = getNavigationSessionStorageKey_(navToken);
+  let payload = CacheService.getScriptCache().get(key);
+
+  if (!payload) {
+    payload = PropertiesService.getScriptProperties().getProperty(key);
+  }
+
+  CacheService.getScriptCache().remove(key);
+  PropertiesService.getScriptProperties().deleteProperty(key);
+
+  if (!payload) {
+    throw new Error("Token de navegacion expirado. Abra el modulo nuevamente.");
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(payload);
+  } catch (err) {
+    throw new Error("Token de navegacion invalido.");
+  }
+
+  if (!parsed.expiresAt || Number(parsed.expiresAt) < Date.now()) {
+    throw new Error("Token de navegacion expirado. Abra el modulo nuevamente.");
+  }
+
+  const session = requireSession_(parsed.sessionToken, [], parsed.companyId);
+
+  return {
+    success: true,
+    email: session.email || "",
+    name: session.name || "",
+    role: session.role || "",
+    companyId: String(session.companyId || parsed.companyId || "").trim().toUpperCase(),
+    sessionToken: parsed.sessionToken,
+    sessionExpiresAt: Number(session.expiresAt || 0)
+  };
+}
+
 function cleanupExpiredSessions_() {
   const props = PropertiesService.getScriptProperties();
   const all = props.getProperties();
@@ -375,7 +440,7 @@ function cleanupExpiredSessions_() {
   let removed = 0;
 
   Object.keys(all).forEach(function(key) {
-    if (key.indexOf(AUTH_SESSION_PREFIX) !== 0) return;
+    if (key.indexOf(AUTH_SESSION_PREFIX) !== 0 && key.indexOf(AUTH_NAV_SESSION_PREFIX) !== 0) return;
 
     try {
       const session = JSON.parse(all[key] || "{}");
@@ -396,6 +461,10 @@ function cleanupExpiredSessions_() {
 
 function getSessionStorageKey_(sessionToken) {
   return AUTH_SESSION_PREFIX + hashSessionToken_(sessionToken);
+}
+
+function getNavigationSessionStorageKey_(navToken) {
+  return AUTH_NAV_SESSION_PREFIX + hashSessionToken_(navToken);
 }
 
 function hashSessionToken_(sessionToken) {
