@@ -437,8 +437,14 @@ function load() {
 
   google.script.run
     .withSuccessHandler(function(res) {
-      data = res || [];
-      render();
+      try {
+        data = Array.isArray(res) ? res : [];
+        render();
+      } catch (err) {
+        document.getElementById("cards").innerHTML =
+          "ERROR renderizando ordenes: " + getErrorMessage(err);
+        return;
+      }
 
       setTimeout(function() {
         showLastWOMessage();

@@ -91,6 +91,7 @@ function getDashboardData(companyId, role, sessionToken) {
   }
 
   const data = [];
+  const storesByNsn = getStoresByNsnMap_(companyId);
 
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
@@ -114,7 +115,7 @@ function getDashboardData(companyId, role, sessionToken) {
 
     obj.ROW_NUMBER = i + 1;
 
-    enrichWorkOrderObject_(obj);
+    enrichWorkOrderObjectFromStore_(obj, storesByNsn[normalizeNSN_(obj.NSN)] || {});
 
     data.push(obj);
   }

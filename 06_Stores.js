@@ -84,6 +84,89 @@ function getStoreByNSN_(nsn, companyId) {
   return {};
 }
 
+function getStoresByNsnMap_(companyId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(CFG.SHEET_STORES);
+  const map = {};
+
+  if (!sh) return map;
+
+  const data = sh.getDataRange().getValues();
+  if (data.length < 2) return map;
+
+  const headers = data[0].map(function(h) {
+    return String(h).trim();
+  });
+
+  const idxCompany = headers.indexOf("COMPANY_ID");
+  const idxNSN = headers.indexOf("NSN #");
+  const idxClient = headers.indexOf("CLIENTE");
+  const idxAddress = headers.indexOf("ADDRESS");
+  const idxCity = headers.indexOf("CITY");
+  const idxState = headers.indexOf("STATE");
+  const idxZip = headers.indexOf("ZIP");
+  const idxVendor = headers.indexOf("VendorID");
+  const idxActive = headers.indexOf("ACTIVE");
+  const idxStoreEmail = headers.indexOf("STORE_EMAIL");
+  const idxStoreEmails = headers.indexOf("STORE_EMAILS");
+  const idxSupervisorName = headers.indexOf("SUPERVISOR_NAME");
+  const idxSupervisorEmail = headers.indexOf("SUPERVISOR_EMAIL");
+  const idxBillingEmails = headers.indexOf("BILLING_EMAILS");
+  const idxPmReportEmails = headers.indexOf("PM_REPORT_EMAILS");
+  const idxQuoteEmails = headers.indexOf("QUOTE_EMAILS");
+  const idxInvoiceEmails = headers.indexOf("INVOICE_EMAILS");
+
+  if (idxNSN === -1) return map;
+
+  const targetCompany = String(companyId || CFG.DEFAULT_COMPANY_ID).trim().toUpperCase();
+
+  for (let i = 1; i < data.length; i++) {
+    const rowCompany = idxCompany >= 0
+      ? String(data[i][idxCompany] || "").trim().toUpperCase()
+      : targetCompany;
+
+    const rowNSN = normalizeNSN_(data[i][idxNSN]);
+
+    const active = idxActive >= 0
+      ? String(data[i][idxActive] || "YES").trim().toUpperCase()
+      : "YES";
+
+    if (!rowNSN || rowCompany !== targetCompany || active === "NO") continue;
+
+    const normalized = normalizeStoreAddressFields_({
+      ADDRESS: idxAddress >= 0 ? data[i][idxAddress] || "" : "",
+      CITY: idxCity >= 0 ? data[i][idxCity] || "" : "",
+      STATE: idxState >= 0 ? data[i][idxState] || "" : "",
+      ZIP: idxZip >= 0 ? data[i][idxZip] || "" : ""
+    });
+
+    map[rowNSN] = {
+      nsn: rowNSN,
+      client: idxClient >= 0 ? data[i][idxClient] || "" : "",
+      address: normalized.ADDRESS,
+      city: normalized.CITY,
+      state: normalized.STATE,
+      zip: normalized.ZIP,
+      vendorId: idxVendor >= 0 ? data[i][idxVendor] || "" : "",
+      storeEmail: idxStoreEmail >= 0 ? data[i][idxStoreEmail] || "" : "",
+      storeEmails: [
+        idxStoreEmail >= 0 ? data[i][idxStoreEmail] || "" : "",
+        idxStoreEmails >= 0 ? data[i][idxStoreEmails] || "" : ""
+      ].filter(Boolean).join(","),
+      supervisorName: idxSupervisorName >= 0 ? data[i][idxSupervisorName] || "" : "",
+      supervisorEmail: idxSupervisorEmail >= 0 ? data[i][idxSupervisorEmail] || "" : "",
+      supervisorEmails: idxSupervisorEmail >= 0 ? data[i][idxSupervisorEmail] || "" : "",
+      billingEmails: idxBillingEmails >= 0 ? data[i][idxBillingEmails] || "" : "",
+      pmReportEmails: idxPmReportEmails >= 0 ? data[i][idxPmReportEmails] || "" : "",
+      quoteEmails: idxQuoteEmails >= 0 ? data[i][idxQuoteEmails] || "" : "",
+      invoiceEmails: idxInvoiceEmails >= 0 ? data[i][idxInvoiceEmails] || "" : "",
+      fullAddress: normalized.FULL_ADDRESS
+    };
+  }
+
+  return map;
+}
+
 function normalizeStoreAddressFields_(store) {
   let address = String(store.ADDRESS || "").trim();
   let city = String(store.CITY || "").trim();
@@ -167,7 +250,11 @@ function normalizeNSN_(value) {
 
 function enrichWorkOrderObject_(obj) {
   const store = getStoreByNSN_(obj.NSN, obj.COMPANY_ID || CFG.DEFAULT_COMPANY_ID);
+  return enrichWorkOrderObjectFromStore_(obj, store);
+}
 
+function enrichWorkOrderObjectFromStore_(obj, store) {
+  store = store || {};
   obj.STORE_ADDRESS = store.fullAddress || "";
   obj.STORE_STREET = store.address || "";
   obj.STORE_CITY = store.city || "";
