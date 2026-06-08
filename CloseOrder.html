@@ -182,6 +182,7 @@ const WO_NUMBER_FROM_URL = "<?= wo ?>";
 const TECH_NAME = "<?= techName ?>";
 const BASE_URL = "<?= baseUrl ?>";
 const RETURN_TO = "<?= returnTo ?>";
+const SPECIAL_INVOICE_FROM_URL = /^(1|true|yes)$/i.test(String("<?= specialInvoice ?>").trim());
 
 let ORDER = null;
 let ORDER_READY = false;
@@ -215,6 +216,12 @@ function setupSpecialInvoiceBox() {
 
   const allowed = canUseSpecialInvoice() && !isPMOrder();
   box.style.display = allowed ? "block" : "none";
+
+  if (allowed && SPECIAL_INVOICE_FROM_URL) {
+    const check = document.getElementById("SPECIAL_INVOICE");
+    if (check) check.checked = true;
+    toggleSpecialInvoiceFields();
+  }
 
   if (!allowed) {
     const check = document.getElementById("SPECIAL_INVOICE");

@@ -50,6 +50,7 @@
     .btn-red { background:#dc2626; color:white; }
     .btn-green { background:#16a34a; color:white; }
     .btn-black { background:#111827; color:white; }
+    .btn-special { background:#b91c1c; color:white; font-weight:bold; }
 
     #notificationsBox,
     #companyBox {
@@ -276,6 +277,15 @@ function canDeleteWO() {
   return ["ADMIN", "SYSTEM", "ORDENES"].includes(role);
 }
 
+function canCreateSpecialInvoice() {
+  const role = normalizeRole(getCurrentRole());
+  return ["ADMIN", "SYSTEM", "ORDENES", "OWNER"].includes(role);
+}
+
+function isPMOrderCard(order) {
+  return String(order && order.WO_TYPE || "").trim().toUpperCase() === "PM_FORM";
+}
+
 function openQuote(row, woNumber, companyId) {
   TOP_NAV.href =
     BASE_URL +
@@ -285,6 +295,25 @@ function openQuote(row, woNumber, companyId) {
     "&companyId=" + encodeURIComponent(companyId || ACTIVE_COMPANY_ID) +
     ownerPortalParam() +
     "&returnTo=" + encodeURIComponent(getOrdersReturnUrl(companyId || ACTIVE_COMPANY_ID));
+}
+
+function openSpecialInvoice(row, woNumber, companyId) {
+  companyId = String(companyId || ACTIVE_COMPANY_ID || "").trim().toUpperCase();
+
+  if (!row || !woNumber) {
+    alert("No se pudo identificar la orden para el invoice especial.");
+    return;
+  }
+
+  TOP_NAV.href =
+    BASE_URL +
+    "?view=close" +
+    "&row=" + encodeURIComponent(row) +
+    "&wo=" + encodeURIComponent(woNumber || "") +
+    "&companyId=" + encodeURIComponent(companyId) +
+    ownerPortalParam() +
+    "&specialInvoice=1" +
+    "&returnTo=" + encodeURIComponent(getOrdersReturnUrl(companyId));
 }
 
 function getOrdersReturnUrl(companyId) {
@@ -562,6 +591,8 @@ function card(o) {
 
   const row = Number(o.ROW_NUMBER);
   const equipment = o.REPORTED_EQUIPMENT || o["Reported Equipment"] || o["REPORTED EQUIPMENT"] || "No especificado";
+  const woNumber = String(o.WO_NUMBER || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  const companyId = String(o.COMPANY_ID || ACTIVE_COMPANY_ID || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 
   const currentTechs = String(o.TECHNICIAN || "")
     .split(",")
@@ -620,6 +651,14 @@ function card(o) {
 
       <div class="actions">
         <button onclick="saveNotes(${row})">Guardar Notas</button>
+
+        ${canCreateSpecialInvoice() && !isPMOrderCard(o) ? `
+          <button
+            class="btn-special"
+            onclick="openSpecialInvoice(${row}, '${woNumber}', '${companyId}')">
+            Invoice Especial
+          </button>
+        ` : ""}
 
         ${canCreateQuote() ? `
   <button

@@ -138,6 +138,7 @@ function doGet(e) {
       template.techName = p.tech || "";
       template.baseUrl = baseUrl;
       template.returnTo = p.returnTo || "";
+      template.specialInvoice = p.specialInvoice || "";
 
       return template.evaluate()
         .setTitle("Close Work Order")
