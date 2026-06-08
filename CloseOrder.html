@@ -365,8 +365,13 @@ function saveClose() {
   let manualPartsTotal = "";
   let manualSubTotal = "";
 
-  if (!isPM && (!hours || !work)) {
+  if (!isPM && !specialInvoice && (!hours || !work)) {
     alert("Horas y Trabajo Realizado son obligatorios.");
+    return;
+  }
+
+  if (!isPM && specialInvoice && !work) {
+    alert("Trabajo Realizado es obligatorio.");
     return;
   }
 
