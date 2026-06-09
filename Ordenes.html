@@ -51,6 +51,75 @@
     .btn-green { background:#16a34a; color:white; }
     .btn-black { background:#111827; color:white; }
     .btn-special { background:#b91c1c; color:white; font-weight:bold; }
+    .btn-filter-order { background:#0f172a; color:white; font-weight:bold; }
+
+    .modal-backdrop {
+      display:none;
+      position:fixed;
+      inset:0;
+      z-index:9999;
+      background:rgba(15,23,42,.58);
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+    }
+
+    .modal-card {
+      width:min(860px, 100%);
+      max-height:calc(100vh - 36px);
+      overflow:auto;
+      background:white;
+      border-radius:14px;
+      box-shadow:0 24px 70px rgba(0,0,0,.28);
+      padding:18px;
+    }
+
+    .modal-head {
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:12px;
+      border-bottom:1px solid #e5e7eb;
+      padding-bottom:12px;
+      margin-bottom:12px;
+    }
+
+    .filter-order-grid {
+      display:grid;
+      grid-template-columns: 1.2fr 2fr 110px 110px;
+      gap:8px;
+      align-items:center;
+    }
+
+    .filter-order-grid.header {
+      font-size:12px;
+      color:#64748b;
+      font-weight:bold;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+      margin-bottom:6px;
+    }
+
+    .filter-order-row {
+      padding:8px 0;
+      border-bottom:1px solid #eef2f7;
+    }
+
+    .filter-order-row input {
+      width:100%;
+      box-sizing:border-box;
+      text-align:center;
+    }
+
+    .filter-order-actions {
+      display:flex;
+      justify-content:flex-end;
+      gap:8px;
+      margin-top:14px;
+      flex-wrap:wrap;
+    }
+
+    .muted { color:#64748b; font-size:13px; }
 
     #notificationsBox,
     #companyBox {
@@ -122,15 +191,54 @@
   <button onclick="load()">Refresh</button>
   <button class="new-order" onclick="newOrder()">New Order</button>
   <button class="new-order" onclick="openPartsTown()">New Parts</button>
+  <button class="btn-filter-order" onclick="openFilterOrderModal()">Pedido Filtros</button>
   <button class="notif-btn" onclick="toggleNotifications()">🔔 Notifications <span id="notifCount"></span></button>
 </div>
 
 <div id="companyBox"></div>
 <div id="notificationsBox"></div>
+<div id="filterOrderModal" class="modal-backdrop">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <h2 style="margin:0;">Pedido de Filtros</h2>
+        <div class="muted">Cuenta United Refrigeration: 11437479</div>
+      </div>
+      <button class="btn-black" onclick="closeFilterOrderModal()">Cerrar</button>
+    </div>
+
+    <div class="filter-order-grid header">
+      <div>Filtro</div>
+      <div>Descripcion</div>
+      <div>Precio ref.</div>
+      <div>Cantidad</div>
+    </div>
+    <div id="filterOrderRows"></div>
+
+    <label style="display:block; margin-top:12px; font-weight:bold;">Notas del pedido</label>
+    <textarea id="filterOrderNotes" placeholder="Notas opcionales para este pedido"></textarea>
+
+    <div class="filter-order-actions">
+      <button class="btn-black" onclick="closeFilterOrderModal()">Cancelar</button>
+      <button id="filterOrderSubmitBtn" class="btn-filter-order" onclick="submitFilterOrder()">Generar PDF</button>
+    </div>
+  </div>
+</div>
 <div id="statusMetrics" class="box" style="display:flex; gap:10px; flex-wrap:wrap;"></div>
 <div id="cards" class="grid"></div>
 
 <script>
+const FILTER_ORDER_CATALOG = [
+  { sku: "20X24X2AB40", size: "20x24x2", description: "MERV 8 PLEATED FILTER STANDARD CAPACITY", price: 5.87 },
+  { sku: "24X24X2AB40", size: "24x24x2", description: "MERV 8 PLEATED FILTER STANDARD CAPACITY", price: 6.23 },
+  { sku: "16X20X2AB40", size: "16x20x2", description: "MERV 8 PLEATED FILTER STANDARD CAPACITY", price: 4.84 },
+  { sku: "20X30X2AB40", size: "20x30x2", description: "MERV 8 PLEATED FILTER STANDARD CAPACITY", price: 10.96 },
+  { sku: "14X30X2AB40", size: "14x30x2", description: "MERV 8 PLEATED FILTER STANDARD CAPACITY", price: 12.69 },
+  { sku: "20X25X2AB40", size: "20x25x2", description: "MERV 8 PLEATED FILTER STANDARD CAPACITY", price: 5.93 },
+  { sku: "16X25X2AB40", size: "16x25x2", description: "MERV 8 PLEATED FILTER STANDARD CAPACITY", price: 5.37 },
+  { sku: "18X24X2AB40", size: "18x24x2", description: "MERV 8 PLEATED FILTER STANDARD CAPACITY", price: 5.70 }
+];
+
 function navigateApp(url) {
   const target = String(url || "").trim();
   if (!target) return;
@@ -826,6 +934,100 @@ function renderStatusMetrics(list) {
 
 function openPartsTown() {
   window.open("https://www.partstown.com/", "_blank");
+}
+
+function escapeHtmlClient(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function formatMoneyClient(value) {
+  const n = Number(value || 0);
+  return "$" + n.toFixed(2);
+}
+
+function openFilterOrderModal() {
+  if (!ACTIVE_COMPANY_ID) {
+    alert("Seleccione una empresa antes de crear el pedido de filtros.");
+    return;
+  }
+
+  document.getElementById("filterOrderRows").innerHTML =
+    FILTER_ORDER_CATALOG.map(function(item, idx) {
+      return `
+        <div class="filter-order-grid filter-order-row">
+          <div>
+            <b>${escapeHtmlClient(item.size)}</b><br>
+            <span class="muted">${escapeHtmlClient(item.sku)}</span>
+          </div>
+          <div>${escapeHtmlClient(item.description)}</div>
+          <div>${formatMoneyClient(item.price)}</div>
+          <div>
+            <input id="filterQty_${idx}" type="number" min="0" step="1" value="0">
+          </div>
+        </div>
+      `;
+    }).join("");
+
+  document.getElementById("filterOrderNotes").value = "";
+  document.getElementById("filterOrderModal").style.display = "flex";
+}
+
+function closeFilterOrderModal() {
+  document.getElementById("filterOrderModal").style.display = "none";
+}
+
+function submitFilterOrder() {
+  const items = FILTER_ORDER_CATALOG.map(function(item, idx) {
+    const qty = Number(document.getElementById("filterQty_" + idx).value || 0);
+    return {
+      sku: item.sku,
+      qty: Math.max(0, Math.floor(qty))
+    };
+  }).filter(function(item) {
+    return item.qty > 0;
+  });
+
+  if (!items.length) {
+    alert("Ponga cantidad al menos en un filtro.");
+    return;
+  }
+
+  const btn = document.getElementById("filterOrderSubmitBtn");
+  btn.disabled = true;
+  btn.innerText = "Generando...";
+
+  const user = getCurrentUser();
+  const payload = {
+    companyId: ACTIVE_COMPANY_ID,
+    requestedBy: user.name || user.NAME || user.email || user.EMAIL || "",
+    notes: document.getElementById("filterOrderNotes").value,
+    items: items
+  };
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      btn.disabled = false;
+      btn.innerText = "Generar PDF";
+      closeFilterOrderModal();
+
+      if (res && res.url) {
+        alert("Pedido de filtros creado en Drive: " + (res.name || ""));
+        window.open(res.url, "_blank");
+      } else {
+        alert("Pedido de filtros creado.");
+      }
+    })
+    .withFailureHandler(function(err) {
+      btn.disabled = false;
+      btn.innerText = "Generar PDF";
+      alertServerError(err);
+    })
+    .createFilterOrderPdf(payload, getSessionToken());
 }
 
 load();
