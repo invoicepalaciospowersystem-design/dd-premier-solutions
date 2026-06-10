@@ -211,6 +211,43 @@
       color:#dc2626;
       font-weight:bold;
     }
+
+    .manual-hours-form {
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(170px, 1fr));
+      gap:10px;
+      margin-top:12px;
+      align-items:end;
+    }
+
+    .manual-hours-form label {
+      display:flex;
+      flex-direction:column;
+      gap:5px;
+      font-size:12px;
+      color:#4b5563;
+      font-weight:bold;
+    }
+
+    .manual-hours-table {
+      width:100%;
+      border-collapse:collapse;
+      margin-top:14px;
+      font-size:13px;
+    }
+
+    .manual-hours-table th,
+    .manual-hours-table td {
+      padding:8px;
+      border-bottom:1px solid #e5e7eb;
+      text-align:left;
+      vertical-align:top;
+    }
+
+    .manual-hours-table th {
+      background:#f9fafb;
+      color:#4b5563;
+    }
   </style>
   <?!= include("AppWatermark"); ?>
 </head>
@@ -274,6 +311,8 @@
 
   <button onclick="load()">Refresh</button>
 
+  <button id="manualHoursBtn" onclick="toggleManualHours()">Horas Manuales</button>
+
   <button id="syncInvoicesBtn" onclick="syncInvoices()">Sync Invoices</button>
   <button id="repairEconomyBtn" onclick="repairEconomyDuplicates()">Repair Duplicates</button>
 
@@ -288,6 +327,54 @@
   </button>
 
   <span id="periodLabel" style="font-weight:bold; align-self:center;"></span>
+</div>
+
+<div id="manualHoursBox" class="box" style="display:none;">
+  <h3 style="margin-top:0;">Horas Manuales de Tecnico</h3>
+  <div style="color:#4b5563; font-size:13px;">
+    Use esto para pagar horas a un tecnico aunque no exista invoice. No aumenta facturacion; solo suma pago de tecnico y gasto laboral.
+  </div>
+
+  <div class="manual-hours-form">
+    <label>
+      Tecnico
+      <select id="manualHoursTech" onchange="syncManualHoursRate()"></select>
+    </label>
+
+    <label>
+      Fecha trabajada
+      <input id="manualHoursDate" type="date">
+    </label>
+
+    <label>
+      Horas
+      <input id="manualHoursQty" type="number" min="0.25" max="24" step="0.25" placeholder="0.00">
+    </label>
+
+    <label>
+      Rate
+      <input id="manualHoursRate" type="number" min="0" step="0.01" placeholder="45.00">
+    </label>
+
+    <label>
+      WO opcional
+      <input id="manualHoursWO" placeholder="WO-2026-0000">
+    </label>
+
+    <label>
+      Motivo
+      <input id="manualHoursReason" placeholder="Ej. training, helper, callback">
+    </label>
+  </div>
+
+  <textarea id="manualHoursNotes" placeholder="Notas opcionales..."></textarea>
+
+  <div class="payment-import-actions">
+    <button id="saveManualHoursBtn" onclick="saveManualHours()" style="background:#16a34a;">Guardar Horas</button>
+    <button onclick="clearManualHoursForm()" style="background:#6b7280;">Limpiar</button>
+  </div>
+
+  <div id="manualHoursList"></div>
 </div>
 
 <div id="mcdPaymentBox" class="box" style="display:none;">
@@ -378,6 +465,8 @@ let VIEW_MODE = "REGULAR";
 let ECONOMY_METRIC_FILTER = "all";
 let METRIC_PERIOD_INITIALIZED = false;
 let MCD_PAYMENT_PREVIEW_READY = false;
+let MANUAL_HOURS = [];
+let MANUAL_TECH_OPTIONS = [];
 
 function getCurrentUser() {
   try {
@@ -462,9 +551,13 @@ function setMode(mode) {
   document.getElementById("repairEconomyBtn").style.display = mode === "REGULAR" ? "inline-block" : "none";
   document.getElementById("syncOldBtn").style.display = mode === "REGULAR" ? "inline-block" : "none";
   document.getElementById("mcdPaymentBtn").style.display = mode === "REGULAR" ? "inline-block" : "none";
+  document.getElementById("manualHoursBtn").style.display = mode === "REGULAR" ? "inline-block" : "none";
   if (mode !== "REGULAR") {
     const mcdBox = document.getElementById("mcdPaymentBox");
     if (mcdBox) mcdBox.style.display = "none";
+    const manualBox = document.getElementById("manualHoursBox");
+    if (manualBox) manualBox.style.display = "none";
+    MANUAL_HOURS = [];
   }
 
   load();
@@ -617,6 +710,7 @@ function load() {
     google.script.run
       .withSuccessHandler(function(res) {
         ECONOMY = res || [];
+        MANUAL_HOURS = [];
         loadPeriodFilter();
         render();
       })
@@ -632,12 +726,38 @@ function load() {
     .withSuccessHandler(function(res) {
       ECONOMY = res || [];
       loadPeriodFilter();
-      render();
+      loadManualHoursForActiveCompany(function() {
+        render();
+      });
     })
     .withFailureHandler(function(err) {
       renderServerError(err, "cards", "ERROR: ");
     })
     .getEconomyData(ACTIVE_COMPANY_ID, user.role, getSessionToken());
+}
+
+function loadManualHoursForActiveCompany(done) {
+  done = typeof done === "function" ? done : function() {};
+
+  if (VIEW_MODE !== "REGULAR" || !ACTIVE_COMPANY_ID) {
+    MANUAL_HOURS = [];
+    done();
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      MANUAL_HOURS = res || [];
+      loadPeriodFilter();
+      renderManualHoursList();
+      done();
+    })
+    .withFailureHandler(function(err) {
+      MANUAL_HOURS = [];
+      console.error("Manual hours load failed", err);
+      done();
+    })
+    .getTechManualHoursData(ACTIVE_COMPANY_ID, getSessionToken());
 }
 
 function render() {
@@ -861,7 +981,62 @@ function calculateEconomyMetrics(rows) {
     totals.yoel += split.yoel;
   });
 
+  const manual = calculateManualHoursMetricsForCurrentView();
+  totals.techPay += manual.laborPay;
+  totals.hours += manual.hours;
+  totals.profit -= manual.laborPay;
+
   return totals;
+}
+
+function calculateManualHoursMetricsForCurrentView() {
+  const totals = { count: 0, hours: 0, laborPay: 0 };
+
+  if (VIEW_MODE !== "REGULAR") return totals;
+
+  (MANUAL_HOURS || []).forEach(function(row) {
+    if (!manualHoursMatchesMetricPeriod(row)) return;
+
+    totals.count++;
+    totals.hours += parseEconomyNumber(row.HOURS);
+    totals.laborPay += parseEconomyNumber(row.LABOR_PAY);
+  });
+
+  return totals;
+}
+
+function manualHoursMatchesMetricPeriod(row) {
+  const mode = String(document.getElementById("metricPeriodMode").value || "period");
+  if (mode === "all") return true;
+
+  const periodLabel = String(row.PERIOD_LABEL || "").trim();
+
+  if (mode === "period") {
+    const selected = String(document.getElementById("periodFilter").value || "").trim() || CURRENT_PERIOD_LABEL;
+    return !selected || periodLabel === selected;
+  }
+
+  const year = Number(document.getElementById("metricPeriodYear").value || new Date().getFullYear());
+  const month = Number(document.getElementById("metricPeriodMonth").value || (new Date().getMonth() + 1));
+  const rowYear = Number(row.PERIOD_YEAR || 0);
+  const rowMonth = Number(row.PERIOD_MONTH || 0);
+
+  if (mode === "annual") {
+    if (rowYear && rowYear === year) return true;
+    if (periodLabel && periodLabel.indexOf(String(year)) === 0) return true;
+  }
+
+  if (mode === "monthly") {
+    const wantedLabel = year + "-" + String(month).padStart(2, "0");
+    if (periodLabel && periodLabel === wantedLabel) return true;
+    if (rowYear && rowMonth && rowYear === year && rowMonth === month) return true;
+  }
+
+  const date = new Date(row.DATE_WORKED || "");
+  if (isNaN(date.getTime())) return false;
+
+  if (mode === "annual") return date.getFullYear() === year;
+  return date.getFullYear() === year && (date.getMonth() + 1) === month;
 }
 
 function applyEconomyMetricFilter(rows) {
@@ -1499,6 +1674,186 @@ function clearMcdPaymentImport(clearText) {
   MCD_PAYMENT_PREVIEW_READY = false;
 }
 
+function toggleManualHours() {
+  const box = document.getElementById("manualHoursBox");
+  if (!box) return;
+
+  const opening = box.style.display === "none";
+  box.style.display = opening ? "block" : "none";
+  if (!opening) return;
+
+  initManualHoursDate();
+  loadManualTechOptions();
+  loadManualHoursForActiveCompany();
+}
+
+function initManualHoursDate() {
+  const input = document.getElementById("manualHoursDate");
+  if (!input || input.value) return;
+
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  input.value = yyyy + "-" + mm + "-" + dd;
+}
+
+function loadManualTechOptions() {
+  if (!ACTIVE_COMPANY_ID) return;
+
+  google.script.run
+    .withSuccessHandler(function(options) {
+      MANUAL_TECH_OPTIONS = options || [];
+      renderManualTechOptions();
+    })
+    .withFailureHandler(function(err) {
+      alertServerError(err);
+    })
+    .getTechOptionsForManualHours(ACTIVE_COMPANY_ID, getSessionToken());
+}
+
+function renderManualTechOptions() {
+  const select = document.getElementById("manualHoursTech");
+  if (!select) return;
+
+  select.innerHTML = '<option value="">Seleccione tecnico</option>' +
+    MANUAL_TECH_OPTIONS.map(function(t) {
+      return `<option value="${escapeHtmlClient(t.name || "")}" data-rate="${Number(t.rate || 0)}">${escapeHtmlClient(t.name || "")}</option>`;
+    }).join("");
+
+  syncManualHoursRate();
+}
+
+function syncManualHoursRate() {
+  const select = document.getElementById("manualHoursTech");
+  const rateInput = document.getElementById("manualHoursRate");
+  if (!select || !rateInput) return;
+
+  const option = select.options[select.selectedIndex];
+  const rate = option ? Number(option.getAttribute("data-rate") || 0) : 0;
+  rateInput.value = rate ? rate.toFixed(2) : "";
+}
+
+function clearManualHoursForm() {
+  const fields = ["manualHoursQty", "manualHoursRate", "manualHoursWO", "manualHoursReason", "manualHoursNotes"];
+  fields.forEach(function(id) {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+  initManualHoursDate();
+  syncManualHoursRate();
+}
+
+function saveManualHours() {
+  if (!ACTIVE_COMPANY_ID) {
+    alert("Primero cargue la compania.");
+    return;
+  }
+
+  const payload = {
+    companyId: ACTIVE_COMPANY_ID,
+    technician: document.getElementById("manualHoursTech").value,
+    dateWorked: document.getElementById("manualHoursDate").value,
+    hours: document.getElementById("manualHoursQty").value,
+    rate: document.getElementById("manualHoursRate").value,
+    woNumber: document.getElementById("manualHoursWO").value,
+    reason: document.getElementById("manualHoursReason").value,
+    notes: document.getElementById("manualHoursNotes").value
+  };
+
+  const btn = document.getElementById("saveManualHoursBtn");
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = "Guardando...";
+  }
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = "Guardar Horas";
+      }
+
+      clearManualHoursForm();
+      loadManualHoursForActiveCompany(function() {
+        render();
+        if (document.getElementById("techSummaryBox").style.display !== "none") {
+          loadTechSummary();
+        }
+      });
+
+      alert("Horas manuales guardadas. Pago: " + formatMoney(res && res.laborPay));
+    })
+    .withFailureHandler(function(err) {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = "Guardar Horas";
+      }
+      alertServerError(err);
+    })
+    .saveTechManualHours(payload, getSessionToken());
+}
+
+function deleteManualHours(rowNumber) {
+  if (!rowNumber) return;
+  if (!confirm("Eliminar este ajuste de horas manuales?")) return;
+
+  google.script.run
+    .withSuccessHandler(function() {
+      loadManualHoursForActiveCompany(function() {
+        render();
+        if (document.getElementById("techSummaryBox").style.display !== "none") {
+          loadTechSummary();
+        }
+      });
+    })
+    .withFailureHandler(function(err) {
+      alertServerError(err);
+    })
+    .deleteTechManualHours(rowNumber, getSessionToken());
+}
+
+function renderManualHoursList() {
+  const list = document.getElementById("manualHoursList");
+  if (!list) return;
+
+  if (!MANUAL_HOURS.length) {
+    list.innerHTML = '<div style="margin-top:12px;color:#6b7280;">No hay horas manuales registradas.</div>';
+    return;
+  }
+
+  const rows = MANUAL_HOURS.slice(0, 20).map(function(r) {
+    return `
+      <tr>
+        <td>${escapeHtmlClient(r.DATE_WORKED || "")}</td>
+        <td><b>${escapeHtmlClient(r.TECHNICIAN || "")}</b><br><small>${escapeHtmlClient(r.PERIOD_LABEL || "")}</small></td>
+        <td>${Number(r.HOURS || 0).toFixed(2)}</td>
+        <td>${formatMoney(r.RATE)}</td>
+        <td><b>${formatMoney(r.LABOR_PAY)}</b></td>
+        <td>${escapeHtmlClient(r.REASON || "")}<br><small>${escapeHtmlClient(r.WO_NUMBER || "")}</small></td>
+        <td><button onclick="deleteManualHours(${Number(r.ROW_NUMBER || 0)})" style="background:#dc2626;">Eliminar</button></td>
+      </tr>
+    `;
+  }).join("");
+
+  list.innerHTML = `
+    <table class="manual-hours-table">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Tecnico / Periodo</th>
+          <th>Horas</th>
+          <th>Rate</th>
+          <th>Pago</th>
+          <th>Motivo</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
 function previewMcdPayment() {
   if (!ACTIVE_COMPANY_ID) {
     alert("Primero cargue la compania.");
@@ -1818,6 +2173,11 @@ function loadPeriodFilter() {
 
   ECONOMY.forEach(function(o) {
     const label = getEconomyPeriodLabel(o);
+    if (isValidEconomyPeriodLabel(label)) periodSet[label] = true;
+  });
+
+  MANUAL_HOURS.forEach(function(o) {
+    const label = String(o.PERIOD_LABEL || "").trim();
     if (isValidEconomyPeriodLabel(label)) periodSet[label] = true;
   });
 

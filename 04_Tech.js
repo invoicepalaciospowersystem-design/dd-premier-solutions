@@ -130,10 +130,6 @@ function getMyTechInvoiceSummary(companyId, techName, month, year, sessionToken)
   const invData = shInv.getDataRange().getValues();
   const woData = shWO.getDataRange().getValues();
 
-  if (ecoData.length < 2 && pmData.length < 2) {
-    return { rows: [], totals: emptyTechInvoiceTotals_() };
-  }
-
   const eh = ecoData.length ? ecoData[0].map(String) : [];
   const ph = pmData.length ? pmData[0].map(String) : [];
   const ih = invData[0].map(String);
@@ -295,6 +291,8 @@ function getMyTechInvoiceSummary(companyId, techName, month, year, sessionToken)
       });
     }
   }
+
+  addManualTechHoursToInvoiceRows_(rows, companyId, techName, month, year);
 
   const totals = rows.reduce(function(acc, r) {
     acc.invoices++;

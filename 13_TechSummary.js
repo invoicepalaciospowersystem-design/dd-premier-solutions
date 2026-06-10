@@ -265,6 +265,12 @@ function getTechSummaryByPeriod_(companyId, periodMode, month, year, sessionToke
   }
 
   // =====================================================
+  // HORAS MANUALES
+  // =====================================================
+
+  addManualTechHoursToSummary_(summary, companyId, periodMode, month, year);
+
+  // =====================================================
   // HISTORICO VIEJO
   // =====================================================
 
