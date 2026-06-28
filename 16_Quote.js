@@ -7,25 +7,29 @@ function generateQuoteNumber(companyId) {
   lock.waitLock(30000);
 
   try {
-    const props = PropertiesService.getScriptProperties();
-    const year = Utilities.formatDate(new Date(), CFG.TIMEZONE, "yyyy");
-
-    const company = String(companyId || CFG.DEFAULT_COMPANY_ID || "GENERAL")
-      .trim()
-      .toUpperCase();
-
-    const key = "LAST_QUOTE_NUMBER_" + company + "_" + year;
-
-    let last = Number(props.getProperty(key) || 0);
-    last++;
-
-    props.setProperty(key, String(last));
-
-    return "Q-" + year + "-" + ("0000" + last).slice(-4);
+    return nextQuoteNumber_(companyId);
 
   } finally {
     lock.releaseLock();
   }
+}
+
+function nextQuoteNumber_(companyId) {
+  const props = PropertiesService.getScriptProperties();
+  const year = Utilities.formatDate(new Date(), CFG.TIMEZONE, "yyyy");
+
+  const company = String(companyId || CFG.DEFAULT_COMPANY_ID || "GENERAL")
+    .trim()
+    .toUpperCase();
+
+  const key = "LAST_QUOTE_NUMBER_" + company + "_" + year;
+
+  let last = Number(props.getProperty(key) || 0);
+  last++;
+
+  props.setProperty(key, String(last));
+
+  return "Q-" + year + "-" + ("0000" + last).slice(-4);
 }
 
 function getWorkOrderForQuoteByWO(woNumber) {
@@ -127,7 +131,7 @@ function getStoreInfoForQuote_(ss, nsn) {
 
 function createQuote(data, sessionToken) {
   const companyId = data && (data.companyId || CFG.DEFAULT_COMPANY_ID || "");
-  const session = requireSession_(sessionToken || (data && data.sessionToken), ["OWNER", "ADMIN", "ORDENES"], companyId);
+  const session = requireSession_(sessionToken || (data && data.sessionToken), ["OWNER", "SYSTEM", "ADMIN", "ORDENES"], companyId);
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
 
@@ -151,6 +155,10 @@ function createQuote_(data, session) {
   if (!data) throw new Error("No quote data received.");
 
   setupQuotesModule_();
+
+  if (!String(data.quote_number || "").trim()) {
+    data.quote_number = nextQuoteNumber_(data.companyId || CFG.DEFAULT_COMPANY_ID || "");
+  }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = ss.getSheetByName("QUOTES");

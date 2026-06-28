@@ -22,6 +22,22 @@ function generatePdfFromCloseOrder_(invoiceRow) {
   };
 }
 
+function regenerateInvoiceEnglishPdf_(invoiceRow) {
+  const invoicesRoot = DriveApp.getFolderById(CFG.INVOICES_FOLDER_ID);
+  const normalizedRow = normalizeInvoiceRowForPdfRepair_(invoiceRow);
+
+  const clientName = normalizedRow.CLIENTE || "SIN_CLIENTE";
+  const nsNumber = normalizedRow.NS || "SIN_NS";
+  const submittedAt = normalizedRow.Timestamp || new Date();
+
+  const monthFolderName = formatMonthFolder_(submittedAt);
+  const clientFolder = getOrCreateFolder_(invoicesRoot, safeFolderName_(clientName));
+  const monthFolder = getOrCreateFolder_(clientFolder, monthFolderName);
+  const nsFolder = getOrCreateFolder_(monthFolder, safeFolderName_(nsNumber));
+
+  return generateOnePdfFromTemplate_(normalizedRow, nsFolder, "EN", true);
+}
+
 function generateOnePdfFromTemplate_(invoiceRow, targetFolder, langTag, doTranslate) {
   const templateFile = DriveApp.getFileById(CFG.TEMPLATE_DOC_ID);
 
@@ -49,6 +65,10 @@ function generateOnePdfFromTemplate_(invoiceRow, targetFolder, langTag, doTransl
     body.replaceText("\\{\\{" + escapeRegex_(key) + "\\}\\}", String(map[key] ?? ""));
   });
 
+  if (doTranslate) {
+    replaceStaticInvoiceLabelsToEnglish_(body);
+  }
+
   doc.saveAndClose();
 
   Utilities.sleep(3000);
@@ -75,6 +95,326 @@ function generateOnePdfFromTemplate_(invoiceRow, targetFolder, langTag, doTransl
   docCopy.setTrashed(true);
 
   return pdfFile.getUrl();
+}
+
+function repairExistingInvoiceEnglishPdfs(companyId, invoiceNumbers, sessionToken, options) {
+  const session = requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"], companyId);
+  return repairExistingInvoiceEnglishPdfs_(companyId, invoiceNumbers, session, options);
+}
+
+function repairLatestPpsInvoiceEnglishPdfsFromEditor() {
+  throw new Error(
+    "Esta reparacion masiva quedo desactivada porque puede crear PDFs incompletos si la fila INVOICES no contiene todos los datos del template. " +
+    "Use restoreInvoiceEnglishPdfUrlsFromPreviousFromEditor() para regresar a los PDFs anteriores."
+  );
+}
+
+function restoreInvoiceEnglishPdfUrlsFromPreviousFromEditor() {
+  return restoreInvoiceEnglishPdfUrlsFromPrevious_("PPS", {
+    limit: 200,
+    actor: {
+      email: Session.getActiveUser().getEmail() || "SCRIPT_EDITOR",
+      name: "SCRIPT_EDITOR",
+      role: "OWNER"
+    }
+  });
+}
+
+function restoreInvoiceEnglishPdfUrlsFromPrevious(companyId, sessionToken, options) {
+  const session = requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"], companyId);
+  options = options || {};
+  options.actor = session;
+  return restoreInvoiceEnglishPdfUrlsFromPrevious_(companyId, options);
+}
+
+function restoreInvoiceEnglishPdfUrlsFromPrevious_(companyId, options) {
+  options = options || {};
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName("INVOICES");
+  if (!sh) throw new Error("No existe la hoja INVOICES.");
+
+  companyId = String(companyId || CFG.DEFAULT_COMPANY_ID || "").trim().toUpperCase();
+  const actor = options.actor || {};
+  const limit = Math.max(1, Number(options.limit || 200));
+
+  let headers = ensureSheetColumns_(sh, [
+    "PDF_EN_URL",
+    "PDF_EN_PREVIOUS_URL",
+    "PDF_EN_REPAIR_BAD_URL",
+    "PDF_EN_RESTORED_AT",
+    "PDF_EN_RESTORED_BY"
+  ]);
+
+  const lastRow = sh.getLastRow();
+  if (lastRow < 2) {
+    return {
+      ok: true,
+      companyId: companyId,
+      restored: [],
+      skipped: []
+    };
+  }
+
+  const data = sh.getRange(2, 1, lastRow - 1, headers.length).getValues();
+  const restored = [];
+  const skipped = [];
+
+  for (let i = data.length - 1; i >= 0; i--) {
+    if (restored.length >= limit) break;
+
+    const sheetRow = i + 2;
+    const row = data[i];
+
+    if (isMonthCloseMarkerRow_(row, headers) || isSoftDeletedRow_(row, headers)) continue;
+
+    const invoiceObj = rowToObject_(headers, row);
+    const rowCompany = String(invoiceObj.COMPANY_ID || CFG.DEFAULT_COMPANY_ID || "").trim().toUpperCase();
+    if (companyId && rowCompany !== companyId) continue;
+
+    const currentUrl = String(invoiceObj.PDF_EN_URL || "").trim();
+    const previousUrl = String(invoiceObj.PDF_EN_PREVIOUS_URL || "").trim();
+    const invoiceNumber = normalizeInvoiceRepairNumber_(
+      invoiceObj.INVOICE_NUMBER || invoiceObj.Invoice || invoiceObj.INVOICE
+    );
+
+    if (!previousUrl) {
+      skipped.push({ row: sheetRow, invoiceNumber: invoiceNumber, reason: "NO_PREVIOUS_URL" });
+      continue;
+    }
+
+    if (currentUrl === previousUrl) {
+      skipped.push({ row: sheetRow, invoiceNumber: invoiceNumber, reason: "ALREADY_RESTORED" });
+      continue;
+    }
+
+    headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(function(h) {
+      return String(h || "").trim();
+    });
+
+    setCellByHeader_(sh, sheetRow, headers, "PDF_EN_REPAIR_BAD_URL", currentUrl);
+    setCellByHeader_(sh, sheetRow, headers, "PDF_EN_URL", previousUrl);
+    setCellByHeader_(sh, sheetRow, headers, "PDF_EN_RESTORED_AT", new Date());
+    setCellByHeader_(sh, sheetRow, headers, "PDF_EN_RESTORED_BY", getSessionActorLabel_(actor));
+
+    restored.push({
+      row: sheetRow,
+      invoiceNumber: invoiceNumber,
+      restoredUrl: previousUrl,
+      badUrl: currentUrl
+    });
+  }
+
+  addAuditLog_("INVOICE", "ENGLISH_PDF_URLS_RESTORED", companyId, "INVOICE", "BATCH", actor, {
+    limit: limit,
+    restoredCount: restored.length,
+    skippedCount: skipped.length
+  });
+
+  return {
+    ok: true,
+    companyId: companyId,
+    restored: restored,
+    skipped: skipped
+  };
+}
+
+function repairExistingInvoiceEnglishPdfs_(companyId, invoiceNumbers, actor, options) {
+  options = options || {};
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName("INVOICES");
+  if (!sh) throw new Error("No existe la hoja INVOICES.");
+
+  companyId = String(companyId || CFG.DEFAULT_COMPANY_ID || "").trim().toUpperCase();
+  const wantedInvoices = normalizeInvoiceRepairList_(invoiceNumbers);
+  const limit = Math.max(1, Number(options.limit || 25));
+  const latestFirst = options.latestFirst !== false;
+
+  let headers = ensureSheetColumns_(sh, [
+    "PDF_EN_URL",
+    "PDF_EN_REPAIRED_AT",
+    "PDF_EN_REPAIRED_BY",
+    "PDF_EN_PREVIOUS_URL"
+  ]);
+
+  const lastRow = sh.getLastRow();
+  if (lastRow < 2) {
+    return {
+      ok: true,
+      companyId: companyId,
+      processed: 0,
+      updated: [],
+      skipped: [],
+      errors: [],
+      remainingEstimate: 0
+    };
+  }
+
+  const data = sh.getRange(2, 1, lastRow - 1, headers.length).getValues();
+  const rowIndexes = data.map(function(_, i) { return i; });
+  if (latestFirst) rowIndexes.reverse();
+
+  const updated = [];
+  const skipped = [];
+  const errors = [];
+  let remainingEstimate = 0;
+  let attempted = 0;
+
+  for (let n = 0; n < rowIndexes.length; n++) {
+    const i = rowIndexes[n];
+    const sheetRow = i + 2;
+    const row = data[i];
+
+    if (isMonthCloseMarkerRow_(row, headers) || isSoftDeletedRow_(row, headers)) continue;
+
+    const invoiceObj = rowToObject_(headers, row);
+    const rowCompany = String(invoiceObj.COMPANY_ID || CFG.DEFAULT_COMPANY_ID || "").trim().toUpperCase();
+    if (companyId && rowCompany !== companyId) continue;
+
+    const invoiceNumber = normalizeInvoiceRepairNumber_(
+      invoiceObj.INVOICE_NUMBER || invoiceObj.Invoice || invoiceObj.INVOICE
+    );
+
+    if (!invoiceNumber) {
+      skipped.push({ row: sheetRow, reason: "NO_INVOICE_NUMBER" });
+      continue;
+    }
+
+    if (wantedInvoices.length && wantedInvoices.indexOf(invoiceNumber) === -1) continue;
+
+    if (attempted >= limit) {
+      remainingEstimate++;
+      continue;
+    }
+
+    attempted++;
+
+    try {
+      const oldUrl = String(invoiceObj.PDF_EN_URL || "").trim();
+      const newUrl = regenerateInvoiceEnglishPdf_(invoiceObj);
+      validateGeneratedInvoicePdfUrl_(newUrl, invoiceNumber);
+
+      headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(function(h) {
+        return String(h || "").trim();
+      });
+
+      setCellByHeader_(sh, sheetRow, headers, "PDF_EN_URL", newUrl);
+      setCellByHeader_(sh, sheetRow, headers, "PDF_EN_REPAIRED_AT", new Date());
+      setCellByHeader_(sh, sheetRow, headers, "PDF_EN_REPAIRED_BY", getSessionActorLabel_(actor));
+      setCellByHeader_(sh, sheetRow, headers, "PDF_EN_PREVIOUS_URL", oldUrl);
+
+      updated.push({
+        row: sheetRow,
+        invoiceNumber: invoiceNumber,
+        oldUrl: oldUrl,
+        newUrl: newUrl
+      });
+    } catch (err) {
+      errors.push({
+        row: sheetRow,
+        invoiceNumber: invoiceNumber,
+        error: err && err.message ? err.message : String(err)
+      });
+    }
+  }
+
+  addAuditLog_("INVOICE", "ENGLISH_PDFS_REPAIRED", companyId, "INVOICE", "BATCH", actor, {
+    requestedInvoices: wantedInvoices,
+    limit: limit,
+    updatedCount: updated.length,
+    errorCount: errors.length,
+    remainingEstimate: remainingEstimate
+  });
+
+  return {
+    ok: errors.length === 0,
+    companyId: companyId,
+    processed: attempted,
+    updated: updated,
+    skipped: skipped,
+    errors: errors,
+    remainingEstimate: remainingEstimate
+  };
+}
+
+function normalizeInvoiceRowForPdfRepair_(invoiceRow) {
+  const r = Object.assign({}, invoiceRow || {});
+
+  r.INVOICE_NUMBER = r.INVOICE_NUMBER || r.Invoice || r.INVOICE || "";
+  r.Invoice = r.Invoice || r.INVOICE_NUMBER || "";
+  r.Timestamp = r.Timestamp || r.DATE_INVOICE || r.INVOICE_DATE || new Date();
+
+  r.CLIENTE = r.CLIENTE || r.CLIENT || r.CUSTOMER || CFG.CLIENT_DEFAULT || "";
+  r.NS = r.NS || r.NSN || r.STORE_NUMBER || "";
+
+  r.PARTS = r.PARTS || r.MATERIAL_COST || r.COMPRA || r.INVERSION || 0;
+  r.LABOR = r.LABOR || r.LABOR_AMOUNT || 0;
+  r.TAX = r.TAX || r.TAX_AMOUNT || 0;
+  r.TOTAL = r.TOTAL || r.INVOICE_TOTAL || r.GRAND_TOTAL || 0;
+  r.GRAND_TOTAL = r.GRAND_TOTAL || r.TOTAL || 0;
+  r.SUB_TOTAL = r.SUB_TOTAL || Math.max(0, parseMoney_(r.TOTAL) - parseMoney_(r.TAX));
+
+  r.EQUIPMENT_MAKE = r.EQUIPMENT_MAKE || r.MAKE || "";
+  r.EQUIPMENT_MODEL = r.EQUIPMENT_MODEL || r.MODEL || "";
+  r.EQUIPMENT_SERIAL = r.EQUIPMENT_SERIAL || r.SERIAL_NUMBER || r.SERIAL || "";
+
+  return r;
+}
+
+function normalizeInvoiceRepairList_(invoiceNumbers) {
+  if (!invoiceNumbers) return [];
+
+  if (typeof invoiceNumbers === "string") {
+    invoiceNumbers = invoiceNumbers.split(/[,\n;]+/);
+  }
+
+  if (!Array.isArray(invoiceNumbers)) return [];
+
+  return invoiceNumbers.map(normalizeInvoiceRepairNumber_).filter(Boolean);
+}
+
+function normalizeInvoiceRepairNumber_(value) {
+  return String(value || "").trim().replace(/\.0$/, "").toUpperCase();
+}
+
+function validateGeneratedInvoicePdfUrl_(pdfUrl, invoiceNumber) {
+  const fileId = extractInvoicePdfFileId_(pdfUrl);
+  if (!fileId) throw new Error("No se pudo validar el PDF generado para invoice " + invoiceNumber + ".");
+
+  const file = DriveApp.getFileById(fileId);
+  const size = Number(file.getSize() || 0);
+
+  if (size < 12000) {
+    try {
+      file.setTrashed(true);
+    } catch (trashErr) {
+      Logger.log("No se pudo enviar a trash PDF sospechoso: " + trashErr);
+    }
+
+    throw new Error(
+      "PDF generado parece estar vacio o incompleto para invoice " + invoiceNumber +
+      " (" + size + " bytes). Se conserva el PDF anterior."
+    );
+  }
+
+  return true;
+}
+
+function extractInvoicePdfFileId_(urlOrId) {
+  const s = String(urlOrId || "").trim();
+  if (/^[a-zA-Z0-9_-]{25,}$/.test(s)) return s;
+
+  let m = s.match(/\/d\/([a-zA-Z0-9_-]{25,})/);
+  if (m && m[1]) return m[1];
+
+  m = s.match(/[?&]id=([a-zA-Z0-9_-]{25,})/);
+  if (m && m[1]) return m[1];
+
+  m = s.match(/\/file\/d\/([a-zA-Z0-9_-]{25,})/);
+  if (m && m[1]) return m[1];
+
+  return "";
 }
 
 function buildPlaceholderMapFromInvoice_(r) {
@@ -228,6 +568,30 @@ function translateMapToEnglish_(map) {
   m.i4_desc = safeTranslateToEn_(m.i4_desc);
 
   return m;
+}
+
+function replaceStaticInvoiceLabelsToEnglish_(body) {
+  const replacements = [
+    { pattern: "\\bMARCA\\b", value: "MAKE" },
+    { pattern: "\\bMarca\\b", value: "Make" },
+    { pattern: "\\bMODELO\\b", value: "MODEL" },
+    { pattern: "\\bModelo\\b", value: "Model" },
+    { pattern: "\\bN.?MERO\\s+DE\\s+SERIE\\b", value: "SERIAL NUMBER" },
+    { pattern: "\\bN.?mero\\s+de\\s+Serie\\b", value: "Serial Number" },
+    { pattern: "\\bN.?mero\\s+de\\s+serie\\b", value: "Serial Number" },
+    { pattern: "\\bNUMERO\\s+DE\\s+SERIE\\b", value: "SERIAL NUMBER" },
+    { pattern: "\\bNumero\\s+de\\s+Serie\\b", value: "Serial Number" },
+    { pattern: "\\bNumero\\s+de\\s+serie\\b", value: "Serial Number" },
+    { pattern: "\\bN.?MERO\\s+SERIE\\b", value: "SERIAL NUMBER" },
+    { pattern: "\\bNumero\\s+Serie\\b", value: "Serial Number" },
+    { pattern: "\\bN\\.\\s*SERIE\\b", value: "SERIAL NUMBER" },
+    { pattern: "\\bNo\\.\\s*Serie\\b", value: "Serial Number" },
+    { pattern: "\\bNO\\.\\s*SERIE\\b", value: "SERIAL NUMBER" }
+  ];
+
+  replacements.forEach(function(item) {
+    body.replaceText(item.pattern, item.value);
+  });
 }
 
 function getOrCreateFolder_(parentFolder, folderName) {

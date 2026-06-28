@@ -79,7 +79,7 @@ function loginUserForCompany(email, password, requestedCompanyId, ownerOnly) {
   const role = String(user.role || "").trim().toUpperCase();
 
   if (ownerOnly === true || String(ownerOnly || "").trim() === "true" || String(ownerOnly || "").trim() === "1") {
-    if (role !== "OWNER") {
+    if (!isGlobalOwnerRole_(role)) {
       destroySession(user.sessionToken);
       throw new Error("Este acceso es solo para OWNER.");
     }
@@ -87,7 +87,7 @@ function loginUserForCompany(email, password, requestedCompanyId, ownerOnly) {
 
   if (
     requested &&
-    role !== "OWNER" &&
+    !isGlobalOwnerRole_(role) &&
     String(user.companyId || "").trim().toUpperCase() !== requested
   ) {
     destroySession(user.sessionToken);
@@ -95,6 +95,11 @@ function loginUserForCompany(email, password, requestedCompanyId, ownerOnly) {
   }
 
   return user;
+}
+
+function isGlobalOwnerRole_(role) {
+  role = String(role || "").trim().toUpperCase();
+  return role === "OWNER" || role === "SYSTEM";
 }
 
 function ensureUserSecurityColumns_(sh) {
@@ -351,7 +356,7 @@ function requireSession_(sessionToken, allowedRoles, companyId) {
   const requestedCompany = String(companyId || "").trim().toUpperCase();
   const sessionCompany = String(session.companyId || "").trim().toUpperCase();
 
-  if (requestedCompany && role !== "OWNER" && sessionCompany !== requestedCompany) {
+  if (requestedCompany && !isGlobalOwnerRole_(role) && sessionCompany !== requestedCompany) {
     throw new Error("No autorizado para esta compania.");
   }
 
