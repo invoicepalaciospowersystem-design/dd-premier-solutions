@@ -13,9 +13,9 @@ const PM_ECO_CFG = {
   TAX_RATE: 0.07,
 
   // Economía real D&D
-  DD_PAYMENT: 180,
-  TECH_PAY: 80,
-  DD_PROFIT: 100
+  DD_PAYMENT: 225,
+  TECH_PAY: 100,
+  DD_PROFIT: 125
 };
 
 // =====================================================
@@ -126,7 +126,7 @@ function savePMEconomy(pmData) {
       "",
 
     TECH_PAY_DETAIL:
-      "Technician: $80",
+      "Technician: $" + techPay.toFixed(2),
 
     TECH_LABOR_COST:
       techPay,
@@ -135,7 +135,9 @@ function savePMEconomy(pmData) {
       "PM Invoice Total: $" + invoiceTotal.toFixed(2) +
       " | Subtotal: $" + subtotal.toFixed(2) +
       " | Tax: $" + tax.toFixed(2) +
-      " | Paid to D&D: $180 | Tech Pay: $80 | D&D Profit: $100",
+      " | Total PM Amount: $" + amount.toFixed(2) +
+      " | Tech Pay: $" + techPay.toFixed(2) +
+      " | D&D Profit: $" + profit.toFixed(2),
 
     INV_SOURCE:
       "PM",
