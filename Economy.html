@@ -908,9 +908,12 @@ function getEconomyMetricCards(m) {
       { key:"pending", label:"Pending", value:m.pending, note:"Not invoiced or paid", tone:m.pending ? "danger" : "success" },
       { key:"invoiced", label:"Invoiced", value:m.invoiced, note:"Ready for payment", tone:"warning" },
       { key:"paid", label:"Paid", value:m.paid, note:"Closed payments", tone:"success" },
-      { key:"amount", label:"Paid to D&D", value:formatMoney(m.amount), note:"Total PM amount", tone:"info" },
+      { key:"amount", label:"PM Total", value:formatMoney(m.amount), note:"Subtotal before tax", tone:"info" },
+      { key:"ddPayment", label:"D&D Premier", value:formatMoney(m.ddPayment), note:"D&D PM charge", tone:"success" },
       { key:"techPay", label:"Tech Pay", value:formatMoney(m.techPay), note:"PM technician pay", tone:"warning" },
-      { key:"profit", label:"D&D Profit", value:formatMoney(m.profit), note:"Amount - cost", tone:m.profit >= 0 ? "success" : "danger" },
+      { key:"palaciosPayment", label:"Palacios", value:formatMoney(m.palaciosPayment), note:"PPS PM share", tone:"info" },
+      { key:"suppliesReserve", label:"PM Supplies", value:formatMoney(m.suppliesReserve), note:"Filters and algae tablets", tone:"warning" },
+      { key:"profit", label:"D&D Profit", value:formatMoney(m.profit), note:"D&D Premier profit", tone:m.profit >= 0 ? "success" : "danger" },
       { key:"hours", label:"Hours", value:m.hours.toFixed(2), note:"Registered hours", tone:"neutral" }
     ];
   }
@@ -947,11 +950,36 @@ function calculateEconomyMetrics(rows) {
     laborBilled: 0,
     billedParts: 0,
     david: 0,
-    yoel: 0
+    yoel: 0,
+    ddPayment: 0,
+    palaciosPayment: 0,
+    suppliesReserve: 0
   };
 
   rows.forEach(function(o) {
     const status = String(o.STATUS || "PENDING").toUpperCase();
+    const isPM = VIEW_MODE === "PM" || String(o.INV_SOURCE || "").toUpperCase() === "PM";
+
+    if (!status || status === "PENDING") totals.pending++;
+    if (status === "INVOICED") totals.invoiced++;
+    if (status === "PAID") totals.paid++;
+
+    if (isPM) {
+      const pmValues = getPmDerivedValues(o);
+      const hours = parseEconomyNumber(o.HORAS || o.LABOR_HOURS);
+
+      totals.amount += pmValues.amount;
+      totals.tax += pmValues.tax;
+      totals.cost += pmValues.suppliesReserve;
+      totals.profit += pmValues.profit;
+      totals.techPay += pmValues.techPay;
+      totals.hours += hours;
+      totals.ddPayment += pmValues.ddPayment;
+      totals.palaciosPayment += pmValues.palaciosPayment;
+      totals.suppliesReserve += pmValues.suppliesReserve;
+      return;
+    }
+
     const amount = parseEconomyNumber(o.AMOUNT);
     const tax = parseEconomyNumber(o.TAX);
     const rawCost = parseEconomyNumber(o.COST);
@@ -964,10 +992,6 @@ function calculateEconomyMetrics(rows) {
       Math.max(0, amount - tax - laborBilled);
     const profit = amount - tax - realCost - techPay;
     const split = getInvestmentSplitValues(o.INV_SOURCE, rawCost);
-
-    if (!status || status === "PENDING") totals.pending++;
-    if (status === "INVOICED") totals.invoiced++;
-    if (status === "PAID") totals.paid++;
 
     totals.amount += amount;
     totals.tax += tax;
@@ -1046,6 +1070,25 @@ function applyEconomyMetricFilter(rows) {
 
   return rows.filter(function(o) {
     const status = String(o.STATUS || "PENDING").toUpperCase();
+    const isPM = VIEW_MODE === "PM" || String(o.INV_SOURCE || "").toUpperCase() === "PM";
+
+    if (isPM) {
+      const pmValues = getPmDerivedValues(o);
+      const hours = parseEconomyNumber(o.HORAS || o.LABOR_HOURS);
+
+      if (key === "pending") return !status || status === "PENDING";
+      if (key === "invoiced") return status === "INVOICED";
+      if (key === "paid") return status === "PAID";
+      if (key === "amount") return pmValues.amount > 0;
+      if (key === "ddPayment") return pmValues.ddPayment > 0;
+      if (key === "techPay") return pmValues.techPay > 0;
+      if (key === "palaciosPayment") return pmValues.palaciosPayment > 0;
+      if (key === "suppliesReserve") return pmValues.suppliesReserve > 0;
+      if (key === "profit") return pmValues.profit !== 0;
+      if (key === "hours") return hours > 0;
+      return true;
+    }
+
     const amount = parseEconomyNumber(o.AMOUNT);
     const tax = parseEconomyNumber(o.TAX);
     const rawCost = parseEconomyNumber(o.COST);
@@ -1219,7 +1262,12 @@ function parsePmSummaryFromNotes(noteText) {
     "Subtotal": "invoiceSubtotal",
     "Tax": "invoiceTax",
     "Paid to D&D": "ddPayment",
+    "Total PM Amount": "pmTotalAmount",
+    "PM Total Amount": "pmTotalAmount",
+    "D&D Premier": "ddPayment",
     "Tech Pay": "techPay",
+    "Palacios Power System": "palaciosPayment",
+    "PM Supplies Reserve": "suppliesReserve",
     "D&D Profit": "ddProfit"
   };
 
@@ -1243,15 +1291,38 @@ function getPmDerivedValues(record, noteTextOverride) {
   const legacyPmDefaults = {
     subtotal: 391.67,
     tax: 27.42,
-    total: 419.09
+    total: 419.09,
+    amount: 391.67,
+    ddPayment: 125,
+    techPay: 100,
+    palaciosPayment: 125,
+    suppliesReserve: 41.67,
+    ddProfit: 125
   };
   const safeRecord = record || {};
   const notes = noteTextOverride !== undefined ? noteTextOverride : safeRecord.NOTES;
   const noteSummary = parsePmSummaryFromNotes(notes);
-  const amount = parseEconomyNumber(safeRecord.AMOUNT);
+  const storedTotal = parseEconomyNumber(safeRecord.PM_TOTAL_AMOUNT);
+  const notedTotal = Number(noteSummary.pmTotalAmount || 0);
+  const rowAmount = parseEconomyNumber(safeRecord.AMOUNT);
+  const amount = storedTotal ||
+    (notedTotal >= 300 ? notedTotal : 0) ||
+    (rowAmount >= 300 ? rowAmount : 0) ||
+    legacyPmDefaults.amount;
   const techPay = parseEconomyNumber(
     safeRecord.TECH_LABOR_COST || safeRecord.TECH_LABOR_PAY || safeRecord.COST
-  );
+  ) || noteSummary.techPay || legacyPmDefaults.techPay;
+  const suppliesReserve = parseEconomyNumber(safeRecord.SUPPLIES_RESERVE) ||
+    noteSummary.suppliesReserve ||
+    legacyPmDefaults.suppliesReserve;
+  const ddPayment = parseEconomyNumber(safeRecord.DD_PAYMENT) ||
+    noteSummary.ddPayment ||
+    noteSummary.ddProfit ||
+    parseEconomyNumber(safeRecord.PROFIT) ||
+    legacyPmDefaults.ddPayment;
+  const palaciosPayment = parseEconomyNumber(safeRecord.PALACIOS_PAYMENT) ||
+    noteSummary.palaciosPayment ||
+    Math.max(0, amount - ddPayment - techPay - suppliesReserve);
   const tax = noteSummary.invoiceTax !== undefined
     ? noteSummary.invoiceTax
     : (parseEconomyNumber(safeRecord.TAX) || legacyPmDefaults.tax);
@@ -1259,7 +1330,7 @@ function getPmDerivedValues(record, noteTextOverride) {
     ? parseEconomyNumber(safeRecord.PROFIT)
     : (noteSummary.ddProfit !== undefined
       ? noteSummary.ddProfit
-      : (amount - tax - techPay));
+      : ddPayment);
   const subtotal = noteSummary.invoiceSubtotal !== undefined
     ? noteSummary.invoiceSubtotal
     : legacyPmDefaults.subtotal;
@@ -1270,7 +1341,10 @@ function getPmDerivedValues(record, noteTextOverride) {
   return {
     noteSummary: noteSummary,
     amount: amount,
+    ddPayment: ddPayment,
     techPay: techPay,
+    palaciosPayment: palaciosPayment,
+    suppliesReserve: suppliesReserve,
     tax: tax,
     profit: profit,
     subtotal: subtotal,
@@ -1307,13 +1381,33 @@ function renderPMSummary(o) {
       <hr style="margin:10px 0; border:none; border-top:1px solid #dbeafe;">
 
       <div class="pm-row">
-        <span>Paid to D&D:</span>
+        <span>PM Total Amount:</span>
         <b>${formatMoney(pmValues.amount)}</b>
+      </div>
+
+      <div class="pm-row">
+        <span>D&D Premier:</span>
+        <b>${formatMoney(pmValues.ddPayment)}</b>
       </div>
 
       <div class="pm-row">
         <span>Tech Pay:</span>
         <b>${formatMoney(pmValues.techPay)}</b>
+      </div>
+
+      <div class="pm-row">
+        <span>Palacios Power System:</span>
+        <b>${formatMoney(pmValues.palaciosPayment)}</b>
+      </div>
+
+      <div class="pm-row">
+        <span>PM Supplies Reserve:</span>
+        <b>${formatMoney(pmValues.suppliesReserve)}</b>
+      </div>
+
+      <div class="pm-row">
+        <span>Split Check:</span>
+        <b>${formatMoney(pmValues.ddPayment + pmValues.techPay + pmValues.palaciosPayment + pmValues.suppliesReserve)}</b>
       </div>
 
       <div class="pm-row">
@@ -1381,7 +1475,7 @@ function card(o) {
   if (status === "INVOICED") cls = "invoiced";
   if (status === "PAID") cls = "paid";
 
-  const amount = parseEconomyNumber(o.AMOUNT);
+  const amount = isPM ? getPmDerivedValues(o).ddPayment : parseEconomyNumber(o.AMOUNT);
   const tax = parseEconomyNumber(o.TAX);
   const rawCost = parseEconomyNumber(o.COST);
   const realCost = calculateRealPartsCost(o.INV_SOURCE, rawCost);
@@ -1412,9 +1506,9 @@ function card(o) {
 
       <div class="money" style="grid-template-columns: 1fr 1fr 1fr;">
         <div>
-          <label>${isPM ? "Paid to D&D" : "Amount"}</label>
+          <label>${isPM ? "PM Total Amount" : "Amount"}</label>
           <input id="amount_${row}" type="number" step="0.01"
-            value="${formatMoneyValue(o.AMOUNT)}" ${lockAttr}>
+            value="${formatMoneyValue(isPM ? (pmValues.amount || o.AMOUNT) : o.AMOUNT)}" ${isPM ? "readonly" : lockAttr}>
         </div>
 
         <div>
@@ -1434,8 +1528,11 @@ function card(o) {
       ${isPM ? `
         <div class="row" style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:10px;">
           <b>Economía D&D:</b><br>
-          Palacios Power System paga a D&D: <b>${formatMoney(amount)}</b><br>
+          Total PM antes de tax: <b>${formatMoney(pmValues.amount)}</b><br>
+          D&D Premier: <b>${formatMoney(pmValues.ddPayment)}</b><br>
           D&D paga al técnico: <b>${formatMoney(pmTechPay)}</b><br>
+          Palacios Power System: <b>${formatMoney(pmValues.palaciosPayment)}</b><br>
+          Reserva filtros/pastillas: <b>${formatMoney(pmValues.suppliesReserve)}</b><br>
           Ganancia D&D: <b>${formatMoney(pmProfit)}</b>
         </div>
       ` : `
@@ -1509,10 +1606,9 @@ function save(row, btn) {
   if (!isPM) {
     updates.INV_SOURCE = document.getElementById("inv_" + row).value;
   } else {
-    const pmAmount = parseEconomyNumber(updates.AMOUNT);
     const pmCost = parseEconomyNumber(updates.COST);
     const currentDetail = String(currentRecord && currentRecord.TECH_PAY_DETAIL || "").trim();
-    const pmTax = getPmDerivedValues(
+    const pmValues = getPmDerivedValues(
       Object.assign({}, currentRecord, {
         AMOUNT: updates.AMOUNT,
         COST: updates.COST,
@@ -1521,11 +1617,15 @@ function save(row, btn) {
         PROFIT: ""
       }),
       updates.NOTES
-    ).tax;
+    );
 
     updates.INV_SOURCE = "PM";
     updates.TECH_LABOR_COST = pmCost;
-    updates.PROFIT = (pmAmount - pmTax - pmCost).toFixed(2);
+    updates.DD_PAYMENT = pmValues.ddPayment.toFixed(2);
+    updates.PALACIOS_PAYMENT = pmValues.palaciosPayment.toFixed(2);
+    updates.SUPPLIES_RESERVE = pmValues.suppliesReserve.toFixed(2);
+    updates.PM_TOTAL_AMOUNT = pmValues.amount.toFixed(2);
+    updates.PROFIT = pmValues.profit.toFixed(2);
 
     if (!currentDetail || currentDetail.indexOf("|") === -1) {
       const techName = currentDetail

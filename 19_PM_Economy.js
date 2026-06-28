@@ -13,8 +13,10 @@ const PM_ECO_CFG = {
   TAX_RATE: 0.07,
 
   // Economía real D&D
-  DD_PAYMENT: 225,
+  DD_PAYMENT: 125,
   TECH_PAY: 100,
+  PALACIOS_PAYMENT: 125,
+  SUPPLIES_RESERVE: 41.67,
   DD_PROFIT: 125
 };
 
@@ -31,9 +33,11 @@ function savePMEconomy(pmData) {
     throw new Error("No existe la hoja PM_ECONOMY");
   }
 
-  const headers = sh.getRange(1,1,1,sh.getLastColumn())
+  let headers = sh.getRange(1,1,1,sh.getLastColumn())
     .getValues()[0]
     .map(String);
+
+  headers = ensurePMEconomyHeaders_(sh, headers);
 
   const woNumber = String(
     pmData.WO_NUMBER || pmData.woNumber || ""
@@ -57,11 +61,30 @@ function savePMEconomy(pmData) {
     subtotal + tax
   );
 
-  const amount = PM_ECO_CFG.DD_PAYMENT;
+  const ddPayment = roundPMMoney_(PM_ECO_CFG.DD_PAYMENT);
 
-  const techPay = PM_ECO_CFG.TECH_PAY;
+  const techPay = roundPMMoney_(PM_ECO_CFG.TECH_PAY);
 
-  const profit = PM_ECO_CFG.DD_PROFIT;
+  const palaciosPayment = roundPMMoney_(PM_ECO_CFG.PALACIOS_PAYMENT);
+
+  const suppliesReserve = roundPMMoney_(PM_ECO_CFG.SUPPLIES_RESERVE);
+
+  const amount = roundPMMoney_(
+    ddPayment +
+    techPay +
+    palaciosPayment +
+    suppliesReserve
+  );
+
+  if (Math.abs(amount - subtotal) > 0.01) {
+    throw new Error(
+      "El desglose PM no cuadra con el subtotal. " +
+      "Subtotal: $" + subtotal.toFixed(2) +
+      " | Desglose: $" + amount.toFixed(2)
+    );
+  }
+
+  const profit = roundPMMoney_(PM_ECO_CFG.DD_PROFIT);
 
   const completedDate =
     pmData.DATE_COMPLETED ||
@@ -105,6 +128,18 @@ function savePMEconomy(pmData) {
     PROFIT:
       profit,
 
+    DD_PAYMENT:
+      ddPayment,
+
+    PALACIOS_PAYMENT:
+      palaciosPayment,
+
+    SUPPLIES_RESERVE:
+      suppliesReserve,
+
+    PM_TOTAL_AMOUNT:
+      amount,
+
     STATUS:
       pmData.STATUS || "INVOICED",
 
@@ -135,9 +170,13 @@ function savePMEconomy(pmData) {
       "PM Invoice Total: $" + invoiceTotal.toFixed(2) +
       " | Subtotal: $" + subtotal.toFixed(2) +
       " | Tax: $" + tax.toFixed(2) +
-      " | Total PM Amount: $" + amount.toFixed(2) +
+      " | PM Total Amount: $" + amount.toFixed(2) +
+      " | D&D Premier: $" + ddPayment.toFixed(2) +
       " | Tech Pay: $" + techPay.toFixed(2) +
-      " | D&D Profit: $" + profit.toFixed(2),
+      " | Palacios Power System: $" + palaciosPayment.toFixed(2) +
+      " | PM Supplies Reserve: $" + suppliesReserve.toFixed(2) +
+      " | D&D Profit: $" + profit.toFixed(2) +
+      " | Split Check: $" + amount.toFixed(2),
 
     INV_SOURCE:
       "PM",
@@ -210,7 +249,10 @@ function savePMEconomy(pmData) {
     success: true,
     woNumber: woNumber,
     amount: amount,
+    ddPayment: ddPayment,
     techPay: techPay,
+    palaciosPayment: palaciosPayment,
+    suppliesReserve: suppliesReserve,
     profit: profit
   };
 }
@@ -287,9 +329,10 @@ function updatePMEconomyRow(rowNumber, updates, sessionToken) {
     throw new Error("No existe PM_ECONOMY");
   }
 
-  const headers = sh.getRange(1,1,1,sh.getLastColumn())
+  let headers = sh.getRange(1,1,1,sh.getLastColumn())
     .getValues()[0]
     .map(String);
+  headers = ensurePMEconomyHeaders_(sh, headers);
   const companyId = getCellByHeader_(sh, rowNumber, headers, "COMPANY_ID") ||
     PM_ECO_CFG.COMPANY_ID ||
     CFG.DEFAULT_COMPANY_ID;
@@ -338,4 +381,31 @@ function updatePMEconomyRow(rowNumber, updates, sessionToken) {
 
 function roundPMMoney_(n) {
   return Math.round(Number(n || 0) * 100) / 100;
+}
+
+function ensurePMEconomyHeaders_(sh, headers) {
+  const required = [
+    "DD_PAYMENT",
+    "PALACIOS_PAYMENT",
+    "SUPPLIES_RESERVE",
+    "PM_TOTAL_AMOUNT"
+  ];
+
+  let changed = false;
+
+  required.forEach(function(header) {
+    if (headers.indexOf(header) >= 0) return;
+
+    sh.getRange(1, sh.getLastColumn() + 1)
+      .setValue(header);
+    changed = true;
+  });
+
+  if (!changed) {
+    return headers;
+  }
+
+  return sh.getRange(1,1,1,sh.getLastColumn())
+    .getValues()[0]
+    .map(String);
 }
