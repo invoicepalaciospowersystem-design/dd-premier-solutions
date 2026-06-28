@@ -336,7 +336,7 @@ function findDocumentEmailIssues_(ss) {
 
     statusIndexes.forEach(function(idx) {
       const status = String(row[idx] || "").trim().toUpperCase();
-      if (!status || status === "SENT" || status === "SKIPPED_TEST_MODE") return;
+      if (isSuccessfulDocumentEmailStatus_(status)) return;
 
       const sentHeader = String(headers[idx] || "").replace(/_STATUS$/i, "_SENT");
       const sentValue = String(getSystemHealthValue_(row, headers, [sentHeader]) || "").trim().toUpperCase();
@@ -352,6 +352,16 @@ function findDocumentEmailIssues_(ss) {
   }
 
   return issues;
+}
+
+function isSuccessfulDocumentEmailStatus_(status) {
+  status = String(status || "").trim().toUpperCase();
+
+  return !status ||
+    status === "SENT" ||
+    status === "SKIPPED_TEST_MODE" ||
+    status.indexOf("SENT_ATTACHMENTS") === 0 ||
+    status.indexOf("TEST_SENT_ATTACHMENTS") === 0;
 }
 
 function getSystemBackupStatus_() {
@@ -487,6 +497,7 @@ function pruneSystemBackups_(folder, maxFiles) {
 }
 
 function sendSystemHealthAlert_(report) {
+  if (CFG.SYSTEM_HEALTH_ALERT_EMAILS_ENABLED === false) return;
   if (CFG.SYSTEM_ALERTS_ENABLED === false || !CFG.SYSTEM_ALERT_EMAIL) return;
 
   const minutes = Number(CFG.SYSTEM_HEALTH_ALERT_THROTTLE_MINUTES || 60);
