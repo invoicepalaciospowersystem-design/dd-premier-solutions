@@ -188,6 +188,9 @@ function savePMEconomy(pmData) {
       period.year,
 
     PERIOD_LABEL:
+      period.label,
+
+    ACCOUNTING_PERIOD:
       period.label
   };
 
@@ -273,15 +276,23 @@ function getPMEconomyData(companyId, role, sessionToken) {
     throw new Error("No existe PM_ECONOMY");
   }
 
-  const data = sh.getDataRange().getValues();
+  let data = sh.getDataRange().getValues();
 
   if (data.length < 2) {
     return [];
   }
 
-  const headers = data[0].map(String);
+  let headers = data[0].map(function(h) {
+    return String(h || "").trim();
+  });
+  headers = ensurePMEconomyHeaders_(sh, headers);
+  data = sh.getDataRange().getValues();
+  headers = data[0].map(function(h) {
+    return String(h || "").trim();
+  });
 
   return data.slice(1).map(function(row, i) {
+    if (isMonthCloseMarkerRow_(row, headers)) return null;
 
     const obj = {};
 
@@ -301,10 +312,12 @@ function getPMEconomyData(companyId, role, sessionToken) {
     });
 
     obj.ROW_NUMBER = i + 2;
+    normalizePMEconomyObjectPeriodFields_(obj);
 
     return obj;
 
   }).filter(function(o) {
+    if (!o) return false;
     return String(o.COMPANY_ID || "").trim().toUpperCase() === companyId;
   }).reverse();
 }
@@ -385,16 +398,46 @@ function roundPMMoney_(n) {
 
 function ensurePMEconomyHeaders_(sh, headers) {
   const required = [
+    "COMPANY_ID",
+    "WO_NUMBER",
+    "CLIENT",
+    "NSN",
+    "DATE_COMPLETED",
+    "AMOUNT",
+    "TAX",
+    "COST",
+    "PROFIT",
     "DD_PAYMENT",
     "PALACIOS_PAYMENT",
     "SUPPLIES_RESERVE",
-    "PM_TOTAL_AMOUNT"
+    "PM_TOTAL_AMOUNT",
+    "STATUS",
+    "INVOICE_NUMBER",
+    "DATE_INVOICE",
+    "DATE_PAID",
+    "HORAS",
+    "TECHNICIANS",
+    "TECH_PAY_DETAIL",
+    "TECH_LABOR_COST",
+    "NOTES",
+    "INV_SOURCE",
+    "PERIOD_MONTH",
+    "PERIOD_YEAR",
+    "PERIOD_LABEL",
+    "ACCOUNTING_PERIOD",
+    "CLOSED_PERIOD",
+    "MONTH_CLOSED_AT",
+    "MONTH_CLOSED_BY",
+    "MONTH_CLOSED_BY_EMAIL"
   ];
 
   let changed = false;
 
   required.forEach(function(header) {
-    if (headers.indexOf(header) >= 0) return;
+    const exists = headers.some(function(existingHeader) {
+      return String(existingHeader || "").trim().toUpperCase() === String(header || "").trim().toUpperCase();
+    });
+    if (exists) return;
 
     sh.getRange(1, sh.getLastColumn() + 1)
       .setValue(header);
@@ -408,4 +451,20 @@ function ensurePMEconomyHeaders_(sh, headers) {
   return sh.getRange(1,1,1,sh.getLastColumn())
     .getValues()[0]
     .map(String);
+}
+
+function normalizePMEconomyObjectPeriodFields_(obj) {
+  obj = obj || {};
+
+  const label = getEconomyObjectPeriodLabel_(obj);
+  if (!label) return obj;
+
+  obj.PERIOD_LABEL = label;
+  if (!obj.ACCOUNTING_PERIOD) obj.ACCOUNTING_PERIOD = label;
+
+  const parts = label.split("-");
+  if (!obj.PERIOD_YEAR) obj.PERIOD_YEAR = Number(parts[0]);
+  if (!obj.PERIOD_MONTH) obj.PERIOD_MONTH = Number(parts[1]);
+
+  return obj;
 }

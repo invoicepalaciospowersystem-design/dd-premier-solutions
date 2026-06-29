@@ -302,6 +302,7 @@ function collectAdminEconomyFinancials_(ss, dashboard, companyId, periodScope) {
     });
   }
 
+  collectAdminPMEconomyFinancials_(ss, dashboard, companyId, periodScope, activeInvoiceKeys);
   collectAdminEconomyHistoryFinancials_(ss, dashboard, companyId, periodScope, activeInvoiceKeys);
 
   dashboard.totals.grossProfit =
@@ -309,6 +310,34 @@ function collectAdminEconomyFinancials_(ss, dashboard, companyId, periodScope) {
     dashboard.totals.taxTotal -
     dashboard.totals.partsCost -
     dashboard.totals.techLaborCost;
+}
+
+function collectAdminPMEconomyFinancials_(ss, dashboard, companyId, periodScope, activeInvoiceKeys) {
+  const sh = ss.getSheetByName(getPMEconomySheetName_());
+  if (!sh || sh.getLastRow() < 2) return;
+
+  let data = sh.getDataRange().getValues();
+  let headers = data[0].map(function(h) { return String(h || "").trim(); });
+  if (typeof ensurePMEconomyHeaders_ === "function") {
+    headers = ensurePMEconomyHeaders_(sh, headers);
+    data = sh.getDataRange().getValues();
+    headers = data[0].map(function(h) { return String(h || "").trim(); });
+  }
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (isSoftDeletedRow_(row, headers)) continue;
+
+    const rowCompany = String(getExecutiveValue_(row, headers, ["COMPANY_ID"]) || CFG.DEFAULT_COMPANY_ID).trim().toUpperCase();
+    if (rowCompany !== companyId) continue;
+
+    const invoiceKey = getEconomyHistoryInvoiceKey_(companyId, getExecutiveValue_(row, headers, ["INVOICE_NUMBER", "INVOICE"]));
+    if (invoiceKey) activeInvoiceKeys[invoiceKey] = true;
+    if (!adminEconomyRowMatchesScope_(row, headers, periodScope, {})) continue;
+
+    const entry = buildAdminEconomyEntryFromPMRow_(row, headers);
+    addAdminEconomyEntryToDashboard_(dashboard, entry);
+  }
 }
 
 function collectAdminEconomyHistoryFinancials_(ss, dashboard, companyId, periodScope, activeInvoiceKeys) {
@@ -333,6 +362,46 @@ function collectAdminEconomyHistoryFinancials_(ss, dashboard, companyId, periodS
     const entry = buildAdminEconomyEntryFromEconomyRow_(row, headers);
     addAdminEconomyEntryToDashboard_(dashboard, entry);
   }
+}
+
+function buildAdminEconomyEntryFromPMRow_(row, headers) {
+  const amount = parseMoneyFlexible_(getExecutiveValue_(row, headers, [
+    "PM_TOTAL_AMOUNT",
+    "AMOUNT",
+    "INVOICE_TOTAL",
+    "TOTAL"
+  ])) || getPMEconomyConfigNumber_("INVOICE_SUBTOTAL", 0);
+  const tax = parseMoneyFlexible_(getExecutiveValue_(row, headers, ["TAX", "TAX_AMOUNT"]));
+  const hours = parseMoneyFlexible_(getExecutiveValue_(row, headers, ["HORAS", "LABOR_HOURS", "HOURS"]));
+  const techLaborCost = parseMoneyFlexible_(getExecutiveValue_(row, headers, [
+    "TECH_LABOR_COST",
+    "TECH_LABOR_PAY",
+    "COST"
+  ])) || getPMEconomyConfigNumber_("TECH_PAY", 0);
+  const palaciosPayment = parseMoneyFlexible_(getExecutiveValue_(row, headers, ["PALACIOS_PAYMENT"])) ||
+    getPMEconomyConfigNumber_("PALACIOS_PAYMENT", 0);
+  const suppliesReserve = parseMoneyFlexible_(getExecutiveValue_(row, headers, ["SUPPLIES_RESERVE"])) ||
+    getPMEconomyConfigNumber_("SUPPLIES_RESERVE", 0);
+  const status = String(getExecutiveValue_(row, headers, ["STATUS"]) || "").trim().toUpperCase();
+
+  return {
+    source: "PM_ECONOMY",
+    woNumber: String(getExecutiveValue_(row, headers, ["WO_NUMBER"]) || "").trim(),
+    invoiceNumber: String(getExecutiveValue_(row, headers, ["INVOICE_NUMBER", "INVOICE #", "INVOICE"]) || "").trim(),
+    status: status || "INVOICED",
+    amount: amount,
+    tax: tax,
+    laborHours: hours,
+    laborBilled: techLaborCost,
+    partsBilled: palaciosPayment + suppliesReserve,
+    rawPartsCost: suppliesReserve,
+    partsCost: suppliesReserve,
+    techLaborCost: techLaborCost,
+    invSource: "PM",
+    davidPartsCost: 0,
+    yoelPartsCost: 0,
+    unassignedPartsCost: 0
+  };
 }
 
 function buildAdminEconomyEntryFromEconomyRow_(row, headers) {
@@ -614,6 +683,23 @@ function getAdminInvestorSplit_(source, cost) {
   return { david: 0, yoel: 0, unassigned: cost };
 }
 
+function getPMEconomySheetName_() {
+  if (typeof PM_ECO_CFG !== "undefined" && PM_ECO_CFG && PM_ECO_CFG.SHEET_NAME) {
+    return PM_ECO_CFG.SHEET_NAME;
+  }
+
+  return "PM_ECONOMY";
+}
+
+function getPMEconomyConfigNumber_(key, fallback) {
+  if (typeof PM_ECO_CFG !== "undefined" && PM_ECO_CFG && PM_ECO_CFG[key] !== undefined) {
+    const value = Number(PM_ECO_CFG[key]);
+    return isNaN(value) ? Number(fallback || 0) : value;
+  }
+
+  return Number(fallback || 0);
+}
+
 function collectExecutiveWorkOrders_(ss, dashboard, perCompany, companyMap, requestedCompany, periodScope) {
   const sh = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
   const woCompanyMap = {};
@@ -790,7 +876,35 @@ function collectExecutiveEconomy_(ss, dashboard, perCompany, companyMap, request
     }
   }
 
+  collectExecutivePMEconomy_(ss, dashboard, perCompany, companyMap, requestedCompany, activeInvoiceKeys, periodScope);
   collectExecutiveEconomyHistory_(ss, dashboard, perCompany, companyMap, requestedCompany, activeInvoiceKeys, periodScope);
+}
+
+function collectExecutivePMEconomy_(ss, dashboard, perCompany, companyMap, requestedCompany, activeInvoiceKeys, periodScope) {
+  const sh = ss.getSheetByName(getPMEconomySheetName_());
+  if (!sh || sh.getLastRow() < 2) return;
+
+  let data = sh.getDataRange().getValues();
+  let headers = data[0].map(function(h) { return String(h || "").trim(); });
+  if (typeof ensurePMEconomyHeaders_ === "function") {
+    headers = ensurePMEconomyHeaders_(sh, headers);
+    data = sh.getDataRange().getValues();
+    headers = data[0].map(function(h) { return String(h || "").trim(); });
+  }
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (isSoftDeletedRow_(row, headers)) continue;
+
+    const companyId = String(getExecutiveValue_(row, headers, ["COMPANY_ID"]) || CFG.DEFAULT_COMPANY_ID).trim().toUpperCase();
+    if (requestedCompany && companyId !== requestedCompany) continue;
+
+    const invoiceKey = getEconomyHistoryInvoiceKey_(companyId, getExecutiveValue_(row, headers, ["INVOICE_NUMBER", "INVOICE"]));
+    if (invoiceKey) activeInvoiceKeys[invoiceKey] = true;
+    if (periodScope && !adminEconomyRowMatchesScope_(row, headers, periodScope, {})) continue;
+
+    addExecutiveEconomyRowToDashboard_(dashboard, perCompany, companyMap, companyId, row, headers);
+  }
 }
 
 function collectExecutiveEconomyHistory_(ss, dashboard, perCompany, companyMap, requestedCompany, activeInvoiceKeys, periodScope) {
@@ -819,7 +933,7 @@ function collectExecutiveEconomyHistory_(ss, dashboard, perCompany, companyMap, 
 function addExecutiveEconomyRowToDashboard_(dashboard, perCompany, companyMap, companyId, row, headers) {
   const company = ensureExecutiveCompanySummary_(perCompany, companyId, companyMap[companyId] || companyId);
   const status = String(getExecutiveValue_(row, headers, ["STATUS"]) || "").trim().toUpperCase();
-  const amount = Number(getExecutiveValue_(row, headers, ["AMOUNT", "INVOICE_TOTAL", "TOTAL"]) || 0);
+  const amount = Number(getExecutiveValue_(row, headers, ["PM_TOTAL_AMOUNT", "AMOUNT", "INVOICE_TOTAL", "TOTAL"]) || 0);
 
   if (status === "INVOICED" || status === "PAID") {
     dashboard.totals.economyInvoiced++;

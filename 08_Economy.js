@@ -1498,6 +1498,19 @@ function closeEconomyMonth(sessionToken) {
     const closedRows = closeEconomyRowsForPeriod_(shEco, previousLabel, closedAt, session);
     const economyMarkerRow = appendMonthCloseMarkerRow_(shEco, previousLabel, closedAt, session);
 
+    const pmEconomySheetName = typeof PM_ECO_CFG !== "undefined" && PM_ECO_CFG.SHEET_NAME
+      ? PM_ECO_CFG.SHEET_NAME
+      : "PM_ECONOMY";
+    const shPMEco = ss.getSheetByName(pmEconomySheetName);
+    let pmClosedRows = 0;
+    let pmMarkerRow = 0;
+
+    if (shPMEco) {
+      ensurePMEconomyHeaders_(shPMEco, shPMEco.getRange(1, 1, 1, Math.max(shPMEco.getLastColumn(), 1)).getValues()[0].map(String));
+      pmClosedRows = closeEconomyRowsForPeriod_(shPMEco, previousLabel, closedAt, session);
+      pmMarkerRow = appendMonthCloseMarkerRow_(shPMEco, previousLabel, closedAt, session);
+    }
+
     const shInv = ss.getSheetByName("INVOICES");
     const invoiceMarkerRow = shInv
       ? appendMonthCloseMarkerRow_(shInv, previousLabel, closedAt, session)
@@ -1526,6 +1539,8 @@ function closeEconomyMonth(sessionToken) {
       label: newLabel,
       closedRows: closedRows,
       economyMarkerRow: economyMarkerRow,
+      pmClosedRows: pmClosedRows,
+      pmMarkerRow: pmMarkerRow,
       invoiceMarkerRow: invoiceMarkerRow
     });
 
@@ -1536,6 +1551,8 @@ function closeEconomyMonth(sessionToken) {
       label: newLabel,
       closedRows: closedRows,
       economyMarkerRow: economyMarkerRow,
+      pmClosedRows: pmClosedRows,
+      pmMarkerRow: pmMarkerRow,
       invoiceMarkerRow: invoiceMarkerRow
     };
   } catch (err) {
