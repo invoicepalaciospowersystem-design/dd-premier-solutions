@@ -160,6 +160,7 @@
 
   <select id="statusFilter" onchange="render()">
     <option value="">All Status</option>
+    <option value="__NOT_COMPLETED__">No completado</option>
     <option>ORDER RECEIVED</option>
     <option>SENT TO TECH</option>
     <option>IN PROGRESS</option>
@@ -635,7 +636,7 @@ function render() {
 
     return (
       (!search || text.includes(search)) &&
-      (!statusFilter || o.STATUS === statusFilter) &&
+      statusMatchesFilter(o.STATUS, statusFilter) &&
       (!nsnFilter || String(o.NSN || "").toLowerCase().includes(nsnFilter)) &&
       (!techFilter || String(o.TECHNICIAN || "").includes(techFilter)) &&
       (!priorityFilter || String(o.ORDER_PRIORITY || "").toUpperCase() === priorityFilter.toUpperCase())
@@ -646,6 +647,21 @@ function render() {
 
   document.getElementById("cards").innerHTML =
     filtered.length ? filtered.map(function(o) { return card(o); }).join("") : "No work orders found.";
+}
+
+function statusMatchesFilter(status, filterValue) {
+  const normalizedStatus = String(status || "").trim().toUpperCase();
+  const normalizedFilter = String(filterValue || "").trim().toUpperCase();
+
+  if (!normalizedFilter) return true;
+
+  if (normalizedFilter === "__NOT_COMPLETED__") {
+    return normalizedStatus !== "COMPLETED" &&
+      normalizedStatus !== "CLOSED" &&
+      normalizedStatus !== "DELETED";
+  }
+
+  return normalizedStatus === normalizedFilter;
 }
 
 function getCreatedAgeText(o) {
