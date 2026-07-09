@@ -7,7 +7,7 @@ Use `app-palacios-worker.js` as the Worker for:
 `www.ddpremiersolutionscorp.com/*`
 `app.ddpremiersolutionscorp.com/*`
 
-This Worker keeps the browser on the public domain and loads the Google Apps Script Web App inside an iframe. It also serves the PWA files from the same domain:
+This Worker keeps the browser on the public domain and proxies the Google Apps Script Web App through Cloudflare. It removes the Google frame headers that can produce `script.google.com refused to connect`, and it proxies the `/static` and `/macros` paths that Apps Script needs internally. It also serves the PWA files from the same domain:
 
 - `/manifest.webmanifest`
 - `/service-worker.js`

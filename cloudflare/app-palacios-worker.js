@@ -1,4 +1,5 @@
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwAiZ0Dh5BQoX-QTmMbZcRDEr974-X_nNWcW5x2XeYurC_CeXLNSrl1k-f3p1DDKppOCw/exec";
+const GOOGLE_SCRIPT_ORIGIN = "https://script.google.com";
 
 const BRANDS = {
   PPS: {
@@ -35,17 +36,11 @@ export default {
       }
     }
 
-    const params = new URLSearchParams(url.search);
-    if (brand.companyId) {
-      params.set("companyId", brand.companyId);
-      params.delete("ownerOnly");
-    } else {
-      params.delete("companyId");
-      params.set("ownerOnly", "1");
+    if (url.pathname.startsWith("/static/") || url.pathname.startsWith("/macros/")) {
+      return proxyGoogleRequest(request, GOOGLE_SCRIPT_ORIGIN + url.pathname + url.search);
     }
 
-    const iframeUrl = APPS_SCRIPT_URL + (params.toString() ? "?" + params.toString() : "");
-    return htmlResponse(shellHtml(brand, iframeUrl), "no-store");
+    return proxyAppsScriptRequest(request, brand, url);
   }
 };
 
@@ -95,12 +90,68 @@ function shortcut(name, url) {
   };
 }
 
-function shellHtml(brand, iframeUrl) {
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+async function proxyAppsScriptRequest(request, brand, requestUrl) {
+  const upstreamUrl = buildAppsScriptUrl(brand, requestUrl.search);
+  const upstreamResponse = await fetch(new Request(upstreamUrl, request));
+  const contentType = upstreamResponse.headers.get("content-type") || "";
+
+  if (contentType.toLowerCase().includes("text/html")) {
+    const html = injectAppShellSupport(await upstreamResponse.text(), brand);
+    return new Response(html, {
+      status: upstreamResponse.status,
+      statusText: upstreamResponse.statusText,
+      headers: proxyHeaders(upstreamResponse.headers, "text/html; charset=UTF-8", "no-store")
+    });
+  }
+
+  return new Response(upstreamResponse.body, {
+    status: upstreamResponse.status,
+    statusText: upstreamResponse.statusText,
+    headers: proxyHeaders(upstreamResponse.headers, contentType, "no-store")
+  });
+}
+
+async function proxyGoogleRequest(request, upstreamUrl) {
+  const upstreamResponse = await fetch(new Request(upstreamUrl, request));
+  const contentType = upstreamResponse.headers.get("content-type") || "application/octet-stream";
+
+  return new Response(upstreamResponse.body, {
+    status: upstreamResponse.status,
+    statusText: upstreamResponse.statusText,
+    headers: proxyHeaders(upstreamResponse.headers, contentType, "no-store")
+  });
+}
+
+function buildAppsScriptUrl(brand, search) {
+  const params = new URLSearchParams(search || "");
+
+  if (brand.companyId) {
+    params.set("companyId", brand.companyId);
+    params.delete("ownerOnly");
+  } else {
+    params.delete("companyId");
+    params.set("ownerOnly", "1");
+  }
+
+  const query = params.toString();
+  return APPS_SCRIPT_URL + (query ? "?" + query : "");
+}
+
+function proxyHeaders(sourceHeaders, contentType, cacheControl) {
+  const headers = new Headers(sourceHeaders);
+  headers.set("content-type", contentType || "application/octet-stream");
+  headers.set("cache-control", cacheControl || "no-store");
+  headers.delete("content-security-policy");
+  headers.delete("content-security-policy-report-only");
+  headers.delete("x-frame-options");
+  headers.delete("content-encoding");
+  headers.delete("content-length");
+  headers.delete("set-cookie");
+  return headers;
+}
+
+function injectAppShellSupport(html, brand) {
+  const headInject = `
   <meta name="theme-color" content="${esc(brand.theme)}">
   <meta name="application-name" content="${esc(brand.name)}">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -108,60 +159,43 @@ function shellHtml(brand, iframeUrl) {
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/pwa-icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="/apple-touch-icon.svg">
-  <title>${esc(brand.name)}</title>
-  <style>
-    html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#07090d}
-    iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:#07090d}
-  </style>
+  <link rel="apple-touch-icon" href="/apple-touch-icon.svg">`;
+
+  const bodyInject = `
   <script>
     (function(){
-      try {
-        var hasModuleView = /[?&]view=/.test(window.location.search || "");
-        var hasActiveWrapperSession = sessionStorage.getItem("pps_wrapper_active_session") === "1";
-        if (hasModuleView && !hasActiveWrapperSession) {
-          window.location.replace(window.location.origin + window.location.pathname);
-        }
-      } catch (err) {}
+      try { sessionStorage.setItem("pps_wrapper_active_session", "1"); } catch (err) {}
+      if ("serviceWorker" in navigator && window.isSecureContext) {
+        window.addEventListener("load", function(){
+          navigator.serviceWorker.register("/service-worker.js").catch(function(){});
+        });
+      }
+      window.addEventListener("message", function(event) {
+        var data = event.data || {};
+        if (!data || data.type !== "PPS_NAVIGATE") return;
+        try {
+          var target = new URL(String(data.url || ""), window.location.href);
+          if (target.protocol !== "https:") return;
+          var ok = {
+            "app.palaciospowersystems.com": true,
+            "app.ddpremiersolutionscorp.com": true,
+            "ddpremiersolutionscorp.com": true,
+            "www.ddpremiersolutionscorp.com": true,
+            "script.google.com": true
+          };
+          if (!ok[target.hostname]) return;
+          var next = new URL(window.location.href);
+          next.search = target.search;
+          next.hash = target.hash;
+          window.location.href = next.href;
+        } catch (err) {}
+      });
     })();
-  </script>
-</head>
-<body>
-  <iframe title="${esc(brand.name)}" src="${esc(iframeUrl)}" allow="clipboard-read; clipboard-write"></iframe>
-  <script>
-    try { sessionStorage.setItem("pps_wrapper_active_session", "1"); } catch (err) {}
-    if ("serviceWorker" in navigator && window.isSecureContext) {
-      window.addEventListener("load", function(){ navigator.serviceWorker.register("/service-worker.js").catch(function(){}); });
-    }
-    window.addEventListener("message", function(event) {
-      var data = event.data || {};
-      if (!data || data.type !== "PPS_NAVIGATE") return;
-      try {
-        var target = new URL(String(data.url || ""), window.location.href);
-        if (target.protocol !== "https:") return;
-        if (target.hostname === "script.google.com") {
-          var sameHost = new URL(window.location.href);
-          sameHost.search = target.search;
-          sameHost.hash = target.hash;
-          try { sessionStorage.setItem("pps_wrapper_active_session", "1"); } catch (err) {}
-          window.location.href = sameHost.href;
-          return;
-        }
-        var ok = {
-          "app.palaciospowersystems.com": true,
-          "app.ddpremiersolutionscorp.com": true,
-          "ddpremiersolutionscorp.com": true,
-          "www.ddpremiersolutionscorp.com": true
-        };
-        if (ok[target.hostname]) {
-          try { sessionStorage.setItem("pps_wrapper_active_session", "1"); } catch (err) {}
-          window.location.href = target.href;
-        }
-      } catch (err) {}
-    });
-  </script>
-</body>
-</html>`;
+  </script>`;
+
+  return String(html || "")
+    .replace(/(<head[^>]*>)/i, "$1" + headInject)
+    .replace(/<\/body>/i, bodyInject + "</body>");
 }
 
 function serviceWorkerJs() {
