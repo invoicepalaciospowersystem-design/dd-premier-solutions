@@ -343,7 +343,9 @@ function handleWorkOrderAction_(e) {
   return HtmlService.createHtmlOutput(
     "<h2>Acciones por email desactivadas</h2>" +
     "<p>Por seguridad, los estados de las ordenes se actualizan solamente desde la Web App.</p>"
-  );
+  )
+    .setTitle("Work Order Action")
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 function buildWorkOrderActionLink_(publicBaseUrl, companyId, woNumber, action) {

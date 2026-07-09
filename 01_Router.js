@@ -203,7 +203,9 @@ function doGet(e) {
     });
     return HtmlService.createHtmlOutput(
       "<h2>Error</h2><p>" + err.message + "</p>"
-    );
+    )
+      .setTitle(CFG.APP_NAME)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   }
 }
 
