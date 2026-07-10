@@ -12,14 +12,13 @@ Ruta completa en esta PC:
 
 ## Que hace este Worker
 
-- Mantiene la app en `app.palaciospowersystems.com`.
-- Mantiene el portal owner en los dominios de D&D Premier.
+- Usa `app.palaciospowersystems.com` como entrada estable hacia la app.
+- Usa los dominios de D&D Premier como entrada estable hacia el portal owner.
 - Sirve la PWA desde el mismo dominio.
 - Evita el error `script.google.com refused to connect`.
-- Ya no usa un iframe directo hacia Google Apps Script.
-- Hace proxy de Google Apps Script por Cloudflare.
-- Hace proxy de rutas internas que Apps Script necesita, como `/static/` y `/macros/`.
-- Hace proxy del panel interno de Apps Script, `/userCodeAppPanel`, para evitar pantalla blanca en PWA o navegador.
+- Redirige al Apps Script real para que Google cargue su sandbox correctamente.
+- No usa iframe directo hacia Google Apps Script.
+- No intenta hacer reverse proxy del HTML de Apps Script, porque Google bloquea ese modo con `Invalid URI in postMessage handler`.
 - Cambia el cache de la PWA a una version nueva para que Edge/Chrome no usen el Worker viejo.
 
 ## Dominios que debe manejar
@@ -46,7 +45,7 @@ El mismo Worker debe estar conectado a estos dominios/rutas:
 8. Pegalo completo en Cloudflare.
 9. Dale a `Deploy`.
 
-Importante: no pegues solo una parte. Si Cloudflare se queda con el codigo viejo, la app seguira usando iframe y volvera el error `script.google.com refused to connect`.
+Importante: no pegues solo una parte. Si Cloudflare se queda con el codigo viejo, la app puede quedarse en blanco o volver al error `script.google.com refused to connect`.
 
 ## Rutas en Cloudflare
 
@@ -89,7 +88,6 @@ Abre:
 - `https://app.palaciospowersystems.com/`
 - `https://app.palaciospowersystems.com/manifest.webmanifest`
 - `https://app.palaciospowersystems.com/service-worker.js`
-- `https://app.palaciospowersystems.com/userCodeAppPanel`
 
 Tambien prueba:
 
@@ -104,9 +102,9 @@ Todavia esta usando el Worker viejo si pasa cualquiera de estas cosas:
 - La pagina abre en blanco.
 - El login no carga y se queda en loading.
 - En el codigo fuente aparece un `<iframe>` apuntando a `script.google.com`.
-- En el codigo fuente aparece `script.googleusercontent.com` como `sandboxHost`.
+- En la consola del navegador aparece `posting uri is not valid`.
 
-El Worker nuevo no debe depender de un iframe directo a `script.google.com`.
+El Worker nuevo debe redirigir al Apps Script real. Apps Script necesita cargar su sandbox interno desde los dominios de Google.
 
 ## PWA
 

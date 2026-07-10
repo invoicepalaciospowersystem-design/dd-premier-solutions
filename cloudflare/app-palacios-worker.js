@@ -37,15 +37,7 @@ export default {
       }
     }
 
-    if (url.pathname === "/userCodeAppPanel" || url.pathname === "/blank") {
-      return proxyGoogleRequest(request, GOOGLE_USERCONTENT_ORIGIN + url.pathname + url.search);
-    }
-
-    if (url.pathname.startsWith("/static/") || url.pathname.startsWith("/macros/")) {
-      return proxyGoogleRequest(request, GOOGLE_SCRIPT_ORIGIN + url.pathname + url.search);
-    }
-
-    return proxyAppsScriptRequest(request, brand, url);
+    return redirectToAppsScript(brand, url);
   }
 };
 
@@ -101,7 +93,7 @@ async function proxyAppsScriptRequest(request, brand, requestUrl) {
   const contentType = upstreamResponse.headers.get("content-type") || "";
 
   if (contentType.toLowerCase().includes("text/html")) {
-    const html = injectAppShellSupport(await upstreamResponse.text(), brand, requestUrl);
+    const html = injectAppShellSupport(await upstreamResponse.text(), brand);
     return new Response(html, {
       status: upstreamResponse.status,
       statusText: upstreamResponse.statusText,
@@ -114,6 +106,10 @@ async function proxyAppsScriptRequest(request, brand, requestUrl) {
     statusText: upstreamResponse.statusText,
     headers: proxyHeaders(upstreamResponse.headers, contentType, "no-store")
   });
+}
+
+function redirectToAppsScript(brand, requestUrl) {
+  return Response.redirect(buildAppsScriptUrl(brand, requestUrl.search), 302);
 }
 
 async function proxyGoogleRequest(request, upstreamUrl) {
@@ -155,7 +151,7 @@ function proxyHeaders(sourceHeaders, contentType, cacheControl) {
   return headers;
 }
 
-function injectAppShellSupport(html, brand, requestUrl) {
+function injectAppShellSupport(html, brand) {
   const headInject = `
   <meta name="theme-color" content="${esc(brand.theme)}">
   <meta name="application-name" content="${esc(brand.name)}">
@@ -198,21 +194,13 @@ function injectAppShellSupport(html, brand, requestUrl) {
     })();
   </script>`;
 
-  return rewriteAppsScriptSandboxHost(String(html || ""), requestUrl.origin)
+  return String(html || "")
     .replace(/(<head[^>]*>)/i, "$1" + headInject)
     .replace(/<\/body>/i, bodyInject + "</body>");
 }
 
-function rewriteAppsScriptSandboxHost(html, wrapperOrigin) {
-  const escapedGoogleusercontent = GOOGLE_USERCONTENT_ORIGIN.replace(/\//g, "\\/");
-  const escapedWrapper = String(wrapperOrigin || "").replace(/\//g, "\\/");
-  return String(html || "")
-    .split(GOOGLE_USERCONTENT_ORIGIN).join(wrapperOrigin)
-    .split(escapedGoogleusercontent).join(escapedWrapper);
-}
-
 function serviceWorkerJs() {
-  return `const CACHE_NAME="dd-premier-pwa-v3";
+  return `const CACHE_NAME="dd-premier-pwa-v5";
 const OFFLINE_URL="/offline";
 self.addEventListener("install",event=>event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll([OFFLINE_URL,"/pwa-icon.svg"])).then(()=>self.skipWaiting())));
 self.addEventListener("activate",event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.map(key=>key===CACHE_NAME?null:caches.delete(key)))).then(()=>self.clients.claim())));
