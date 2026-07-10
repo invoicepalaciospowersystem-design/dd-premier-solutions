@@ -19,6 +19,8 @@ Ruta completa en esta PC:
 - Ya no usa un iframe directo hacia Google Apps Script.
 - Hace proxy de Google Apps Script por Cloudflare.
 - Hace proxy de rutas internas que Apps Script necesita, como `/static/` y `/macros/`.
+- Hace proxy del panel interno de Apps Script, `/userCodeAppPanel`, para evitar pantalla blanca en PWA o navegador.
+- Cambia el cache de la PWA a una version nueva para que Edge/Chrome no usen el Worker viejo.
 
 ## Dominios que debe manejar
 
@@ -87,6 +89,7 @@ Abre:
 - `https://app.palaciospowersystems.com/`
 - `https://app.palaciospowersystems.com/manifest.webmanifest`
 - `https://app.palaciospowersystems.com/service-worker.js`
+- `https://app.palaciospowersystems.com/userCodeAppPanel`
 
 Tambien prueba:
 
@@ -101,6 +104,7 @@ Todavia esta usando el Worker viejo si pasa cualquiera de estas cosas:
 - La pagina abre en blanco.
 - El login no carga y se queda en loading.
 - En el codigo fuente aparece un `<iframe>` apuntando a `script.google.com`.
+- En el codigo fuente aparece `script.googleusercontent.com` como `sandboxHost`.
 
 El Worker nuevo no debe depender de un iframe directo a `script.google.com`.
 

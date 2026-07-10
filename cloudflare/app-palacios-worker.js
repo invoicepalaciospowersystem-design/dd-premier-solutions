@@ -1,5 +1,6 @@
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwAiZ0Dh5BQoX-QTmMbZcRDEr974-X_nNWcW5x2XeYurC_CeXLNSrl1k-f3p1DDKppOCw/exec";
 const GOOGLE_SCRIPT_ORIGIN = "https://script.google.com";
+const GOOGLE_USERCONTENT_ORIGIN = "https://n-pdqbm3jiktl42ouuuxskcgzyi3matvmx4a26gha-0lu-script.googleusercontent.com";
 
 const BRANDS = {
   PPS: {
@@ -34,6 +35,10 @@ export default {
       if (url.pathname === "/pwa-icon.svg" || url.pathname === "/favicon.ico" || url.pathname === "/apple-touch-icon.svg") {
         return svgResponse(iconSvg(brand));
       }
+    }
+
+    if (url.pathname === "/userCodeAppPanel" || url.pathname === "/blank") {
+      return proxyGoogleRequest(request, GOOGLE_USERCONTENT_ORIGIN + url.pathname + url.search);
     }
 
     if (url.pathname.startsWith("/static/") || url.pathname.startsWith("/macros/")) {
@@ -96,7 +101,7 @@ async function proxyAppsScriptRequest(request, brand, requestUrl) {
   const contentType = upstreamResponse.headers.get("content-type") || "";
 
   if (contentType.toLowerCase().includes("text/html")) {
-    const html = injectAppShellSupport(await upstreamResponse.text(), brand);
+    const html = injectAppShellSupport(await upstreamResponse.text(), brand, requestUrl);
     return new Response(html, {
       status: upstreamResponse.status,
       statusText: upstreamResponse.statusText,
@@ -150,7 +155,7 @@ function proxyHeaders(sourceHeaders, contentType, cacheControl) {
   return headers;
 }
 
-function injectAppShellSupport(html, brand) {
+function injectAppShellSupport(html, brand, requestUrl) {
   const headInject = `
   <meta name="theme-color" content="${esc(brand.theme)}">
   <meta name="application-name" content="${esc(brand.name)}">
@@ -193,13 +198,21 @@ function injectAppShellSupport(html, brand) {
     })();
   </script>`;
 
-  return String(html || "")
+  return rewriteAppsScriptSandboxHost(String(html || ""), requestUrl.origin)
     .replace(/(<head[^>]*>)/i, "$1" + headInject)
     .replace(/<\/body>/i, bodyInject + "</body>");
 }
 
+function rewriteAppsScriptSandboxHost(html, wrapperOrigin) {
+  const escapedGoogleusercontent = GOOGLE_USERCONTENT_ORIGIN.replace(/\//g, "\\/");
+  const escapedWrapper = String(wrapperOrigin || "").replace(/\//g, "\\/");
+  return String(html || "")
+    .split(GOOGLE_USERCONTENT_ORIGIN).join(wrapperOrigin)
+    .split(escapedGoogleusercontent).join(escapedWrapper);
+}
+
 function serviceWorkerJs() {
-  return `const CACHE_NAME="dd-premier-pwa-v2";
+  return `const CACHE_NAME="dd-premier-pwa-v3";
 const OFFLINE_URL="/offline";
 self.addEventListener("install",event=>event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll([OFFLINE_URL,"/pwa-icon.svg"])).then(()=>self.skipWaiting())));
 self.addEventListener("activate",event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.map(key=>key===CACHE_NAME?null:caches.delete(key)))).then(()=>self.clients.claim())));
