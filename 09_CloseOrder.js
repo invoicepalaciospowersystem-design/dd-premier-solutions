@@ -105,9 +105,12 @@ function saveCloseOrder_(data) {
   const headersWO = shWO.getRange(1, 1, 1, shWO.getLastColumn()).getValues()[0].map(String);
   const rowWO = shWO.getRange(rowNumber, 1, 1, shWO.getLastColumn()).getValues()[0];
   const session = requireWorkOrderSession_(data.sessionToken, rowWO, headersWO, ["TECH", "OWNER", "ADMIN", "ORDENES", "ECONOMIA"], "cerrar");
+  const invoiceDate = getCloseOrderInvoiceDate_(data);
 
   if (woType === "PM_FORM") {
     const result = createPMInvoiceFromCloseOrder_(data);
+
+    touchAppCacheVersion_();
 
     return {
       success: true,
@@ -118,6 +121,47 @@ function saveCloseOrder_(data) {
       message: "PM invoice created and returned from saveCloseOrder"
     };
   }
+
+  const finalizeInvoice = String(data.FINALIZE_INVOICE || "").trim().toUpperCase() === "YES";
+  const closeRole = String(session.role || "").trim().toUpperCase();
+
+  if (!finalizeInvoice) {
+    return saveRepairInvoiceDraft_(data, session, rowWO, headersWO);
+  }
+
+  if (["OWNER", "ADMIN", "ORDENES"].indexOf(closeRole) === -1) {
+    throw new Error("Solo ADMIN, OWNER u ORDENES pueden crear el invoice final.");
+  }
+
+  const techProblemFound = String(
+    getRowValue_(rowWO, headersWO, "TECH_PROBLEM_FOUND") ||
+    data.TECH_PROBLEM_FOUND ||
+    ""
+  ).trim();
+  const techProposedSolution = String(
+    getRowValue_(rowWO, headersWO, "TECH_PROPOSED_SOLUTION") ||
+    data.TECH_PROPOSED_SOLUTION ||
+    ""
+  ).trim();
+  const workCompletionResult = String(
+    getRowValue_(rowWO, headersWO, "WORK_COMPLETION_RESULT") ||
+    data.WORK_COMPLETION_RESULT ||
+    ""
+  ).trim();
+  const approvedWorkPerformed = String(data.APPROVED_WORK_PERFORMED || "").trim();
+  const fullWorkPerformed = approvedWorkPerformed || buildRepairCompletionReport_(
+    techProblemFound,
+    techProposedSolution,
+    workCompletionResult,
+    data.WORK_PERFORMED
+  );
+  const reportedProblem = String(
+    getRowValue_(rowWO, headersWO, "REPORTED_PROBLEM_ES") ||
+    getRowValue_(rowWO, headersWO, "REPORTED_PROBLEM_EN") ||
+    getRowValue_(rowWO, headersWO, "REPORTED_PROBLEM_ORIGINAL") ||
+    data.REPORTED_PROBLEM ||
+    ""
+  ).trim();
 
   addAuditLog_("INVOICE", "CLOSE_ORDER_STARTED", companyId, "WORK_ORDER", woNumber, session, {
     rowNumber: rowNumber,
@@ -188,6 +232,12 @@ function saveCloseOrder_(data) {
 
   const invoiceNumber = generateInvoiceNumber_(companyId);
 
+  ensureSheetColumns_(shInv, [
+    "TECH_PROBLEM_FOUND",
+    "TECH_PROPOSED_SOLUTION",
+    "WORK_COMPLETION_RESULT"
+  ]);
+
   const invHeaders = shInv
     .getRange(1, 1, 1, shInv.getLastColumn())
     .getValues()[0]
@@ -208,8 +258,8 @@ function saveCloseOrder_(data) {
     INVOICE_NUMBER: invoiceNumber,
     Invoice: invoiceNumber,
 
-    DATE_INVOICE: new Date(),
-    Timestamp: new Date(),
+    DATE_INVOICE: invoiceDate,
+    Timestamp: invoiceDate,
 
     INVOICE_TOTAL: total,
     TOTAL: total,
@@ -229,7 +279,10 @@ function saveCloseOrder_(data) {
     "TECHNICIAN NAME": data.TECHNICIAN || "",
 
     PROCESO: "RECIBIDO",
-    WORK_PERFORMED: data.WORK_PERFORMED || "",
+    TECH_PROBLEM_FOUND: techProblemFound,
+    TECH_PROPOSED_SOLUTION: techProposedSolution,
+    WORK_COMPLETION_RESULT: workCompletionResult,
+    WORK_PERFORMED: fullWorkPerformed,
 
     LABOR_AMOUNT: laborTotal,
     LABOR: laborTotal,
@@ -281,13 +334,30 @@ function saveCloseOrder_(data) {
     STORE_STATE: normalizedAddress.state,
     STORE_ZIP: normalizedAddress.zip,
 
-    REPORTED_PROBLEM: data.REPORTED_PROBLEM || "",
+    REPORTED_PROBLEM: reportedProblem,
     EQUIPMENT_MAKE: data.EQUIPMENT_MAKE || "",
     EQUIPMENT_MODEL: data.EQUIPMENT_MODEL || "",
     EQUIPMENT_SERIAL: data.EQUIPMENT_SERIAL || "",
     NOTES: data.NOTES || "",
     SIGNATURE: data.SIGNATURE || ""
   };
+
+  if (approvedWorkPerformed) {
+    ensureSheetColumns_(shWO, ["WORK_PERFORMED"]);
+    const currentWorkOrderHeaders = shWO
+      .getRange(1, 1, 1, shWO.getLastColumn())
+      .getValues()[0]
+      .map(function(header) {
+        return String(header || "").trim();
+      });
+    setCellByHeader_(
+      shWO,
+      rowNumber,
+      currentWorkOrderHeaders,
+      "WORK_PERFORMED",
+      fullWorkPerformed
+    );
+  }
 
   try {
     const pdfLinks = generatePdfFromCloseOrder_(invoiceRow);
@@ -356,6 +426,8 @@ function saveCloseOrder_(data) {
     throw statusErr;
   }
 
+  touchAppCacheVersion_();
+
   return {
     success: true,
     invoiceNumber: invoiceNumber,
@@ -364,6 +436,27 @@ function saveCloseOrder_(data) {
     emailResult: emailResult,
     oldSync: oldSyncResult
   };
+}
+
+function buildRepairCompletionReport_(problemFound, proposedSolution, completionResult, fallback) {
+  const sections = [];
+  const normalizedProblem = String(problemFound || "").trim();
+  const normalizedSolution = String(proposedSolution || "").trim();
+  const normalizedCompletion = String(completionResult || "").trim();
+
+  if (normalizedProblem) {
+    sections.push("Problema encontrado:\n" + normalizedProblem);
+  }
+  if (normalizedSolution) {
+    sections.push("Solucion prevista:\n" + normalizedSolution);
+  }
+  if (normalizedCompletion) {
+    sections.push("Resultado final:\n" + normalizedCompletion);
+  }
+
+  return sections.length
+    ? sections.join("\n\n")
+    : String(fallback || "").trim();
 }
 
 function normalizeCloseOrderAddress_(data) {
@@ -398,6 +491,52 @@ function normalizeCloseOrderAddress_(data) {
     zip: zip,
     full: full
   };
+}
+
+function getCloseOrderInvoiceDate_(data) {
+  data = data || {};
+  const rawValue = data.INVOICE_DATE_MANUAL || data.MANUAL_INVOICE_DATE || "";
+
+  if (rawValue instanceof Date && !isNaN(rawValue.getTime())) {
+    return rawValue;
+  }
+
+  const raw = String(rawValue || "").trim();
+  if (!raw) return new Date();
+
+  let year;
+  let month;
+  let day;
+
+  let match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) {
+    year = Number(match[1]);
+    month = Number(match[2]);
+    day = Number(match[3]);
+  } else {
+    match = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (match) {
+      month = Number(match[1]);
+      day = Number(match[2]);
+      year = Number(match[3]);
+    }
+  }
+
+  if (!year || !month || !day) {
+    throw new Error("Fecha del invoice invalida. Usa el selector de fecha o formato YYYY-MM-DD.");
+  }
+
+  const parsed = new Date(year, month - 1, day);
+
+  if (
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    throw new Error("Fecha del invoice invalida. Revisa dia, mes y ano.");
+  }
+
+  return parsed;
 }
 
 function syncCloseOrderToOldSystem_(invoiceRow) {

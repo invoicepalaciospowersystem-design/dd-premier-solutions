@@ -205,6 +205,7 @@ function saveUser(rowNumber, data, sessionToken) {
     role: targetRole
   });
 
+  touchAppCacheVersion_();
   return true;
 }
 
@@ -244,6 +245,7 @@ function deleteUser(rowNumber, sessionToken) {
     role: targetRole
   });
 
+  touchAppCacheVersion_();
   return true;
 }
 
@@ -360,6 +362,7 @@ function getFormUrls(companyId) {
 function getCompanyName(companyId) {
   companyId = String(companyId || "").trim().toUpperCase();
 
+  return withAppCache_(["company-name", companyId], 300, function() {
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.SHEET_COMPANIES);
   if (!sh) return companyId;
 
@@ -380,6 +383,7 @@ function getCompanyName(companyId) {
   }
 
   return companyId;
+  });
 }
 
 function getCompanyBranding(companyId) {

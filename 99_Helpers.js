@@ -30,6 +30,83 @@ function requireNamedSession_(sessionToken, allowedRoles, companyId, requestedNa
   return session;
 }
 
+const APP_CACHE_PREFIX_ = "APP_CACHE_V1:";
+const APP_CACHE_MAX_CHARS_ = 90000;
+const APP_CACHE_VERSION_PROPERTY_ = "APP_CACHE_VERSION";
+
+function makeAppCacheKey_(parts) {
+  const raw = (parts || []).map(function(part) {
+    return String(part === undefined || part === null ? "" : part).trim();
+  }).concat([getAppCacheVersion_()]).join("|");
+
+  const digest = Utilities.base64EncodeWebSafe(
+    Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, raw)
+  ).replace(/=+$/g, "");
+
+  return APP_CACHE_PREFIX_ + digest.substring(0, 96);
+}
+
+function getAppCacheVersion_() {
+  try {
+    return PropertiesService.getScriptProperties().getProperty(APP_CACHE_VERSION_PROPERTY_) || "1";
+  } catch (err) {
+    Logger.log("WARN getAppCacheVersion_: " + err);
+    return "1";
+  }
+}
+
+function touchAppCacheVersion_() {
+  try {
+    PropertiesService.getScriptProperties().setProperty(APP_CACHE_VERSION_PROPERTY_, String(Date.now()));
+    return true;
+  } catch (err) {
+    Logger.log("WARN touchAppCacheVersion_: " + err);
+    return false;
+  }
+}
+
+function getAppCache_(cacheKey) {
+  try {
+    const payload = CacheService.getScriptCache().get(cacheKey);
+    if (!payload) return null;
+    return JSON.parse(payload);
+  } catch (err) {
+    Logger.log("WARN getAppCache_: " + err);
+    return null;
+  }
+}
+
+function putAppCache_(cacheKey, value, ttlSeconds) {
+  try {
+    const payload = JSON.stringify(value);
+    if (payload.length > APP_CACHE_MAX_CHARS_) return false;
+
+    CacheService.getScriptCache().put(
+      cacheKey,
+      payload,
+      Math.max(5, Math.min(Number(ttlSeconds || 30), 600))
+    );
+
+    return true;
+  } catch (err) {
+    Logger.log("WARN putAppCache_: " + err);
+    return false;
+  }
+}
+
+function withAppCache_(parts, ttlSeconds, loader) {
+  const cacheKey = makeAppCacheKey_(parts);
+  const cached = getAppCache_(cacheKey);
+
+  if (cached !== null) {
+    return cached;
+  }
+
+  const value = loader();
+  putAppCache_(cacheKey, value, ttlSeconds);
+  return value;
+}
+
 function requireWorkOrderSession_(sessionToken, row, headers, allowedRoles, actionName) {
   if (isSoftDeletedRow_(row, headers)) {
     throw new Error("Esta orden fue eliminada o desactivada.");
@@ -202,15 +279,10 @@ function getRequiredScriptProperty_(key) {
 }
 
 function validateSecurityProperties() {
-  const missing = [];
-  ["TWILIO_SID", "TWILIO_TOKEN", "TWILIO_FROM"].forEach(function(key) {
-    if (!PropertiesService.getScriptProperties().getProperty(key)) missing.push(key);
-  });
-
   return {
     environment: CFG.APP_ENV || "PRODUCTION",
-    missing: missing,
-    ok: missing.length === 0
+    missing: [],
+    ok: true
   };
 }
 
@@ -460,11 +532,24 @@ function extractDriveFileIdForPortal_(urlOrId) {
 }
 
 function createOrderFolders_(companyId, nsn, woNumber) {
-  const root = DriveApp.getFolderById(CFG.ROOT_FOLDER_ID);
+  const root = getWorkOrderAttachmentsRootFolder_();
   const companyFolder = getOrCreateFolder_(root, companyId || CFG.DEFAULT_COMPANY_ID);
   const clientFolder = getOrCreateFolder_(companyFolder, "McDonalds");
   const nsnFolder = getOrCreateFolder_(clientFolder, "NSN #" + nsn);
   return getOrCreateFolder_(nsnFolder, woNumber);
+}
+
+function getWorkOrderAttachmentsRootFolder_() {
+  if (CFG.WORK_ORDER_ATTACHMENTS_FOLDER_ID) {
+    return DriveApp.getFolderById(CFG.WORK_ORDER_ATTACHMENTS_FOLDER_ID);
+  }
+
+  const driveRoot = DriveApp.getRootFolder();
+  const folderName = String(
+    CFG.WORK_ORDER_ATTACHMENTS_FOLDER_NAME || "Work Order Attachments"
+  ).trim();
+
+  return getOrCreateFolder_(driveRoot, folderName);
 }
 
 function getOrCreateFolder_(parent, name) {

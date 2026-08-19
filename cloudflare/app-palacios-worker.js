@@ -1,6 +1,4 @@
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwAiZ0Dh5BQoX-QTmMbZcRDEr974-X_nNWcW5x2XeYurC_CeXLNSrl1k-f3p1DDKppOCw/exec";
-const GOOGLE_SCRIPT_ORIGIN = "https://script.google.com";
-const GOOGLE_USERCONTENT_ORIGIN = "https://n-pdqbm3jiktl42ouuuxskcgzyi3matvmx4a26gha-0lu-script.googleusercontent.com";
 
 const BRANDS = {
   PPS: {
@@ -37,7 +35,7 @@ export default {
       }
     }
 
-    return redirectToAppsScript(brand, url);
+    return redirectToAppsScript(request, brand, url);
   }
 };
 
@@ -87,39 +85,16 @@ function shortcut(name, url) {
   };
 }
 
-async function proxyAppsScriptRequest(request, brand, requestUrl) {
-  const upstreamUrl = buildAppsScriptUrl(brand, requestUrl.search);
-  const upstreamResponse = await fetch(new Request(upstreamUrl, request));
-  const contentType = upstreamResponse.headers.get("content-type") || "";
-
-  if (contentType.toLowerCase().includes("text/html")) {
-    const html = injectAppShellSupport(await upstreamResponse.text(), brand);
-    return new Response(html, {
-      status: upstreamResponse.status,
-      statusText: upstreamResponse.statusText,
-      headers: proxyHeaders(upstreamResponse.headers, "text/html; charset=UTF-8", "no-store")
-    });
-  }
-
-  return new Response(upstreamResponse.body, {
-    status: upstreamResponse.status,
-    statusText: upstreamResponse.statusText,
-    headers: proxyHeaders(upstreamResponse.headers, contentType, "no-store")
-  });
-}
-
-function redirectToAppsScript(brand, requestUrl) {
-  return Response.redirect(buildAppsScriptUrl(brand, requestUrl.search), 302);
-}
-
-async function proxyGoogleRequest(request, upstreamUrl) {
-  const upstreamResponse = await fetch(new Request(upstreamUrl, request));
-  const contentType = upstreamResponse.headers.get("content-type") || "application/octet-stream";
-
-  return new Response(upstreamResponse.body, {
-    status: upstreamResponse.status,
-    statusText: upstreamResponse.statusText,
-    headers: proxyHeaders(upstreamResponse.headers, contentType, "no-store")
+function redirectToAppsScript(request, brand, requestUrl) {
+  const status = request.method !== "GET" && request.method !== "HEAD"
+    ? 307
+    : 302;
+  return new Response(null, {
+    status,
+    headers: {
+      "location": buildAppsScriptUrl(brand, requestUrl.search),
+      "cache-control": "no-store"
+    }
   });
 }
 
@@ -138,69 +113,8 @@ function buildAppsScriptUrl(brand, search) {
   return APPS_SCRIPT_URL + (query ? "?" + query : "");
 }
 
-function proxyHeaders(sourceHeaders, contentType, cacheControl) {
-  const headers = new Headers(sourceHeaders);
-  headers.set("content-type", contentType || "application/octet-stream");
-  headers.set("cache-control", cacheControl || "no-store");
-  headers.delete("content-security-policy");
-  headers.delete("content-security-policy-report-only");
-  headers.delete("x-frame-options");
-  headers.delete("content-encoding");
-  headers.delete("content-length");
-  headers.delete("set-cookie");
-  return headers;
-}
-
-function injectAppShellSupport(html, brand) {
-  const headInject = `
-  <meta name="theme-color" content="${esc(brand.theme)}">
-  <meta name="application-name" content="${esc(brand.name)}">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="${esc(brand.shortName)}">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="icon" href="/pwa-icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="/apple-touch-icon.svg">`;
-
-  const bodyInject = `
-  <script>
-    (function(){
-      try { sessionStorage.setItem("pps_wrapper_active_session", "1"); } catch (err) {}
-      if ("serviceWorker" in navigator && window.isSecureContext) {
-        window.addEventListener("load", function(){
-          navigator.serviceWorker.register("/service-worker.js").catch(function(){});
-        });
-      }
-      window.addEventListener("message", function(event) {
-        var data = event.data || {};
-        if (!data || data.type !== "PPS_NAVIGATE") return;
-        try {
-          var target = new URL(String(data.url || ""), window.location.href);
-          if (target.protocol !== "https:") return;
-          var ok = {
-            "app.palaciospowersystems.com": true,
-            "app.ddpremiersolutionscorp.com": true,
-            "ddpremiersolutionscorp.com": true,
-            "www.ddpremiersolutionscorp.com": true,
-            "script.google.com": true
-          };
-          if (!ok[target.hostname]) return;
-          var next = new URL(window.location.href);
-          next.search = target.search;
-          next.hash = target.hash;
-          window.location.href = next.href;
-        } catch (err) {}
-      });
-    })();
-  </script>`;
-
-  return String(html || "")
-    .replace(/(<head[^>]*>)/i, "$1" + headInject)
-    .replace(/<\/body>/i, bodyInject + "</body>");
-}
-
 function serviceWorkerJs() {
-  return `const CACHE_NAME="dd-premier-pwa-v5";
+  return `const CACHE_NAME="dd-premier-pwa-v6";
 const OFFLINE_URL="/offline";
 self.addEventListener("install",event=>event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll([OFFLINE_URL,"/pwa-icon.svg"])).then(()=>self.skipWaiting())));
 self.addEventListener("activate",event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.map(key=>key===CACHE_NAME?null:caches.delete(key)))).then(()=>self.clients.claim())));

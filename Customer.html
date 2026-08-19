@@ -72,6 +72,11 @@
       background:#9ca3af;
     }
 
+    .media-btn {
+      background:#0f766e;
+      margin-top:10px;
+    }
+
     .quote-approved-btn {
       background:#16a34a;
       margin-top:10px;
@@ -142,6 +147,26 @@
       margin-top:8px;
       white-space:pre-wrap;
     }
+
+    .tech-assessment {
+      display:none;
+      background:#ecfdf5;
+      border:1px solid #a7f3d0;
+      border-left:5px solid #16a34a;
+      border-radius:10px;
+      padding:11px;
+      margin-top:10px;
+      white-space:pre-wrap;
+    }
+
+    .tech-assessment.visible { display:block; }
+    .tech-assessment-toggle {
+      width:100%;
+      margin-top:10px;
+      background:#0f766e;
+    }
+
+    .tech-assessment-row + .tech-assessment-row { margin-top:9px; }
 
     .progress-box {
       margin-top:12px;
@@ -376,6 +401,9 @@ const TOP_NAV = {
 const SUPERVISOR = "<?= supervisor ?>";
 const BASE_URL = "<?= baseUrl ?>";
 let ALL_ORDERS = [];
+let SUPERVISOR_RENDER_LIMIT = 60;
+const SUPERVISOR_RENDER_STEP = 60;
+let SUPERVISOR_FILTER_KEY = "";
 
 function requireLogin() {
   const user = getAppSessionItem("pps_user");
@@ -453,6 +481,8 @@ function loadOrders() {
   google.script.run
     .withSuccessHandler(function(data) {
       ALL_ORDERS = Array.isArray(data) ? data : [];
+      SUPERVISOR_RENDER_LIMIT = 60;
+      SUPERVISOR_FILTER_KEY = "";
       populateFilterOptions(ALL_ORDERS);
       applyFilters();
     })
@@ -464,17 +494,50 @@ function loadOrders() {
 
 function render(data) {
   renderStats(data, ALL_ORDERS.length);
-  renderFilterSummary(data.length, ALL_ORDERS.length);
+  const visible = data.slice(0, SUPERVISOR_RENDER_LIMIT);
+  renderFilterSummary(visible.length, data.length, ALL_ORDERS.length);
 
   if (!data.length) {
     document.getElementById("orders").innerHTML = "No orders found.";
     return;
   }
 
-  document.getElementById("orders").innerHTML = data.map(card).join("");
+  const moreHtml = data.length > visible.length
+    ? `
+      <div style="grid-column:1/-1; text-align:center; padding:16px;">
+        <button onclick="loadMoreSupervisorOrders()" style="background:#111827; color:white; padding:12px 18px; border-radius:10px; border:0; font-weight:bold;">
+          Load more (${visible.length} of ${data.length})
+        </button>
+      </div>
+    `
+    : "";
+
+  document.getElementById("orders").innerHTML = visible.map(card).join("") + moreHtml;
 }
 
 function applyFilters() {
+  const filterKey = getSupervisorFilterKey();
+  if (filterKey !== SUPERVISOR_FILTER_KEY) {
+    SUPERVISOR_RENDER_LIMIT = 60;
+    SUPERVISOR_FILTER_KEY = filterKey;
+  }
+
+  render(getFilteredOrders());
+}
+
+function getSupervisorFilterKey() {
+  return [
+    document.getElementById("searchFilter").value,
+    document.getElementById("statusFilter").value,
+    document.getElementById("priorityFilter").value,
+    document.getElementById("typeFilter").value,
+    document.getElementById("dateFromFilter").value,
+    document.getElementById("dateToFilter").value
+  ].join("|");
+}
+
+function loadMoreSupervisorOrders() {
+  SUPERVISOR_RENDER_LIMIT += SUPERVISOR_RENDER_STEP;
   render(getFilteredOrders());
 }
 
@@ -580,7 +643,7 @@ function uniqueSorted(values) {
     .map(function(key) { return seen[key]; });
 }
 
-function renderFilterSummary(visible, total) {
+function renderFilterSummary(visible, filteredTotal, total) {
   const summary = document.getElementById("filterSummary");
   if (!summary) return;
 
@@ -589,7 +652,7 @@ function renderFilterSummary(visible, total) {
     return;
   }
 
-  summary.innerText = "Showing " + visible + " of " + total + " assigned orders.";
+  summary.innerText = "Showing " + visible + " of " + filteredTotal + " filtered orders (" + total + " assigned).";
 }
 
 function getOrderSearchText(o) {
@@ -605,7 +668,9 @@ function getOrderSearchText(o) {
     getOrderDisplayPriority(o),
     getOrderDisplayType(o),
     getOrderDisplayEquipment(o),
-    getOrderDisplayProblem(o)
+    getOrderDisplayProblem(o),
+    o.TECH_PROBLEM_FOUND,
+    o.TECH_PROPOSED_SOLUTION
   ].join(" ");
 }
 
@@ -659,6 +724,11 @@ function card(o) {
   const pmTypeLabel = getOrderDisplayPMType(o);
   const equipmentLabel = getOrderDisplayEquipment(o);
   const problemText = getOrderDisplayProblem(o);
+  const techProblemFound = String(o.TECH_PROBLEM_FOUND || "").trim();
+  const techProposedSolution = String(o.TECH_PROPOSED_SOLUTION || "").trim();
+  const workStartedAt = String(o.DATE_WORK_STARTED || "").trim();
+  const workStartedBy = String(o.WORK_STARTED_BY || "").trim();
+  const attachmentCount = Math.max(0, Number(o.ATTACHMENT_COUNT || 0));
   const reportedBy = getOrderReportedBy(o);
   const p = String(priorityLabel || o.ORDER_PRIORITY || "").toLowerCase();
 
@@ -694,7 +764,28 @@ function card(o) {
 
     <div class="problem">${esc(problemText || "")}</div>
 
+    ${(techProblemFound || techProposedSolution) ? `
+      <button
+        type="button"
+        class="tech-assessment-toggle"
+        aria-expanded="false"
+        onclick="toggleSupervisorAssessment(${Number(o.ROW_NUMBER)}, this)">
+        View technician diagnosis
+      </button>
+      <div id="supervisorAssessment_${Number(o.ROW_NUMBER)}" class="tech-assessment">
+        <div class="tech-assessment-row"><b>Problem found by technician:</b><br>${esc(techProblemFound)}</div>
+        <div class="tech-assessment-row"><b>Proposed solution:</b><br>${esc(techProposedSolution)}</div>
+        ${(workStartedAt || workStartedBy) ? `<div class="tech-assessment-row"><b>Work started:</b> ${esc(workStartedAt)}${workStartedBy ? " by " + esc(workStartedBy) : ""}</div>` : ""}
+      </div>
+    ` : ""}
+
     ${renderStatusProgress(o)}
+
+    ${attachmentCount ? `
+      <button class="media-btn" onclick="openSupervisorAttachmentGallery(${Number(o.ROW_NUMBER)}, '${jsEsc(o.WO_NUMBER || "")}')">
+        View Photos / Videos (${attachmentCount})
+      </button>
+    ` : ""}
 
     ${pdfButton}
 
@@ -708,6 +799,17 @@ function card(o) {
   </button>
 </div>
   </div>`;
+}
+
+function toggleSupervisorAssessment(row, button) {
+  const detail = document.getElementById("supervisorAssessment_" + Number(row));
+  if (!detail) return;
+
+  const isOpen = detail.classList.toggle("visible");
+  if (button) {
+    button.innerText = isOpen ? "Hide technician diagnosis" : "View technician diagnosis";
+    button.setAttribute("aria-expanded", isOpen ? "true" : "false");
+  }
 }
 
 function renderPMReportButtons(o) {
@@ -988,6 +1090,23 @@ function openInvoicePdf(url) {
   }
 
   window.open(url, "_blank");
+}
+
+function getSupervisorReturnUrl() {
+  return BASE_URL +
+    "?view=customer" +
+    "&supervisor=" + encodeURIComponent(SUPERVISOR || "") +
+    "&companyId=" + encodeURIComponent(getCurrentCompanyId());
+}
+
+function openSupervisorAttachmentGallery(row, woNumber) {
+  TOP_NAV.href =
+    BASE_URL +
+    "?view=orderFiles" +
+    "&row=" + encodeURIComponent(row) +
+    "&wo=" + encodeURIComponent(woNumber || "") +
+    "&companyId=" + encodeURIComponent(getCurrentCompanyId()) +
+    "&returnTo=" + encodeURIComponent(getSupervisorReturnUrl());
 }
 
 function getAge(o) {

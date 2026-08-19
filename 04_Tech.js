@@ -12,6 +12,7 @@ function getTechnicianOrders(techName, sessionToken, companyId) {
     throw new Error("No se encontro el nombre del tecnico.");
   }
 
+  return withAppCache_(["technician-orders", effectiveCompanyId, effectiveTechName], 60, function() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
   if (!sh) throw new Error("No existe la hoja: " + CFG.SHEET_WORK_ORDERS);
@@ -20,8 +21,26 @@ function getTechnicianOrders(techName, sessionToken, companyId) {
   if (values.length < 2) return [];
 
   const headers = values[0].map(String);
+  const storeMap = getStoreMapByCompany_(effectiveCompanyId);
+  const idxCompany = headers.indexOf("COMPANY_ID");
+  const idxTech = headers.indexOf("TECHNICIAN");
+  const idxStatus = headers.indexOf("STATUS");
+  const selectedTech = String(effectiveTechName || "").toLowerCase();
 
-  const data = values.slice(1).map(function(row, i) {
+  const data = [];
+
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    if (isSoftDeletedRow_(row, headers)) continue;
+
+    const rowCompany = idxCompany >= 0 ? String(row[idxCompany] || "").trim().toUpperCase() : "";
+    const assignedTech = idxTech >= 0 ? String(row[idxTech] || "").toLowerCase() : "";
+    const status = idxStatus >= 0 ? String(row[idxStatus] || "").toUpperCase() : "";
+
+    if (effectiveCompanyId && rowCompany && rowCompany !== effectiveCompanyId) continue;
+    if (!assignedTech.includes(selectedTech)) continue;
+    if (status === "CLOSED" || status === "COMPLETED" || status === "READY FOR BILLING") continue;
+
     const obj = {};
     headers.forEach(function(h, c) {
       let value = row[c];
@@ -31,27 +50,49 @@ function getTechnicianOrders(techName, sessionToken, companyId) {
       obj[h] = value;
     });
 
-    obj.ROW_NUMBER = i + 2;
-    enrichWorkOrderObject_(obj);
-    return obj;
+    obj.ROW_NUMBER = i + 1;
+    enrichWorkOrderObjectFromStoreMap_(obj, storeMap);
+    data.push(obj);
+  }
+
+  return data.reverse();
   });
+}
 
-  return data.filter(function(o) {
-    const assignedTech = String(o.TECHNICIAN || "").toLowerCase();
-    const selectedTech = String(effectiveTechName || "").toLowerCase();
-    const rowCompany = String(o.COMPANY_ID || "").trim().toUpperCase();
-    const status = String(o.STATUS || "").toUpperCase();
+function getTechnicianStoreDirectory(companyId, sessionToken) {
+  companyId = String(companyId || "").trim().toUpperCase();
+  const session = requireSession_(sessionToken, ["TECH", "OWNER", "ADMIN"], companyId);
+  const effectiveCompanyId = companyId || String(session.companyId || "").trim().toUpperCase();
 
-    if (isSoftDeletedObject_(o)) return false;
-    if (effectiveCompanyId && rowCompany && rowCompany !== effectiveCompanyId) return false;
+  if (!effectiveCompanyId) {
+    throw new Error("No se pudo detectar la compania para cargar las tiendas.");
+  }
 
-    return assignedTech.includes(selectedTech) && status !== "CLOSED" && status !== "COMPLETED";
-  }).reverse();
+  const storeMap = getStoreMapByCompany_(effectiveCompanyId);
+
+  return Object.keys(storeMap).map(function(nsn) {
+    const store = storeMap[nsn] || {};
+    return {
+      nsn: store.nsn || nsn,
+      client: store.client || "",
+      address: store.fullAddress || store.address || ""
+    };
+  }).sort(function(a, b) {
+    return String(a.nsn || "").localeCompare(String(b.nsn || ""), undefined, {
+      numeric: true,
+      sensitivity: "base"
+    });
+  });
 }
 
 function updateTechOrderStatus(rowNumber, newStatus, sessionToken) {
   rowNumber = Number(rowNumber);
   if (!rowNumber || rowNumber < 2) throw new Error("Fila invalida.");
+
+  newStatus = String(newStatus || "").trim().toUpperCase();
+  if (newStatus === "IN PROGRESS") {
+    throw new Error("Para iniciar el trabajo debe completar el problema encontrado y la solucion propuesta.");
+  }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
@@ -70,6 +111,129 @@ function updateTechOrderStatus(rowNumber, newStatus, sessionToken) {
   return updateTechOrderStatusInternal_(rowNumber, newStatus, getSessionActorLabel_(session));
 }
 
+function startTechWorkWithAssessment(rowNumber, problemFound, proposedSolution, sessionToken) {
+  rowNumber = Number(rowNumber);
+  problemFound = String(problemFound || "").trim();
+  proposedSolution = String(proposedSolution || "").trim();
+
+  if (!rowNumber || rowNumber < 2) throw new Error("Fila invalida.");
+  if (!problemFound) throw new Error("Describa el problema encontrado.");
+  if (!proposedSolution) throw new Error("Describa la solucion que se le dara al problema.");
+  if (problemFound.length > 5000) throw new Error("El problema encontrado no puede exceder 5000 caracteres.");
+  if (proposedSolution.length > 5000) throw new Error("La solucion propuesta no puede exceder 5000 caracteres.");
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
+  if (!sh) throw new Error("No existe la hoja: " + CFG.SHEET_WORK_ORDERS);
+  if (rowNumber > sh.getLastRow()) throw new Error("La orden ya no existe.");
+
+  let headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(function(h) {
+    return String(h || "").trim();
+  });
+  const rowData = sh.getRange(rowNumber, 1, 1, sh.getLastColumn()).getValues()[0];
+  const session = requireWorkOrderSession_(
+    sessionToken,
+    rowData,
+    headers,
+    ["TECH", "OWNER", "ADMIN"],
+    "iniciar el trabajo en"
+  );
+  const companyId = getRowValue_(rowData, headers, "COMPANY_ID") || CFG.DEFAULT_COMPANY_ID;
+  const woNumber = getRowValue_(rowData, headers, "WO_NUMBER");
+  let oldStatus = String(getRowValue_(rowData, headers, "STATUS") || "").trim().toUpperCase();
+
+  if (["COMPLETED", "CLOSED", "READY FOR BILLING", "DELETED"].indexOf(oldStatus) !== -1) {
+    throw new Error("No se puede iniciar una orden que ya esta completada o cerrada.");
+  }
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+
+  let startedAt;
+  let resultingStatus = oldStatus;
+  let wasAlreadyStarted = false;
+
+  try {
+    headers = ensureSheetColumns_(sh, [
+      "TECH_PROBLEM_FOUND",
+      "TECH_PROPOSED_SOLUTION",
+      "DATE_WORK_STARTED",
+      "WORK_STARTED_BY",
+      "TECH_ASSESSMENT_UPDATED_AT"
+    ]);
+
+    oldStatus = String(getCellByHeader_(sh, rowNumber, headers, "STATUS") || "").trim().toUpperCase();
+    if (["COMPLETED", "CLOSED", "READY FOR BILLING", "DELETED"].indexOf(oldStatus) !== -1) {
+      throw new Error("No se puede iniciar una orden que ya esta completada o cerrada.");
+    }
+    resultingStatus = oldStatus;
+
+    startedAt = getCellByHeader_(sh, rowNumber, headers, "DATE_WORK_STARTED");
+    wasAlreadyStarted = !!startedAt;
+    if (!startedAt) startedAt = new Date();
+
+    const progressedStatuses = [
+      "IN PROGRESS",
+      "REQUEST PARTS",
+      "PARTS IN TRANSIT",
+      "PARTS IN STORE"
+    ];
+    if (progressedStatuses.indexOf(oldStatus) === -1) {
+      resultingStatus = "IN PROGRESS";
+      setCellByHeader_(sh, rowNumber, headers, "STATUS", resultingStatus);
+    }
+
+    setCellByHeader_(sh, rowNumber, headers, "TECH_PROBLEM_FOUND", problemFound);
+    setCellByHeader_(sh, rowNumber, headers, "TECH_PROPOSED_SOLUTION", proposedSolution);
+    setCellByHeader_(sh, rowNumber, headers, "DATE_WORK_STARTED", startedAt);
+    setCellByHeader_(sh, rowNumber, headers, "TECH_ASSESSMENT_UPDATED_AT", new Date());
+
+    if (!wasAlreadyStarted) {
+      setCellByHeader_(
+        sh,
+        rowNumber,
+        headers,
+        "WORK_STARTED_BY",
+        String(session.name || getSessionActorLabel_(session) || "Technician").trim()
+      );
+    }
+  } finally {
+    lock.releaseLock();
+  }
+
+  addLog_(
+    companyId,
+    woNumber,
+    wasAlreadyStarted ? "TECH ASSESSMENT UPDATED" : "WORK STARTED WITH TECH ASSESSMENT",
+    oldStatus,
+    resultingStatus,
+    getSessionActorLabel_(session),
+    "Problema encontrado y solucion propuesta guardados."
+  );
+  addAuditLog_(
+    "TECH",
+    wasAlreadyStarted ? "TECH_ASSESSMENT_UPDATED" : "WORK_STARTED_WITH_ASSESSMENT",
+    companyId,
+    "WORK_ORDER",
+    woNumber,
+    session,
+    {
+      rowNumber: rowNumber,
+      problemLength: problemFound.length,
+      solutionLength: proposedSolution.length,
+      status: resultingStatus
+    }
+  );
+
+  touchAppCacheVersion_();
+
+  return {
+    success: true,
+    status: resultingStatus,
+    startedAt: Utilities.formatDate(startedAt, CFG.TIMEZONE, "MM/dd/yyyy hh:mm a")
+  };
+}
+
 function updateTechOrderStatusInternal_(rowNumber, newStatus, actorLabel) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
@@ -82,7 +246,10 @@ function updateTechOrderStatusInternal_(rowNumber, newStatus, actorLabel) {
   setCellByHeader_(sh, rowNumber, headers, "STATUS", newStatus);
 
   if (newStatus === "COMPLETED") {
-    setCellByHeader_(sh, rowNumber, headers, "DATE_COMPLETED", new Date());
+    const completedAt = getCellByHeader_(sh, rowNumber, headers, "DATE_COMPLETED");
+    if (!completedAt) {
+      setCellByHeader_(sh, rowNumber, headers, "DATE_COMPLETED", new Date());
+    }
 
     createEconomyFromWO(companyId, woNumber);
 
@@ -99,6 +266,7 @@ function updateTechOrderStatusInternal_(rowNumber, newStatus, actorLabel) {
   }
 
   addLog_(companyId, woNumber, "STATUS UPDATED FROM TECH APP", oldStatus, newStatus, actorLabel || "Technician App", "");
+  touchAppCacheVersion_();
   return true;
 }
 
@@ -114,6 +282,7 @@ function getMyTechInvoiceSummary(companyId, techName, month, year, sessionToken)
     companyId = String(session.companyId || companyId || "").trim().toUpperCase();
   }
 
+  return withAppCache_(["tech-invoice-summary", companyId, techName, month, year], 60, function() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
   const shEco = ss.getSheetByName(CFG.SHEET_ECONOMY || "ECONOMY");
@@ -307,6 +476,7 @@ function getMyTechInvoiceSummary(companyId, techName, month, year, sessionToken)
     rows: rows,
     totals: totals
   };
+  });
 }
 
 function getTechLaborPayFromEconomy_(row, headers, techName) {

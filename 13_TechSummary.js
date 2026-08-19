@@ -426,6 +426,7 @@ function getMyTechMonthlySummary(companyId, techName, month, year, sessionToken)
     companyId = String(session.companyId || companyId || "").trim().toUpperCase();
   }
 
+  return withAppCache_(["my-tech-monthly-summary", companyId, techName, month, year], 60, function() {
   const all = getTechMonthlySummary(companyId, month, year, sessionToken);
 
   const target = String(techName || "").trim().toLowerCase();
@@ -445,4 +446,5 @@ function getMyTechMonthlySummary(companyId, techName, month, year, sessionToken)
     totalPay: 0,
     workOrders: []
   };
+  });
 }

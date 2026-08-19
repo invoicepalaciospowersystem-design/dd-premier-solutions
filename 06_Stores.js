@@ -3,6 +3,16 @@
 // =====================================================
 
 function getStoreByNSN_(nsn, companyId) {
+  const targetNSN = normalizeNSN_(nsn);
+  const targetCompany = String(companyId || CFG.DEFAULT_COMPANY_ID).trim().toUpperCase();
+  const storeMap = getStoreMapByCompany_(targetCompany);
+  return storeMap[targetNSN] || {};
+}
+
+function getStoreMapByCompany_(companyId) {
+  companyId = String(companyId || CFG.DEFAULT_COMPANY_ID).trim().toUpperCase();
+
+  return withAppCache_(["store-map-by-company", companyId], 300, function() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = ss.getSheetByName(CFG.SHEET_STORES);
   if (!sh) return {};
@@ -34,13 +44,12 @@ function getStoreByNSN_(nsn, companyId) {
 
   if (idxNSN === -1) return {};
 
-  const targetNSN = normalizeNSN_(nsn);
-  const targetCompany = String(companyId || CFG.DEFAULT_COMPANY_ID).trim().toUpperCase();
+  const map = {};
 
   for (let i = 1; i < data.length; i++) {
     const rowCompany = idxCompany >= 0
       ? String(data[i][idxCompany] || "").trim().toUpperCase()
-      : targetCompany;
+      : companyId;
 
     const rowNSN = normalizeNSN_(data[i][idxNSN]);
 
@@ -48,7 +57,7 @@ function getStoreByNSN_(nsn, companyId) {
       ? String(data[i][idxActive] || "YES").trim().toUpperCase()
       : "YES";
 
-    if (rowCompany === targetCompany && rowNSN === targetNSN && active !== "NO") {
+    if (rowCompany === companyId && rowNSN && active !== "NO") {
       const normalized = normalizeStoreAddressFields_({
         ADDRESS: idxAddress >= 0 ? data[i][idxAddress] || "" : "",
         CITY: idxCity >= 0 ? data[i][idxCity] || "" : "",
@@ -56,7 +65,8 @@ function getStoreByNSN_(nsn, companyId) {
         ZIP: idxZip >= 0 ? data[i][idxZip] || "" : ""
       });
 
-      return {
+      if (!map[rowNSN]) {
+        map[rowNSN] = {
         nsn: rowNSN,
         client: idxClient >= 0 ? data[i][idxClient] || "" : "",
         address: normalized.ADDRESS,
@@ -77,11 +87,13 @@ function getStoreByNSN_(nsn, companyId) {
         quoteEmails: idxQuoteEmails >= 0 ? data[i][idxQuoteEmails] || "" : "",
         invoiceEmails: idxInvoiceEmails >= 0 ? data[i][idxInvoiceEmails] || "" : "",
         fullAddress: normalized.FULL_ADDRESS
-      };
+        };
+      }
     }
   }
 
-  return {};
+  return map;
+  });
 }
 
 function normalizeStoreAddressFields_(store) {
@@ -166,7 +178,12 @@ function normalizeNSN_(value) {
 }
 
 function enrichWorkOrderObject_(obj) {
-  const store = getStoreByNSN_(obj.NSN, obj.COMPANY_ID || CFG.DEFAULT_COMPANY_ID);
+  const storeMap = getStoreMapByCompany_(obj.COMPANY_ID || CFG.DEFAULT_COMPANY_ID);
+  return enrichWorkOrderObjectFromStoreMap_(obj, storeMap);
+}
+
+function enrichWorkOrderObjectFromStoreMap_(obj, storeMap) {
+  const store = (storeMap || {})[normalizeNSN_(obj.NSN)] || {};
 
   obj.STORE_ADDRESS = store.fullAddress || "";
   obj.STORE_STREET = store.address || "";
@@ -223,6 +240,65 @@ function getStores(companyId, role, sessionToken) {
   });
 }
 
+function getStoresForCreateOrder(companyId, sessionToken) {
+  companyId = String(companyId || "").trim().toUpperCase();
+  requireSession_(sessionToken, ["OWNER", "ADMIN", "ORDENES"], companyId);
+
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.SHEET_STORES);
+  if (!sh) throw new Error("No existe la hoja STORES.");
+
+  const data = sh.getDataRange().getValues();
+  if (data.length < 2) return [];
+
+  const headers = data[0].map(function(h) {
+    return String(h).trim();
+  });
+
+  const idxCompany = headers.indexOf("COMPANY_ID");
+  const idxNSN = headers.indexOf("NSN #");
+  const idxClient = headers.indexOf("CLIENTE");
+  const idxStoreName = headers.indexOf("STORE_NAME");
+  const idxAddress = headers.indexOf("ADDRESS");
+  const idxCity = headers.indexOf("CITY");
+  const idxState = headers.indexOf("STATE");
+  const idxZip = headers.indexOf("ZIP");
+  const idxActive = headers.indexOf("ACTIVE");
+
+  if (idxCompany === -1 || idxNSN === -1) {
+    throw new Error("La hoja STORES debe tener COMPANY_ID y NSN #.");
+  }
+
+  return data.slice(1).map(function(row) {
+    const rowCompany = String(row[idxCompany] || "").trim().toUpperCase();
+    const active = idxActive >= 0
+      ? String(row[idxActive] || "YES").trim().toUpperCase()
+      : "YES";
+
+    if (rowCompany !== companyId || active === "NO") return null;
+
+    const normalized = normalizeStoreAddressFields_({
+      ADDRESS: idxAddress >= 0 ? row[idxAddress] || "" : "",
+      CITY: idxCity >= 0 ? row[idxCity] || "" : "",
+      STATE: idxState >= 0 ? row[idxState] || "" : "",
+      ZIP: idxZip >= 0 ? row[idxZip] || "" : ""
+    });
+
+    return {
+      nsn: normalizeNSN_(row[idxNSN]),
+      client: idxClient >= 0 ? row[idxClient] || "" : "",
+      storeName: idxStoreName >= 0 ? row[idxStoreName] || "" : "",
+      address: normalized.FULL_ADDRESS
+    };
+  }).filter(function(store) {
+    return store && store.nsn;
+  }).sort(function(a, b) {
+    return String(a.nsn).localeCompare(String(b.nsn), undefined, {
+      numeric: true,
+      sensitivity: "base"
+    });
+  });
+}
+
 function saveStore(store, sessionToken) {
   store = store || {};
   const targetCompany = String(store.COMPANY_ID || "").trim().toUpperCase();
@@ -263,6 +339,7 @@ function saveStore(store, sessionToken) {
     supervisorEmail: store.SUPERVISOR_EMAIL || ""
   });
 
+  touchAppCacheVersion_();
   return true;
 }
 

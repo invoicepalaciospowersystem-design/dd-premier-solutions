@@ -1,0 +1,14 @@
+{
+  "name": "dd-premier-solutions",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "cloudflare:check": "node ./node_modules/wrangler/bin/wrangler.js deploy --dry-run",
+    "cloudflare:types": "node ./node_modules/wrangler/bin/wrangler.js types",
+    "cloudflare:deploy": "node ./node_modules/wrangler/bin/wrangler.js deploy"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "wrangler": "^4.124.0"
+  }
+}

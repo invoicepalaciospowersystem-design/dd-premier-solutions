@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    * { box-sizing:border-box; }
+    html, body { min-height:100%; }
+    body {
+      margin:0;
+      padding:18px;
+      font-family:Arial, sans-serif;
+      color:#111827;
+      background:#f1f5f9;
+    }
+    .shell { width:min(1100px, 100%); margin:0 auto 48px; }
+    .hero {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:18px;
+      padding:22px;
+      margin-bottom:16px;
+      border-radius:16px;
+      color:#ffffff;
+      background:linear-gradient(135deg, #111827, #1e3a5f);
+      box-shadow:0 16px 38px rgba(15,23,42,.2);
+    }
+    .hero h1 { margin:0; font-size:27px; }
+    .hero p { margin:7px 0 0; color:#cbd5e1; font-size:14px; }
+    .status-badge {
+      flex:none;
+      padding:9px 13px;
+      border:1px solid rgba(255,255,255,.22);
+      border-radius:999px;
+      background:rgba(255,255,255,.1);
+      font-size:13px;
+      font-weight:bold;
+    }
+    .panel {
+      margin-bottom:16px;
+      padding:20px;
+      border-radius:15px;
+      background:rgba(255,255,255,.98);
+      box-shadow:0 10px 30px rgba(15,23,42,.1);
+    }
+    .panel h2 { margin:0 0 14px; font-size:19px; }
+    .order-grid,
+    .form-grid {
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:12px;
+    }
+    .order-item {
+      min-width:0;
+      padding:11px 12px;
+      border:1px solid #e2e8f0;
+      border-radius:10px;
+      background:#f8fafc;
+    }
+    .order-item.full { grid-column:1 / -1; }
+    .label,
+    label {
+      display:block;
+      margin-bottom:6px;
+      color:#475569;
+      font-size:12px;
+      font-weight:800;
+      text-transform:uppercase;
+    }
+    .value { overflow-wrap:anywhere; white-space:pre-wrap; line-height:1.4; }
+    .field { display:grid; gap:6px; }
+    textarea {
+      width:100%;
+      min-height:220px;
+      padding:12px;
+      border:1px solid #cbd5e1;
+      border-radius:11px;
+      resize:vertical;
+      font:inherit;
+      line-height:1.45;
+      outline:none;
+    }
+    textarea:focus {
+      border-color:#16a34a;
+      box-shadow:0 0 0 3px rgba(22,163,74,.13);
+    }
+    .required-note { margin:13px 0 0; color:#64748b; font-size:13px; }
+    .attachment-box {
+      padding:16px;
+      border:1px solid #cbd5e1;
+      border-radius:12px;
+      background:#f8fafc;
+    }
+    .attachment-title { margin-bottom:5px; font-size:16px; font-weight:bold; }
+    .attachment-note { color:#64748b; font-size:13px; line-height:1.4; }
+    .attachment-input {
+      position:absolute;
+      width:1px;
+      height:1px;
+      opacity:0;
+      overflow:hidden;
+      pointer-events:none;
+    }
+    .attachment-picker {
+      display:inline-block;
+      margin:12px 0 8px;
+      padding:11px 15px;
+      border-radius:10px;
+      background:#2563eb;
+      color:#ffffff;
+      cursor:pointer;
+      font-weight:bold;
+      text-transform:none;
+    }
+    .attachment-picker.disabled { background:#94a3b8; cursor:not-allowed; }
+    .attachment-count { color:#334155; font-size:13px; font-weight:bold; }
+    .attachment-list { display:grid; gap:8px; margin-top:12px; }
+    .attachment-item {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px;
+      border:1px solid #e2e8f0;
+      border-radius:9px;
+      background:#ffffff;
+    }
+    .attachment-info { min-width:0; }
+    .attachment-name { font-weight:bold; overflow-wrap:anywhere; }
+    .attachment-meta { margin-top:3px; color:#64748b; font-size:12px; }
+    .attachment-progress { margin-top:9px; color:#1d4ed8; font-size:13px; font-weight:bold; }
+    button,
+    .return-link {
+      min-height:46px;
+      padding:12px 18px;
+      border:0;
+      border-radius:10px;
+      color:#ffffff;
+      background:#111827;
+      cursor:pointer;
+      font:inherit;
+      font-weight:bold;
+      text-decoration:none;
+      text-align:center;
+    }
+    button:disabled { background:#94a3b8; cursor:not-allowed; }
+    .remove-btn { min-height:auto; padding:7px 10px; background:#dc2626; font-size:12px; }
+    .send-btn { min-width:245px; background:#16a34a; }
+    .actions {
+      position:sticky;
+      bottom:10px;
+      z-index:10;
+      display:flex;
+      justify-content:flex-end;
+      gap:10px;
+      padding:14px;
+      border:1px solid #e2e8f0;
+      border-radius:14px;
+      background:rgba(255,255,255,.96);
+      box-shadow:0 10px 30px rgba(15,23,42,.14);
+      backdrop-filter:blur(8px);
+    }
+    .error {
+      display:none;
+      margin-bottom:12px;
+      padding:12px;
+      border:1px solid #fecaca;
+      border-radius:10px;
+      color:#991b1b;
+      background:#fef2f2;
+      font-size:13px;
+      font-weight:bold;
+    }
+    .success {
+      display:none;
+      padding:28px;
+      border:1px solid #bbf7d0;
+      border-radius:15px;
+      background:#f0fdf4;
+      text-align:center;
+    }
+    .success h2 { margin:0 0 8px; color:#166534; }
+    .success p { color:#365944; }
+    .return-link { display:inline-block; margin-top:10px; background:#166534; }
+
+    @media (max-width:700px) {
+      body { padding:10px; }
+      .hero { align-items:flex-start; flex-direction:column; padding:17px; }
+      .hero h1 { font-size:23px; }
+      .order-grid,
+      .form-grid { grid-template-columns:1fr; }
+      .order-item.full { grid-column:auto; }
+      textarea { min-height:155px; }
+      .actions { align-items:stretch; flex-direction:column; bottom:4px; padding:10px; }
+      .actions button { width:100%; }
+      .send-btn { min-width:0; }
+    }
+  </style>
+  <?!= include("AppWatermark"); ?>
+</head>
+
+<body class="app-watermark" style="--company-watermark-logo:<?!= watermarkLogoCss ?>;">
+<?!= include("AppBackButton"); ?>
+
+<main class="shell">
+  <header class="hero">
+    <div>
+      <h1>Iniciar trabajo</h1>
+      <p>Registre el diagnostico inicial antes de cambiar la orden a En Progreso.</p>
+    </div>
+    <div id="statusBadge" class="status-badge">Cargando orden...</div>
+  </header>
+
+  <div id="formArea">
+    <section class="panel">
+      <h2>Informacion de la orden</h2>
+      <div id="orderInfo" class="order-grid">
+        <div class="order-item full">Cargando...</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Diagnostico del tecnico</h2>
+      <div class="form-grid">
+        <div class="field">
+          <label for="problemFound">Problema encontrado *</label>
+          <textarea id="problemFound" maxlength="5000" placeholder="Describa lo que encontro al revisar el equipo..."></textarea>
+        </div>
+        <div class="field">
+          <label for="proposedSolution">Solucion que se le dara al problema *</label>
+          <textarea id="proposedSolution" maxlength="5000" placeholder="Describa la reparacion, ajuste o accion que se realizara..."></textarea>
+        </div>
+      </div>
+      <div class="required-note">Los dos campos son obligatorios para iniciar el trabajo.</div>
+    </section>
+
+    <section class="panel">
+      <div class="attachment-box">
+        <div class="attachment-title">Fotos y videos (opcional)</div>
+        <div class="attachment-note">
+          Puede agregar hasta 10 archivos en total por orden. Cada archivo puede pesar hasta 25 MB.
+        </div>
+        <input
+          id="attachments"
+          class="attachment-input"
+          type="file"
+          accept="image/*,video/*"
+          multiple
+          onchange="addAttachments(this)">
+        <label id="attachmentPicker" class="attachment-picker" for="attachments">
+          Seleccionar fotos o videos
+        </label>
+        <div id="attachmentCount" class="attachment-count">0 de 10 archivos</div>
+        <div id="attachmentProgress" class="attachment-progress"></div>
+        <div id="attachmentList" class="attachment-list"></div>
+      </div>
+    </section>
+
+    <div id="errorBox" class="error"></div>
+
+    <div class="actions">
+      <button id="cancelBtn" type="button" onclick="returnToOrders()">Cancelar</button>
+      <button id="sendBtn" class="send-btn" type="button" onclick="sendAndStartWork()" disabled>
+        Cargando orden...
+      </button>
+    </div>
+  </div>
+
+  <section id="successBox" class="success">
+    <h2>Trabajo iniciado correctamente</h2>
+    <p>El diagnostico y los archivos fueron guardados. La orden ya esta En Progreso.</p>
+    <a id="returnLink" class="return-link" href="#" target="_top">Volver a mis ordenes</a>
+  </section>
+</main>
+
+<script>
+function navigateApp(url) {
+  const target = String(url || "").trim();
+  if (!target) return;
+
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: "PPS_NAVIGATE", url: target }, "*");
+      setTimeout(function() {
+        try { window.open(target, "_top"); }
+        catch (err) { window.location.href = target; }
+      }, 250);
+      return;
+    }
+  } catch (err) {}
+
+  try { window.open(target, "_top"); }
+  catch (err) { window.location.href = target; }
+}
+
+const TOP_NAV = {
+  set href(url) { navigateApp(url); }
+};
+
+const ROW_NUMBER = Number("<?= row ?>");
+const WO_NUMBER = "<?= wo ?>";
+const TECH_NAME = "<?= techName ?>";
+const BASE_URL = "<?= baseUrl ?>";
+const PAGE_COMPANY_ID = String("<?= companyId ?>").trim().toUpperCase();
+const RETURN_TO = "<?= returnTo ?>";
+const MAX_FILES = 10;
+const MAX_BYTES = 25 * 1024 * 1024;
+
+let ORDER = null;
+let IS_SENDING = false;
+let EXISTING_FILE_COUNT = 0;
+let FILES = [];
+
+function requireLogin() {
+  const raw = getAppSessionItem("pps_user");
+  if (!raw) {
+    TOP_NAV.href = BASE_URL;
+    return false;
+  }
+
+  try {
+    const user = JSON.parse(raw);
+    if ((!user.role && !user.ROLE) || (!user.sessionToken && !user.SESSION_TOKEN)) {
+      removeAppSessionItem("pps_user");
+      TOP_NAV.href = BASE_URL;
+      return false;
+    }
+  } catch (err) {
+    removeAppSessionItem("pps_user");
+    TOP_NAV.href = BASE_URL;
+    return false;
+  }
+  return true;
+}
+
+function getCurrentUser() {
+  try { return JSON.parse(getAppSessionItem("pps_user") || "{}"); }
+  catch (err) { return {}; }
+}
+
+function getSessionToken() {
+  const user = getCurrentUser();
+  return user.sessionToken || user.SESSION_TOKEN || "";
+}
+
+function getCompanyId() {
+  const user = getCurrentUser();
+  return String(
+    (ORDER && ORDER.COMPANY_ID) ||
+    PAGE_COMPANY_ID ||
+    user.companyId ||
+    user.COMPANY_ID ||
+    ""
+  ).trim().toUpperCase();
+}
+
+function getReturnUrl() {
+  return RETURN_TO ||
+    BASE_URL +
+    "?view=tech&tech=" + encodeURIComponent(TECH_NAME || (ORDER && ORDER.TECHNICIAN) || "") +
+    "&companyId=" + encodeURIComponent(getCompanyId());
+}
+
+function returnToOrders() {
+  if (IS_SENDING) return;
+  TOP_NAV.href = getReturnUrl();
+}
+
+function loadOrder() {
+  if (!requireLogin()) return;
+
+  if (!ROW_NUMBER || !WO_NUMBER) {
+    showError("No se recibio la orden que se va a iniciar.");
+    document.getElementById("statusBadge").textContent = "Orden no disponible";
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      ORDER = result || null;
+      if (!ORDER || !ORDER.WO_NUMBER) {
+        showError("No se pudo cargar la orden.");
+        return;
+      }
+
+      EXISTING_FILE_COUNT = Math.max(0, Number(ORDER.ATTACHMENT_COUNT || 0));
+      document.getElementById("problemFound").value = ORDER.TECH_PROBLEM_FOUND || "";
+      document.getElementById("proposedSolution").value = ORDER.TECH_PROPOSED_SOLUTION || "";
+      document.getElementById("statusBadge").textContent = ORDER.STATUS || "Lista para iniciar";
+      renderOrderInfo();
+      setSending(false);
+      document.getElementById("sendBtn").disabled = false;
+      document.getElementById("problemFound").focus();
+    })
+    .withFailureHandler(function(err) {
+      showError(getErrorMessage(err));
+      document.getElementById("statusBadge").textContent = "No se pudo cargar";
+    })
+    .getCloseOrderData(ROW_NUMBER, WO_NUMBER, getSessionToken());
+}
+
+function renderOrderInfo() {
+  document.getElementById("orderInfo").innerHTML =
+    orderItem("WO", ORDER.WO_NUMBER) +
+    orderItem("NSN", ORDER.NSN || "") +
+    orderItem("Tecnico", ORDER.TECHNICIAN || TECH_NAME || "") +
+    orderItem("Equipo", ORDER.REPORTED_EQUIPMENT || ORDER.REPORTED_EQUIPMENT_EN || "") +
+    orderItem("Direccion", ORDER.STORE_ADDRESS || "", true) +
+    orderItem(
+      "Problema reportado",
+      ORDER.REPORTED_PROBLEM_ES || ORDER.REPORTED_PROBLEM_EN || ORDER.REPORTED_PROBLEM_ORIGINAL || "",
+      true
+    );
+}
+
+function orderItem(label, value, full) {
+  return '<div class="order-item' + (full ? " full" : "") + '">' +
+    '<span class="label">' + escapeHtml(label) + '</span>' +
+    '<div class="value">' + escapeHtml(value || "No disponible") + '</div>' +
+    '</div>';
+}
+
+function addAttachments(input) {
+  if (!input || IS_SENDING) return;
+  const rejected = [];
+
+  Array.from(input.files || []).forEach(function(file) {
+    if (EXISTING_FILE_COUNT + FILES.length >= MAX_FILES) {
+      rejected.push(file.name + ": se alcanzo el maximo de 10 archivos");
+      return;
+    }
+    if (!isAllowedFile(file)) {
+      rejected.push(file.name + ": solo se permiten fotos y videos");
+      return;
+    }
+    if (Number(file.size || 0) > MAX_BYTES) {
+      rejected.push(file.name + ": excede 25 MB");
+      return;
+    }
+
+    const duplicate = FILES.some(function(item) {
+      return item.file.name === file.name &&
+        item.file.size === file.size &&
+        item.file.lastModified === file.lastModified;
+    });
+    if (duplicate) return;
+
+    FILES.push({ id:createUploadId(), file:file, status:"pending", uploaded:null });
+  });
+
+  input.value = "";
+  setSending(false);
+  if (rejected.length) alert("Algunos archivos no fueron agregados:\n\n" + rejected.join("\n"));
+}
+
+function isAllowedFile(file) {
+  const mimeType = String(file && file.type || "").toLowerCase();
+  if (mimeType.indexOf("image/") === 0 || mimeType.indexOf("video/") === 0) return true;
+  return /\.(jpe?g|png|gif|webp|heic|heif|bmp|tiff?|mp4|mov|m4v|webm|avi|mpe?g|3gp)$/i
+    .test(String(file && file.name || ""));
+}
+
+function createUploadId() {
+  if (window.crypto && typeof window.crypto.randomUUID === "function") {
+    return window.crypto.randomUUID();
+  }
+  return "start-work-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+}
+
+function removeAttachment(uploadId) {
+  if (IS_SENDING) return;
+  FILES = FILES.filter(function(item) {
+    return item.id !== uploadId || item.status === "uploaded";
+  });
+  setSending(false);
+}
+
+function renderAttachments() {
+  const total = EXISTING_FILE_COUNT + FILES.length;
+  const existingText = EXISTING_FILE_COUNT
+    ? " (" + EXISTING_FILE_COUNT + " ya guardado" + (EXISTING_FILE_COUNT === 1 ? "" : "s") + ")"
+    : "";
+  document.getElementById("attachmentCount").textContent =
+    total + " de " + MAX_FILES + " archivos" + existingText;
+
+  const labels = {
+    pending:"Listo para enviar",
+    reading:"Preparando...",
+    uploading:"Subiendo...",
+    uploaded:"Guardado",
+    error:"Fallo la carga - puede reintentar"
+  };
+
+  document.getElementById("attachmentList").innerHTML = FILES.map(function(item) {
+    const disabled = IS_SENDING || item.status === "uploaded";
+    return '<div class="attachment-item">' +
+      '<div class="attachment-info">' +
+        '<div class="attachment-name">' + escapeHtml(item.file.name) + '</div>' +
+        '<div class="attachment-meta">' + escapeHtml(formatSize(item.file.size)) +
+          ' - ' + escapeHtml(labels[item.status] || item.status) + '</div>' +
+      '</div>' +
+      '<button class="remove-btn" type="button"' + (disabled ? " disabled" : "") +
+        ' onclick="removeAttachment(\'' + item.id + '\')">Quitar</button>' +
+      '</div>';
+  }).join("");
+}
+
+function setSending(isSending, label) {
+  IS_SENDING = !!isSending;
+  const total = EXISTING_FILE_COUNT + FILES.length;
+  const pickerDisabled = IS_SENDING || total >= MAX_FILES;
+  const input = document.getElementById("attachments");
+  const picker = document.getElementById("attachmentPicker");
+  const send = document.getElementById("sendBtn");
+
+  input.disabled = pickerDisabled;
+  picker.classList.toggle("disabled", pickerDisabled);
+  document.getElementById("cancelBtn").disabled = IS_SENDING;
+  send.disabled = IS_SENDING || !ORDER;
+  send.textContent = label || "Enviar e iniciar trabajo";
+  renderAttachments();
+}
+
+async function sendAndStartWork() {
+  if (!ORDER || IS_SENDING) return;
+
+  const problemFound = String(document.getElementById("problemFound").value || "").trim();
+  const proposedSolution = String(document.getElementById("proposedSolution").value || "").trim();
+  hideError();
+
+  if (!problemFound || !proposedSolution) {
+    showError("Debe completar el problema encontrado y la solucion propuesta.");
+    (!problemFound
+      ? document.getElementById("problemFound")
+      : document.getElementById("proposedSolution")
+    ).focus();
+    return;
+  }
+
+  setSending(true, "Enviando informacion...");
+
+  try {
+    await startWorkOnServer(problemFound, proposedSolution);
+    await uploadPendingFiles();
+    setAppSessionItem("lastTechMessage", "Trabajo iniciado y diagnostico enviado correctamente.");
+    document.getElementById("formArea").style.display = "none";
+    document.getElementById("successBox").style.display = "block";
+    document.getElementById("returnLink").href = getReturnUrl();
+    document.getElementById("statusBadge").textContent = "EN PROGRESO";
+    window.scrollTo({ top:0, behavior:"smooth" });
+  } catch (err) {
+    setSending(false);
+    document.getElementById("sendBtn").textContent = FILES.some(function(item) {
+      return item.status !== "uploaded";
+    }) ? "Reintentar envio" : "Enviar e iniciar trabajo";
+    showError(getErrorMessage(err));
+  }
+}
+
+function startWorkOnServer(problemFound, proposedSolution) {
+  return new Promise(function(resolve, reject) {
+    google.script.run
+      .withSuccessHandler(resolve)
+      .withFailureHandler(reject)
+      .startTechWorkWithAssessment(
+        Number(ORDER.ROW_NUMBER || ROW_NUMBER),
+        problemFound,
+        proposedSolution,
+        getSessionToken()
+      );
+  });
+}
+
+async function uploadPendingFiles() {
+  const pending = FILES.filter(function(item) { return item.status !== "uploaded"; });
+  const progress = document.getElementById("attachmentProgress");
+
+  for (let index = 0; index < pending.length; index++) {
+    const item = pending[index];
+    try {
+      item.status = "reading";
+      progress.textContent = "Preparando archivo " + (index + 1) + " de " + pending.length + "...";
+      setSending(true, "Preparando archivos...");
+      const base64 = await fileToBase64(item.file);
+
+      item.status = "uploading";
+      progress.textContent = "Subiendo archivo " + (index + 1) + " de " + pending.length + "...";
+      setSending(true, "Subiendo " + (index + 1) + " de " + pending.length + "...");
+
+      item.uploaded = await uploadFileOnServer({
+        companyId:getCompanyId(),
+        woNumber:ORDER.WO_NUMBER,
+        uploadId:item.id,
+        name:item.file.name,
+        mimeType:item.file.type,
+        data:base64
+      });
+      item.status = "uploaded";
+      renderAttachments();
+    } catch (err) {
+      item.status = "error";
+      renderAttachments();
+      throw new Error(
+        "El diagnostico fue guardado, pero no se pudo subir " + item.file.name + ": " + getErrorMessage(err)
+      );
+    }
+  }
+
+  if (pending.length) {
+    progress.textContent = pending.length +
+      " archivo" + (pending.length === 1 ? " guardado." : "s guardados.");
+  }
+}
+
+function uploadFileOnServer(payload) {
+  return new Promise(function(resolve, reject) {
+    google.script.run
+      .withSuccessHandler(resolve)
+      .withFailureHandler(reject)
+      .uploadWorkOrderAttachment(payload, getSessionToken());
+  });
+}
+
+function fileToBase64(file) {
+  return new Promise(function(resolve, reject) {
+    const reader = new FileReader();
+    reader.onload = function() {
+      resolve(String(reader.result || "").split(",")[1] || "");
+    };
+    reader.onerror = function() {
+      reject(new Error("No se pudo leer " + file.name + "."));
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function formatSize(bytes) {
+  const size = Number(bytes || 0);
+  if (size < 1024) return size + " B";
+  if (size < 1024 * 1024) return (size / 1024).toFixed(1) + " KB";
+  return (size / 1024 / 1024).toFixed(1) + " MB";
+}
+
+function showError(message) {
+  const box = document.getElementById("errorBox");
+  box.textContent = message || "Ocurrio un error.";
+  box.style.display = "block";
+  box.scrollIntoView({ behavior:"smooth", block:"center" });
+}
+
+function hideError() {
+  const box = document.getElementById("errorBox");
+  box.textContent = "";
+  box.style.display = "none";
+}
+
+function getErrorMessage(err) {
+  return err && err.message ? err.message : String(err || "Ocurrio un error.");
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+document.addEventListener("DOMContentLoaded", loadOrder);
+</script>
+</body>
+</html>

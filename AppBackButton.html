@@ -93,9 +93,13 @@ function removeAppSessionItem(key) {
 }
 
 (function() {
-  var APP_BACK_PUBLIC_URLS = {
-    PPS: "https://app.palaciospowersystems.com/",
-    OWNER: "https://app.ddpremiersolutionscorp.com/"
+  var APP_BACK_INTERNAL_URL = "https://script.google.com/macros/s/AKfycbwAiZ0Dh5BQoX-QTmMbZcRDEr974-X_nNWcW5x2XeYurC_CeXLNSrl1k-f3p1DDKppOCw/exec";
+  var APP_BACK_ALLOWED_HOSTS = {
+    "script.google.com": true,
+    "app.palaciospowersystems.com": true,
+    "app.ddpremiersolutionscorp.com": true,
+    "ddpremiersolutionscorp.com": true,
+    "www.ddpremiersolutionscorp.com": true
   };
 
   function getSearchParams() {
@@ -155,31 +159,25 @@ function removeAppSessionItem(key) {
       /script\.googleusercontent\.com/i.test(value);
   }
 
-  function getPublicBaseUrl(companyId) {
-    if (isOwnerPortal()) return APP_BACK_PUBLIC_URLS.OWNER;
-    if (companyId && APP_BACK_PUBLIC_URLS[companyId]) return APP_BACK_PUBLIC_URLS[companyId];
-
-    return APP_BACK_PUBLIC_URLS.OWNER;
+  function getInternalBaseUrl() {
+    return APP_BACK_INTERNAL_URL;
   }
 
   function normalizeBackUrl(raw) {
     if (isUnsafeBackUrl(raw)) return "";
 
     try {
-      var parsed = new URL(String(raw), getPublicBaseUrl(getStoredCompanyId()));
+      var parsed = new URL(String(raw), getInternalBaseUrl());
 
       if (parsed.protocol !== "https:") return "";
-
-      if (parsed.hostname === "script.google.com") {
-        var publicUrl = new URL(getPublicBaseUrl(getStoredCompanyId()));
-        publicUrl.search = parsed.search;
-        publicUrl.hash = parsed.hash;
-        return publicUrl.href;
-      }
+      if (!APP_BACK_ALLOWED_HOSTS[parsed.hostname]) return "";
 
       if (/script\.googleusercontent\.com/i.test(parsed.hostname)) return "";
 
-      return parsed.href;
+      var internalUrl = new URL(getInternalBaseUrl());
+      internalUrl.search = parsed.search;
+      internalUrl.hash = parsed.hash;
+      return internalUrl.href;
     } catch (err) {
       return "";
     }
@@ -191,7 +189,7 @@ function removeAppSessionItem(key) {
     if (returnTo) return returnTo;
 
     var companyId = getStoredCompanyId();
-    var url = getPublicBaseUrl(companyId);
+    var url = getInternalBaseUrl();
 
     if (isOwnerPortal()) {
       url = appendParam(url, "ownerOnly", "1");
@@ -204,27 +202,13 @@ function removeAppSessionItem(key) {
     return url;
   }
 
-  function getParentMessageUrl(url) {
-    try {
-      var target = new URL(url);
-      if (target.hostname === "app.palaciospowersystems.com" ||
-          target.hostname === "app.ddpremiersolutionscorp.com" ||
-          target.hostname === "ddpremiersolutionscorp.com" ||
-          target.hostname === "www.ddpremiersolutionscorp.com") {
-        return target.pathname + target.search + target.hash;
-      }
-    } catch (err) {}
-
-    return url;
-  }
-
   function navigateBackTarget(url) {
     var target = String(url || "").trim();
     if (!target) return;
 
     try {
       if (window.parent && window.parent !== window) {
-        window.parent.postMessage({ type: "PPS_NAVIGATE", url: getParentMessageUrl(target) }, "*");
+        window.parent.postMessage({ type: "PPS_NAVIGATE", url: target }, "*");
         setTimeout(function() {
           try {
             window.open(target, "_top");

@@ -58,7 +58,7 @@ function createPMInvoiceFromCloseOrder_(data) {
   }
 
   const invoiceNumber = generateInvoiceNumber_(companyId);
-  const now = new Date();
+  const now = getCloseOrderInvoiceDate_(data);
 
   const store = getPMStoreData_(data);
   const folder = getPMInvoiceFolder_(now, store.nsn || data.NSN || "NO_NSN");

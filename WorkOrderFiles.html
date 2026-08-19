@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      font-family:Arial, sans-serif;
+      background:#f3f4f6;
+      margin:0;
+      padding:16px;
+      color:#111827;
+    }
+
+    .header,
+    .box {
+      background:white;
+      padding:16px;
+      border-radius:14px;
+      margin-bottom:15px;
+      box-shadow:0 3px 10px rgba(0,0,0,.08);
+    }
+
+    .header {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      flex-wrap:wrap;
+    }
+
+    .title {
+      font-size:22px;
+      font-weight:bold;
+    }
+
+    .muted {
+      color:#64748b;
+      font-size:13px;
+    }
+
+    .summary {
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:10px;
+    }
+
+    .badge {
+      background:#e2e8f0;
+      border-radius:999px;
+      padding:7px 11px;
+      font-size:13px;
+      font-weight:bold;
+    }
+
+    .gallery {
+      display:grid;
+      grid-template-columns:repeat(auto-fill, minmax(230px, 1fr));
+      gap:14px;
+    }
+
+    .file-card {
+      display:flex;
+      flex-direction:column;
+      min-height:285px;
+      overflow:hidden;
+      border:1px solid #e2e8f0;
+      border-radius:13px;
+      background:white;
+    }
+
+    .preview {
+      height:180px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:#0f172a;
+      overflow:hidden;
+    }
+
+    .preview img {
+      width:100%;
+      height:100%;
+      object-fit:cover;
+    }
+
+    .file-icon {
+      color:white;
+      font-size:54px;
+    }
+
+    .file-details {
+      display:flex;
+      flex:1;
+      flex-direction:column;
+      gap:5px;
+      padding:12px;
+    }
+
+    .file-name {
+      font-weight:bold;
+      overflow-wrap:anywhere;
+    }
+
+    button {
+      width:100%;
+      margin-top:auto;
+      padding:11px 13px;
+      border:0;
+      border-radius:9px;
+      background:#2563eb;
+      color:white;
+      font-weight:bold;
+      cursor:pointer;
+    }
+
+    button:hover {
+      filter:brightness(1.06);
+    }
+
+    .empty,
+    .loading,
+    .error {
+      grid-column:1/-1;
+      padding:24px;
+      text-align:center;
+      border-radius:12px;
+      background:#f8fafc;
+      color:#475569;
+    }
+
+    .error {
+      color:#991b1b;
+      background:#fef2f2;
+    }
+
+    .modal {
+      display:none;
+      position:fixed;
+      inset:0;
+      z-index:9999;
+      align-items:flex-start;
+      justify-content:center;
+      padding:16px;
+      overflow-x:hidden;
+      overflow-y:auto;
+      overscroll-behavior:contain;
+      -webkit-overflow-scrolling:touch;
+      touch-action:pan-y;
+      background:rgba(15,23,42,.78);
+    }
+
+    .modal-card {
+      width:min(980px, 100%);
+      margin:auto;
+      overflow:visible;
+      touch-action:pan-y;
+      border-radius:14px;
+      background:white;
+      box-shadow:0 30px 80px rgba(0,0,0,.4);
+    }
+
+    .modal-head {
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      padding:13px 15px;
+      border-bottom:1px solid #e5e7eb;
+      position:sticky;
+      top:0;
+      z-index:3;
+      background:white;
+    }
+
+    .modal-title {
+      min-width:0;
+      font-weight:bold;
+      overflow-wrap:anywhere;
+    }
+
+    .modal-close {
+      width:auto;
+      min-width:92px;
+      margin:0;
+      background:#dc2626;
+    }
+
+    .viewer {
+      min-height:260px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:14px;
+      overflow:auto;
+      touch-action:pan-x pan-y;
+      background:#0f172a;
+    }
+
+    .viewer img,
+    .viewer video {
+      display:block;
+      width:auto;
+      height:auto;
+      max-width:100%;
+      max-height:calc(100vh - 190px);
+      max-height:calc(100dvh - 190px);
+      object-fit:contain;
+      border-radius:8px;
+      background:black;
+    }
+
+    .viewer video {
+      width:100%;
+    }
+
+    .viewer-loading {
+      color:white;
+      font-weight:bold;
+    }
+
+    .modal-actions {
+      display:flex;
+      justify-content:flex-end;
+      padding:12px 15px;
+      position:sticky;
+      bottom:0;
+      z-index:3;
+      background:white;
+      border-top:1px solid #e5e7eb;
+    }
+
+    .download-link {
+      display:inline-block;
+      padding:10px 14px;
+      border-radius:9px;
+      background:#16a34a;
+      color:white;
+      font-weight:bold;
+      text-decoration:none;
+    }
+
+    @media (max-width:700px) {
+      body { padding:10px; }
+      .gallery { grid-template-columns:1fr; }
+      .file-card { min-height:250px; }
+      .preview { height:210px; }
+      .modal { padding:0; }
+      .modal-card {
+        width:100%;
+        min-height:0;
+        margin:0;
+        border-radius:0;
+      }
+      .viewer {
+        min-height:220px;
+        padding:10px;
+      }
+      .viewer img,
+      .viewer video {
+        max-height:calc(100vh - 165px);
+        max-height:calc(100dvh - 165px);
+      }
+    }
+  </style>
+  <?!= include("AppWatermark"); ?>
+</head>
+
+<body class="app-watermark" style="--company-watermark-logo:<?!= watermarkLogoCss ?>;">
+
+<?!= include("AppBackButton"); ?>
+
+<div class="header">
+  <div>
+    <div class="title">Fotos y videos de la orden</div>
+    <div class="muted">Los archivos se muestran dentro del sistema. No es necesario abrir Google Drive.</div>
+  </div>
+  <div style="text-align:right;">
+    <div style="font-weight:bold;">D&amp;D Premier Solutions Corp</div>
+    <div class="muted">Work Order Files</div>
+  </div>
+</div>
+
+<div class="box">
+  <div id="orderTitle" style="font-size:19px; font-weight:bold;">Cargando orden...</div>
+  <div id="orderSummary" class="summary"></div>
+</div>
+
+<div id="gallery" class="gallery">
+  <div class="loading">Cargando fotos y videos...</div>
+</div>
+
+<div id="fileModal" class="modal" onclick="closeWorkOrderFileFromBackdrop(event)">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div id="modalFileName" class="modal-title">Archivo</div>
+      <button type="button" class="modal-close" onclick="closeWorkOrderFile()">Cerrar</button>
+    </div>
+    <div id="fileViewer" class="viewer">
+      <div class="viewer-loading">Cargando archivo...</div>
+    </div>
+    <div id="modalActions" class="modal-actions"></div>
+  </div>
+</div>
+
+<script>
+function navigateFilesApp(url) {
+  const target = String(url || "").trim();
+  if (!target) return;
+
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: "PPS_NAVIGATE", url: target }, "*");
+      setTimeout(function() {
+        try {
+          window.open(target, "_top");
+        } catch (err) {
+          window.location.href = target;
+        }
+      }, 250);
+      return;
+    }
+  } catch (err) {}
+
+  try {
+    window.open(target, "_top");
+  } catch (err) {
+    window.location.href = target;
+  }
+}
+
+const FILES_BASE_URL = "<?= baseUrl ?>";
+const FILES_ROW = Number("<?= row ?>" || 0);
+const FILES_WO = String("<?= wo ?>").trim();
+const FILES_COMPANY_ID = String("<?= companyId ?>").trim().toUpperCase();
+let WORK_ORDER_FILE_MAP = {};
+let CURRENT_FILE_BLOB_URL = "";
+
+function getFilesCurrentUser() {
+  try {
+    return JSON.parse(getAppSessionItem("pps_user") || "{}");
+  } catch (err) {
+    return {};
+  }
+}
+
+function getFilesSessionToken() {
+  const user = getFilesCurrentUser();
+  return user.sessionToken || user.SESSION_TOKEN || "";
+}
+
+function requireFilesLogin() {
+  const user = getFilesCurrentUser();
+  const token = getFilesSessionToken();
+  const role = String(user.role || user.ROLE || "").trim();
+
+  if (!token || !role) {
+    navigateFilesApp(FILES_BASE_URL);
+    return false;
+  }
+
+  const expiresAt = Number(user.sessionExpiresAt || user.SESSION_EXPIRES_AT || 0);
+  if (expiresAt && expiresAt <= Date.now()) {
+    removeAppSessionItem("pps_user");
+    navigateFilesApp(FILES_BASE_URL);
+    return false;
+  }
+
+  return true;
+}
+
+function loadWorkOrderFiles() {
+  if (!requireFilesLogin()) return;
+
+  google.script.run
+    .withSuccessHandler(renderWorkOrderFiles)
+    .withFailureHandler(function(err) {
+      const message = err && err.message ? err.message : err;
+      document.getElementById("gallery").innerHTML =
+        '<div class="error">' + escapeWorkOrderFiles(message) + '</div>';
+    })
+    .getWorkOrderAttachmentGallery(
+      FILES_ROW,
+      FILES_WO,
+      FILES_COMPANY_ID,
+      getFilesSessionToken()
+    );
+}
+
+function renderWorkOrderFiles(result) {
+  result = result || {};
+  const files = result.files || [];
+  WORK_ORDER_FILE_MAP = {};
+
+  document.getElementById("orderTitle").innerText =
+    "WO " + (result.woNumber || FILES_WO || "") + " - NSN " + (result.nsn || "");
+
+  document.getElementById("orderSummary").innerHTML =
+    '<span class="badge">Company: ' +
+      escapeWorkOrderFiles(result.companyId || FILES_COMPANY_ID || "") +
+    '</span>' +
+    '<span class="badge">' +
+      files.length +
+      ' archivo(s)</span>';
+
+  files.forEach(function(file) {
+    WORK_ORDER_FILE_MAP[file.id] = file;
+  });
+
+  if (!files.length) {
+    document.getElementById("gallery").innerHTML =
+      '<div class="empty">Esta orden no tiene fotos ni videos.</div>';
+    return;
+  }
+
+  document.getElementById("gallery").innerHTML = files.map(function(file) {
+    const preview = file.thumbnailDataUrl
+      ? '<img src="' + escapeWorkOrderFiles(file.thumbnailDataUrl) + '" alt="">'
+      : '<div class="file-icon">' + (file.kind === "video" ? "&#9654;" : "&#128247;") + '</div>';
+
+    return '<div class="file-card">' +
+      '<div class="preview">' + preview + '</div>' +
+      '<div class="file-details">' +
+        '<div class="file-name">' + escapeWorkOrderFiles(file.name) + '</div>' +
+        '<div class="muted">' +
+          escapeWorkOrderFiles(file.kind === "video" ? "Video" : "Foto") +
+          ' - ' +
+          escapeWorkOrderFiles(formatWorkOrderFileSize(file.size)) +
+        '</div>' +
+        '<div class="muted">' + escapeWorkOrderFiles(file.createdAt || "") + '</div>' +
+        '<button type="button" onclick="openWorkOrderFile(\'' + file.id + '\')">' +
+          (file.kind === "video" ? "Reproducir video" : "Ver foto") +
+        '</button>' +
+      '</div>' +
+    '</div>';
+  }).join("");
+}
+
+function openWorkOrderFile(fileId) {
+  const file = WORK_ORDER_FILE_MAP[fileId];
+  if (!file) return;
+
+  closeCurrentWorkOrderBlobUrl();
+  document.getElementById("modalFileName").innerText = file.name || "Archivo";
+  document.getElementById("fileViewer").innerHTML =
+    '<div class="viewer-loading">Cargando archivo...</div>';
+  document.getElementById("modalActions").innerHTML = "";
+  document.getElementById("fileModal").style.display = "flex";
+
+  google.script.run
+    .withSuccessHandler(renderOpenedWorkOrderFile)
+    .withFailureHandler(function(err) {
+      const message = err && err.message ? err.message : err;
+      document.getElementById("fileViewer").innerHTML =
+        '<div class="viewer-loading">' + escapeWorkOrderFiles(message) + '</div>';
+    })
+    .getWorkOrderAttachmentContent(
+      fileId,
+      FILES_ROW,
+      FILES_WO,
+      FILES_COMPANY_ID,
+      getFilesSessionToken()
+    );
+}
+
+function renderOpenedWorkOrderFile(result) {
+  result = result || {};
+
+  try {
+    CURRENT_FILE_BLOB_URL = createWorkOrderFileBlobUrl(
+      result.data || "",
+      result.mimeType || "application/octet-stream"
+    );
+  } catch (err) {
+    document.getElementById("fileViewer").innerHTML =
+      '<div class="viewer-loading">No se pudo preparar el archivo.</div>';
+    return;
+  }
+
+  const safeUrl = escapeWorkOrderFiles(CURRENT_FILE_BLOB_URL);
+  const mimeType = String(result.mimeType || "").toLowerCase();
+
+  if (mimeType.indexOf("video/") === 0) {
+    document.getElementById("fileViewer").innerHTML =
+      '<video controls playsinline preload="metadata" src="' + safeUrl + '"></video>';
+  } else {
+    document.getElementById("fileViewer").innerHTML =
+      '<img src="' + safeUrl + '" alt="' + escapeWorkOrderFiles(result.name || "Foto") + '">';
+  }
+
+  const downloadLink = document.createElement("a");
+  downloadLink.className = "download-link";
+  downloadLink.href = CURRENT_FILE_BLOB_URL;
+  downloadLink.download = result.name || "archivo";
+  downloadLink.textContent = "Descargar archivo";
+
+  const actions = document.getElementById("modalActions");
+  actions.innerHTML = "";
+  actions.appendChild(downloadLink);
+}
+
+function createWorkOrderFileBlobUrl(base64, mimeType) {
+  const binary = atob(String(base64 || ""));
+  const chunkSize = 1024 * 1024;
+  const chunks = [];
+
+  for (let offset = 0; offset < binary.length; offset += chunkSize) {
+    const slice = binary.slice(offset, offset + chunkSize);
+    const bytes = new Uint8Array(slice.length);
+
+    for (let i = 0; i < slice.length; i++) {
+      bytes[i] = slice.charCodeAt(i);
+    }
+
+    chunks.push(bytes);
+  }
+
+  return URL.createObjectURL(new Blob(chunks, { type: mimeType }));
+}
+
+function closeWorkOrderFile() {
+  const video = document.querySelector("#fileViewer video");
+  if (video) {
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+  }
+
+  document.getElementById("fileModal").style.display = "none";
+  document.getElementById("fileViewer").innerHTML = "";
+  document.getElementById("modalActions").innerHTML = "";
+  closeCurrentWorkOrderBlobUrl();
+}
+
+function closeWorkOrderFileFromBackdrop(event) {
+  if (event && event.target && event.target.id === "fileModal") {
+    closeWorkOrderFile();
+  }
+}
+
+function closeCurrentWorkOrderBlobUrl() {
+  if (!CURRENT_FILE_BLOB_URL) return;
+
+  try {
+    URL.revokeObjectURL(CURRENT_FILE_BLOB_URL);
+  } catch (err) {}
+
+  CURRENT_FILE_BLOB_URL = "";
+}
+
+function formatWorkOrderFileSize(bytes) {
+  const size = Number(bytes || 0);
+  if (size < 1024) return size + " B";
+  if (size < 1024 * 1024) return (size / 1024).toFixed(1) + " KB";
+  return (size / 1024 / 1024).toFixed(1) + " MB";
+}
+
+function escapeWorkOrderFiles(value) {
+  return String(value === undefined || value === null ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+document.addEventListener("keydown", function(event) {
+  if (event.key === "Escape" && document.getElementById("fileModal").style.display === "flex") {
+    closeWorkOrderFile();
+  }
+});
+
+window.addEventListener("beforeunload", closeCurrentWorkOrderBlobUrl);
+loadWorkOrderFiles();
+</script>
+
+</body>
+</html>

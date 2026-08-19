@@ -65,6 +65,7 @@ function saveWorkOrderRow_(o) {
   });
 
   sh.appendRow(rowValues);
+  touchAppCacheVersion_();
 }
 
 function getDashboardData(companyId, role, sessionToken) {
@@ -72,6 +73,7 @@ function getDashboardData(companyId, role, sessionToken) {
   role = String(role || "").trim().toUpperCase();
   requireSession_(sessionToken, ["OWNER", "ADMIN", "ORDENES", "ECONOMIA"], companyId);
 
+  return withAppCache_(["orders-dashboard", companyId, role], 90, function() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
 
@@ -91,6 +93,7 @@ function getDashboardData(companyId, role, sessionToken) {
   }
 
   const data = [];
+  const storeMap = getStoreMapByCompany_(companyId);
 
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
@@ -114,12 +117,13 @@ function getDashboardData(companyId, role, sessionToken) {
 
     obj.ROW_NUMBER = i + 1;
 
-    enrichWorkOrderObject_(obj);
+    enrichWorkOrderObjectFromStoreMap_(obj, storeMap);
 
     data.push(obj);
   }
 
   return data.reverse();
+  });
 }
 
 function updateWorkOrderFromDashboard(rowNumber, updates, sessionToken) {
@@ -189,6 +193,7 @@ function updateWorkOrderFromDashboard(rowNumber, updates, sessionToken) {
     updates: updates
   });
 
+  touchAppCacheVersion_();
   return true;
 }
 
@@ -210,6 +215,7 @@ function sendWorkOrderFromDashboard(rowNumber, sessionToken) {
     rowNumber: Number(rowNumber)
   });
 
+  touchAppCacheVersion_();
   return true;
 }
 
@@ -242,6 +248,7 @@ function deleteWorkOrder(rowNumber, sessionToken) {
     rowNumber: rowNumber
   });
 
+  touchAppCacheVersion_();
   return true;
 }
 
@@ -264,6 +271,13 @@ function dispatchRowToTech_(sh, row) {
   const techEmail = getTechEmails_(technician);
 
   const publicBaseUrl = getWebAppBaseUrl_(companyId);
+  const attachmentPortalUrl = obj.FOLDER_URL
+    ? publicBaseUrl +
+      "?view=orderFiles" +
+      "&row=" + encodeURIComponent(String(row)) +
+      "&wo=" + encodeURIComponent(String(obj.WO_NUMBER || "")) +
+      "&companyId=" + encodeURIComponent(String(companyId || ""))
+    : "";
 
   if (isTechEmailTestMode_()) {
     Logger.log("TEST MODE: Email NO enviado. Técnicos: " + technician + " / " + techEmail);
@@ -282,6 +296,11 @@ function dispatchRowToTech_(sh, row) {
         "<p><b>Equipment:</b> " + (obj.REPORTED_EQUIPMENT_EN || obj.REPORTED_EQUIPMENT || "") + "</p>" +
         "<p><b>Priority:</b> " + obj.ORDER_PRIORITY + "</p>" +
         "<p><b>Issue:</b><br>" + obj.REPORTED_PROBLEM_EN + "</p>" +
+        (attachmentPortalUrl
+          ? "<p><b>Photos / Videos:</b> <a href='" +
+            escapeHtmlForEmail_(attachmentPortalUrl) +
+            "'>Open photos and videos in the work order system</a></p>"
+          : "") +
         "<hr>" +
         "<p><b>Dirección:</b> " + (obj.STORE_ADDRESS || "") + "</p>" +
         "<p><b>Problema:</b><br>" + obj.REPORTED_PROBLEM_ES + "</p>" +
@@ -307,18 +326,6 @@ function dispatchRowToTech_(sh, row) {
       "🚨 Assigned Work Order " + obj.WO_NUMBER + " / NSN " + obj.NSN
     );
   });
-
-  try {
-    const smsMessage = buildTechAssignedSmsMessage_(obj, publicBaseUrl);
-    sendSMSToTechnicians_(technician, smsMessage, companyId);
-  } catch (smsErr) {
-    notifySystemError_("TECH_SMS_ASSIGNMENT_ERROR", smsErr, {
-      module: "ORDERS",
-      companyId: companyId,
-      woNumber: obj.WO_NUMBER,
-      technicians: technician
-    });
-  }
 
   addLog_(
     companyId,
@@ -393,15 +400,6 @@ function getWorkOrderActionSecret_() {
   }
 
   return secret;
-}
-
-function buildTechAssignedSmsMessage_(order, publicBaseUrl) {
-  return [
-    "PPS: Nueva orden " + (order.WO_NUMBER || ""),
-    "NSN " + (order.NSN || ""),
-    "Cliente " + (order.CLIENT || ""),
-    "Revise portal tecnico: " + publicBaseUrl
-  ].join(" / ");
 }
 
 function generateWONumber_(companyId) {
@@ -480,9 +478,9 @@ function createWorkOrderFromApp(data, sessionToken) {
 
   const woNumber = generateWONumber_(companyId);
 
-  const equipmentEn = safeTranslate_(equipmentOriginal, "auto", "en");
+  const equipmentEn = String(data._EQUIPMENT_EN || "").trim() || safeTranslate_(equipmentOriginal, "auto", "en");
 
-  const problemEn = safeTranslate_(problemOriginal, "auto", "en");
+  const problemEn = String(data._PROBLEM_EN || "").trim() || safeTranslate_(problemOriginal, "auto", "en");
 
   const statusEn = "ORDER RECEIVED";
 
@@ -574,5 +572,544 @@ function createWorkOrderFromApp(data, sessionToken) {
   return {
     success: true,
     woNumber: woNumber
+  };
+}
+
+function uploadWorkOrderAttachment(data, sessionToken) {
+  try {
+    return uploadWorkOrderAttachment_(data, sessionToken);
+  } catch (err) {
+    notifySystemError_("WORK_ORDER_ATTACHMENT_UPLOAD_ERROR", err, {
+      module: "CREATE_ORDER",
+      companyId: data && data.companyId,
+      woNumber: data && data.woNumber,
+      fileName: data && data.name,
+      mimeType: data && data.mimeType
+    });
+    throw err;
+  }
+}
+
+function uploadWorkOrderAttachment_(data, sessionToken) {
+  data = data || {};
+
+  const requestedCompanyId = String(data.companyId || "").trim().toUpperCase();
+  const woNumber = String(data.woNumber || "").trim();
+  const uploadId = String(data.uploadId || "").trim().substring(0, 180);
+  const rawBase64 = String(data.data || "").trim();
+  const maxFiles = Number(CFG.WORK_ORDER_ATTACHMENT_MAX_FILES || 10);
+  const maxBytes = Number(CFG.WORK_ORDER_ATTACHMENT_MAX_BYTES || 26214400);
+
+  if (!requestedCompanyId) throw new Error("Falta COMPANY_ID para subir el archivo.");
+  if (!woNumber) throw new Error("Falta WO_NUMBER para subir el archivo.");
+  if (!uploadId) throw new Error("Falta el identificador del archivo.");
+  if (!rawBase64) throw new Error("El archivo esta vacio.");
+
+  const estimatedBytes = Math.floor(rawBase64.length * 3 / 4);
+  if (estimatedBytes > maxBytes + 3) {
+    throw new Error(
+      "El archivo excede el limite de " +
+      Math.round(maxBytes / 1024 / 1024) +
+      " MB."
+    );
+  }
+
+  const fileName = sanitizeWorkOrderAttachmentName_(data.name);
+  const mimeType = normalizeWorkOrderAttachmentMimeType_(data.mimeType, fileName);
+  if (mimeType.indexOf("image/") !== 0 && mimeType.indexOf("video/") !== 0) {
+    throw new Error("Solo se permiten archivos de fotos y videos.");
+  }
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
+  if (!sh) throw new Error("No existe la hoja: " + CFG.SHEET_WORK_ORDERS);
+
+  let headers = sh.getRange(1, 1, 1, sh.getLastColumn())
+    .getValues()[0]
+    .map(function(header) {
+      return String(header || "").trim();
+    });
+
+  const values = sh.getDataRange().getValues();
+  const idxWO = headers.indexOf("WO_NUMBER");
+  const idxCompany = headers.indexOf("COMPANY_ID");
+  if (idxWO === -1) throw new Error("WORK_ORDERS no tiene la columna WO_NUMBER.");
+
+  let rowNumber = 0;
+  let rowData = null;
+
+  for (let i = 1; i < values.length; i++) {
+    const currentWO = String(values[i][idxWO] || "").trim();
+    const currentCompanyId = idxCompany >= 0
+      ? String(values[i][idxCompany] || "").trim().toUpperCase()
+      : String(CFG.DEFAULT_COMPANY_ID || "").trim().toUpperCase();
+
+    if (currentWO === woNumber && currentCompanyId === requestedCompanyId) {
+      rowNumber = i + 1;
+      rowData = values[i];
+      break;
+    }
+  }
+
+  if (!rowNumber || !rowData) {
+    throw new Error("No se encontro la orden " + woNumber + ".");
+  }
+
+  const session = requireWorkOrderSession_(
+    sessionToken,
+    rowData,
+    headers,
+    ["TECH", "OWNER", "ADMIN", "ORDENES"],
+    "subir archivos a"
+  );
+
+  const nsn = String(getRowValue_(rowData, headers, "NSN") || "").trim();
+  if (!nsn) throw new Error("La orden no tiene NSN.");
+
+  const orderFolder = createOrderFolders_(requestedCompanyId, nsn, woNumber);
+  const attachmentFolder = getOrCreateFolder_(orderFolder, "Order Attachments");
+
+  const description = "CREATE_ORDER_UPLOAD:" + uploadId;
+  const existingFiles = attachmentFolder.getFiles();
+  let existingFile = null;
+  let fileCount = 0;
+
+  while (existingFiles.hasNext()) {
+    const currentFile = existingFiles.next();
+    fileCount++;
+
+    if (String(currentFile.getDescription() || "") === description) {
+      existingFile = currentFile;
+    }
+  }
+
+  headers = ensureSheetColumns_(sh, ["FOLDER_URL", "ATTACHMENT_COUNT"]);
+
+  if (existingFile) {
+    setCellByHeader_(sh, rowNumber, headers, "FOLDER_URL", orderFolder.getUrl());
+    setCellByHeader_(sh, rowNumber, headers, "ATTACHMENT_COUNT", fileCount);
+
+    return {
+      success: true,
+      reused: true,
+      id: existingFile.getId(),
+      url: existingFile.getUrl(),
+      name: existingFile.getName(),
+      mimeType: existingFile.getMimeType(),
+      attachmentCount: fileCount
+    };
+  }
+
+  if (fileCount >= maxFiles) {
+    throw new Error("Esta orden ya tiene el maximo de " + maxFiles + " archivos.");
+  }
+
+  let bytes;
+  try {
+    bytes = Utilities.base64Decode(rawBase64);
+  } catch (err) {
+    throw new Error("No se pudo leer el archivo seleccionado.");
+  }
+
+  if (bytes.length > maxBytes) {
+    throw new Error(
+      "El archivo excede el limite de " +
+      Math.round(maxBytes / 1024 / 1024) +
+      " MB."
+    );
+  }
+
+  const blob = Utilities.newBlob(bytes, mimeType, fileName);
+  const file = attachmentFolder.createFile(blob);
+  file.setDescription(description);
+
+  setCellByHeader_(sh, rowNumber, headers, "FOLDER_URL", orderFolder.getUrl());
+  setCellByHeader_(sh, rowNumber, headers, "ATTACHMENT_COUNT", fileCount + 1);
+
+  addLog_(
+    requestedCompanyId,
+    woNumber,
+    "ORDER ATTACHMENT UPLOADED",
+    "",
+    "",
+    getSessionActorLabel_(session),
+    fileName
+  );
+
+  addAuditLog_(
+    "ORDERS",
+    "WORK_ORDER_ATTACHMENT_UPLOADED",
+    requestedCompanyId,
+    "WORK_ORDER",
+    woNumber,
+    session,
+    {
+      fileId: file.getId(),
+      fileName: file.getName(),
+      mimeType: file.getMimeType(),
+      size: bytes.length
+    }
+  );
+
+  touchAppCacheVersion_();
+
+  return {
+    success: true,
+    reused: false,
+    id: file.getId(),
+    url: file.getUrl(),
+    name: file.getName(),
+    mimeType: file.getMimeType(),
+    attachmentCount: fileCount + 1
+  };
+}
+
+function sanitizeWorkOrderAttachmentName_(value) {
+  const safeName = String(value || "archivo")
+    .replace(/[\\/:*?"<>|\u0000-\u001F]/g, "-")
+    .trim()
+    .substring(0, 180);
+
+  return safeName || "archivo";
+}
+
+function normalizeWorkOrderAttachmentMimeType_(mimeType, fileName) {
+  const normalized = String(mimeType || "").trim().toLowerCase();
+  if (normalized) return normalized;
+
+  const extension = String(fileName || "").toLowerCase().split(".").pop();
+  const byExtension = {
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    gif: "image/gif",
+    webp: "image/webp",
+    heic: "image/heic",
+    heif: "image/heif",
+    bmp: "image/bmp",
+    tif: "image/tiff",
+    tiff: "image/tiff",
+    mp4: "video/mp4",
+    mov: "video/quicktime",
+    m4v: "video/x-m4v",
+    webm: "video/webm",
+    avi: "video/x-msvideo",
+    mpg: "video/mpeg",
+    mpeg: "video/mpeg",
+    "3gp": "video/3gpp"
+  };
+
+  return byExtension[extension] || "application/octet-stream";
+}
+
+function getWorkOrderAttachmentGallery(rowNumber, woNumber, companyId, sessionToken) {
+  const context = resolveWorkOrderAttachmentContext_(
+    rowNumber,
+    woNumber,
+    companyId,
+    sessionToken,
+    "ver las fotos y videos de"
+  );
+
+  const filesFolder = getWorkOrderAttachmentFilesFolder_(context);
+  const files = [];
+
+  if (filesFolder) {
+    const iterator = filesFolder.getFiles();
+
+    while (iterator.hasNext()) {
+      const file = iterator.next();
+      const mimeType = String(file.getMimeType() || "").toLowerCase();
+      if (mimeType.indexOf("image/") !== 0 && mimeType.indexOf("video/") !== 0) {
+        continue;
+      }
+
+      let thumbnailDataUrl = "";
+      try {
+        const thumbnail = file.getThumbnail();
+        if (thumbnail) {
+          thumbnailDataUrl =
+            "data:" +
+            (thumbnail.getContentType() || "image/png") +
+            ";base64," +
+            Utilities.base64Encode(thumbnail.getBytes());
+        }
+      } catch (err) {
+        Logger.log("WARN getWorkOrderAttachmentGallery thumbnail: " + err);
+      }
+
+      files.push({
+        id: file.getId(),
+        name: file.getName(),
+        mimeType: mimeType,
+        kind: mimeType.indexOf("video/") === 0 ? "video" : "image",
+        size: Number(file.getSize() || 0),
+        createdAtMs: file.getDateCreated().getTime(),
+        createdAt: Utilities.formatDate(
+          file.getDateCreated(),
+          CFG.TIMEZONE,
+          "MM/dd/yyyy hh:mm a"
+        ),
+        thumbnailDataUrl: thumbnailDataUrl
+      });
+    }
+  }
+
+  files.sort(function(a, b) {
+    return Number(b.createdAtMs || 0) - Number(a.createdAtMs || 0);
+  });
+
+  files.forEach(function(file) {
+    delete file.createdAtMs;
+  });
+
+  return {
+    success: true,
+    rowNumber: context.rowNumber,
+    woNumber: context.woNumber,
+    companyId: context.companyId,
+    nsn: context.nsn,
+    attachmentCount: files.length,
+    files: files
+  };
+}
+
+function getWorkOrderAttachmentContent(fileId, rowNumber, woNumber, companyId, sessionToken) {
+  fileId = String(fileId || "").trim();
+  if (!/^[a-zA-Z0-9_-]{20,}$/.test(fileId)) {
+    throw new Error("El archivo solicitado no es valido.");
+  }
+
+  const context = resolveWorkOrderAttachmentContext_(
+    rowNumber,
+    woNumber,
+    companyId,
+    sessionToken,
+    "abrir las fotos y videos de"
+  );
+
+  const filesFolder = getWorkOrderAttachmentFilesFolder_(context);
+  if (!filesFolder) throw new Error("Esta orden no tiene archivos.");
+
+  const iterator = filesFolder.getFiles();
+  let selectedFile = null;
+
+  while (iterator.hasNext()) {
+    const currentFile = iterator.next();
+    if (currentFile.getId() === fileId) {
+      selectedFile = currentFile;
+      break;
+    }
+  }
+
+  if (!selectedFile) {
+    throw new Error("El archivo no pertenece a esta orden.");
+  }
+
+  const mimeType = String(selectedFile.getMimeType() || "").toLowerCase();
+  if (mimeType.indexOf("image/") !== 0 && mimeType.indexOf("video/") !== 0) {
+    throw new Error("Solo se pueden abrir fotos y videos.");
+  }
+
+  const maxBytes = Number(CFG.WORK_ORDER_ATTACHMENT_MAX_BYTES || 26214400);
+  const fileSize = Number(selectedFile.getSize() || 0);
+  if (fileSize > maxBytes) {
+    throw new Error(
+      "El archivo excede el limite de vista de " +
+      Math.round(maxBytes / 1024 / 1024) +
+      " MB."
+    );
+  }
+
+  const blob = selectedFile.getBlob();
+
+  return {
+    success: true,
+    id: selectedFile.getId(),
+    name: selectedFile.getName(),
+    mimeType: mimeType,
+    size: fileSize,
+    data: Utilities.base64Encode(blob.getBytes())
+  };
+}
+
+function resolveWorkOrderAttachmentContext_(
+  rowNumber,
+  woNumber,
+  requestedCompanyId,
+  sessionToken,
+  actionName
+) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
+  if (!sh) throw new Error("No existe la hoja: " + CFG.SHEET_WORK_ORDERS);
+
+  const values = sh.getDataRange().getValues();
+  if (values.length < 2) throw new Error("No hay ordenes disponibles.");
+
+  const headers = values[0].map(function(header) {
+    return String(header || "").trim();
+  });
+  const idxWO = headers.indexOf("WO_NUMBER");
+  const idxCompany = headers.indexOf("COMPANY_ID");
+  if (idxWO === -1) throw new Error("WORK_ORDERS no tiene la columna WO_NUMBER.");
+
+  const requestedWO = String(woNumber || "").trim();
+  requestedCompanyId = String(requestedCompanyId || "").trim().toUpperCase();
+  let resolvedRow = Number(rowNumber || 0);
+
+  function rowMatchesRequest(row) {
+    const rowWO = String(row[idxWO] || "").trim();
+    const rowCompanyId = idxCompany >= 0
+      ? String(row[idxCompany] || "").trim().toUpperCase()
+      : String(CFG.DEFAULT_COMPANY_ID || "").trim().toUpperCase();
+
+    return (!requestedWO || rowWO === requestedWO) &&
+      (!requestedCompanyId || rowCompanyId === requestedCompanyId);
+  }
+
+  if (
+    resolvedRow < 2 ||
+    resolvedRow > values.length ||
+    !rowMatchesRequest(values[resolvedRow - 1])
+  ) {
+    resolvedRow = 0;
+
+    for (let i = 1; i < values.length; i++) {
+      if (rowMatchesRequest(values[i])) {
+        resolvedRow = i + 1;
+        break;
+      }
+    }
+  }
+
+  if (!resolvedRow) {
+    throw new Error(
+      "No se encontro la orden " +
+      requestedWO +
+      (requestedCompanyId ? " para " + requestedCompanyId : "") +
+      "."
+    );
+  }
+
+  const rowData = values[resolvedRow - 1];
+  requireWorkOrderSession_(
+    sessionToken,
+    rowData,
+    headers,
+    ["TECH", "OWNER", "ADMIN", "ORDENES", "SUPERVISOR"],
+    actionName
+  );
+
+  return {
+    sheet: sh,
+    headers: headers,
+    rowData: rowData,
+    rowNumber: resolvedRow,
+    woNumber: String(getRowValue_(rowData, headers, "WO_NUMBER") || "").trim(),
+    companyId: String(
+      getRowValue_(rowData, headers, "COMPANY_ID") || CFG.DEFAULT_COMPANY_ID
+    ).trim().toUpperCase(),
+    nsn: String(getRowValue_(rowData, headers, "NSN") || "").trim(),
+    folderUrl: String(getRowValue_(rowData, headers, "FOLDER_URL") || "").trim()
+  };
+}
+
+function getWorkOrderAttachmentFilesFolder_(context) {
+  if (!context || !context.folderUrl) return null;
+
+  const folderId = extractDriveFileIdForPortal_(context.folderUrl);
+  const orderFolder = DriveApp.getFolderById(folderId);
+
+  if (String(orderFolder.getName() || "").trim() !== String(context.woNumber || "").trim()) {
+    throw new Error("La carpeta de archivos no corresponde a esta orden.");
+  }
+
+  const folders = orderFolder.getFoldersByName("Order Attachments");
+  return folders.hasNext() ? folders.next() : null;
+}
+
+function createPMWorkOrdersBatchFromApp(data, sessionToken) {
+  data = data || {};
+
+  const companyId = String(data.COMPANY_ID || "").trim().toUpperCase();
+  const session = requireSession_(sessionToken, ["OWNER", "ADMIN", "ORDENES"], companyId);
+  const pmType = String(data.PM_TYPE || "").trim();
+  const equipmentOriginal = String(data.REPORTED_EQUIPMENT || "").trim();
+  const priorityOriginal = String(data.ORDER_PRIORITY || "").trim();
+  const problemOriginal = String(data.REPORTED_PROBLEM || "").trim();
+  const manager = String(data.MANAGER || "").trim();
+
+  if (!companyId) throw new Error("No llego COMPANY_ID.");
+  if (!pmType) throw new Error("PM_TYPE es obligatorio para PM_FORM.");
+  if (!equipmentOriginal) throw new Error("Reported Equipment es obligatorio.");
+  if (!priorityOriginal) throw new Error("Order Priority es obligatoria.");
+  if (!problemOriginal) throw new Error("Reported Problem es obligatorio.");
+  if (!manager) throw new Error("Manager Name es obligatorio.");
+
+  const rawNsns = Array.isArray(data.STORE_NSNS)
+    ? data.STORE_NSNS
+    : String(data.STORE_NSNS || "").split(/[,\n;]+/);
+
+  const nsns = [];
+  const seen = {};
+
+  rawNsns.forEach(function(value) {
+    const nsn = normalizeNSN_(value);
+    if (!nsn || seen[nsn]) return;
+    seen[nsn] = true;
+    nsns.push(nsn);
+  });
+
+  if (!nsns.length) {
+    throw new Error("Selecciona al menos una tienda para crear los PM.");
+  }
+
+  if (nsns.length > 150) {
+    throw new Error("Selecciona 150 tiendas o menos por lote.");
+  }
+
+  const missingStores = nsns.filter(function(nsn) {
+    const store = getStoreByNSN_(nsn, companyId);
+    return !store || !store.fullAddress;
+  });
+
+  if (missingStores.length) {
+    throw new Error("No se encontro tienda/direccion para NSN: " + missingStores.join(", "));
+  }
+
+  const created = [];
+  const equipmentEn = safeTranslate_(equipmentOriginal, "auto", "en");
+  const problemEn = safeTranslate_(problemOriginal, "auto", "en");
+
+  nsns.forEach(function(nsn) {
+    const result = createWorkOrderFromApp({
+      COMPANY_ID: companyId,
+      WO_TYPE: "PM_FORM",
+      PM_TYPE: pmType,
+      NSN: nsn,
+      REPORTED_EQUIPMENT: equipmentOriginal,
+      ORDER_PRIORITY: priorityOriginal,
+      REPORTED_PROBLEM: problemOriginal,
+      _EQUIPMENT_EN: equipmentEn,
+      _PROBLEM_EN: problemEn,
+      MANAGER: manager
+    }, sessionToken);
+
+    created.push(result.woNumber);
+  });
+
+  addAuditLog_("ORDERS", "PM_WORK_ORDERS_BATCH_CREATED", companyId, "WORK_ORDER_BATCH", created.join(","), session, {
+    count: created.length,
+    pmType: pmType,
+    nsns: nsns,
+    woNumbers: created
+  });
+
+  return {
+    success: true,
+    count: created.length,
+    woNumbers: created,
+    nsns: nsns
   };
 }

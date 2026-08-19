@@ -14,8 +14,36 @@
     .save { background:#16a34a; }
     .cancel { background:#dc2626; }
     .muted { color:#6b7280; font-size:14px; }
+    .pm-batch-box { display:none; margin:8px 0 14px; padding:14px; border:1px solid #dbeafe; background:#f8fbff; border-radius:12px; }
+    .checkbox-row { display:flex; align-items:center; gap:10px; margin:0 0 8px; font-weight:bold; }
+    .checkbox-row input { width:auto; margin:0; }
+    .batch-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:4px 0 8px; }
+    .batch-actions button { margin:0; padding:10px; background:#374151; }
+    .store-list { max-height:280px; overflow:auto; border:1px solid #d1d5db; border-radius:10px; background:white; }
+    .store-option { display:flex; align-items:flex-start; gap:10px; padding:10px; border-bottom:1px solid #e5e7eb; }
+    .store-option:last-child { border-bottom:none; }
+    .store-option input { width:auto; margin-top:3px; }
+    .store-title { font-weight:bold; }
+    .store-meta { color:#6b7280; font-size:13px; margin-top:3px; }
+    .mini-label { margin-top:10px; font-size:13px; color:#374151; font-weight:bold; }
+    .attachment-box { margin:12px 0; padding:14px; border:1px solid #cbd5e1; background:#f8fafc; border-radius:12px; }
+    .attachment-box.disabled { opacity:.65; }
+    .attachment-title { font-weight:bold; margin-bottom:4px; }
+    .attachment-picker { display:block; margin:10px 0 6px; padding:11px 14px; border-radius:10px; background:#2563eb; color:white; font-weight:bold; text-align:center; cursor:pointer; }
+    .attachment-picker:hover { background:#1d4ed8; }
+    .attachment-picker.disabled { background:#9ca3af; cursor:not-allowed; }
+    .attachment-input { position:absolute; width:1px; height:1px; opacity:0; overflow:hidden; pointer-events:none; }
+    .attachment-list { display:grid; gap:7px; margin-top:10px; }
+    .attachment-item { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 10px; border:1px solid #e2e8f0; background:white; border-radius:9px; }
+    .attachment-info { min-width:0; }
+    .attachment-name { font-weight:bold; overflow-wrap:anywhere; }
+    .attachment-meta { color:#64748b; font-size:12px; margin-top:2px; }
+    .attachment-remove { width:auto; margin:0; padding:7px 10px; background:#dc2626; font-size:12px; }
+    .attachment-progress { margin-top:8px; color:#1d4ed8; font-size:13px; font-weight:bold; }
+    .attachment-warning { display:none; margin-top:8px; color:#92400e; font-size:13px; font-weight:bold; }
     @media (max-width: 700px) {
       body { padding:12px; }
+      .batch-actions { grid-template-columns:1fr; }
     }
   </style>
   <?!= include("AppWatermark"); ?>
@@ -53,7 +81,33 @@
     <option value="ANNUAL">ANNUAL</option>
   </select>
 
-  <input id="NSN" placeholder="NSN #">
+  <div id="singleNsnBox">
+    <input id="NSN" placeholder="NSN #">
+  </div>
+
+  <div id="pmBatchBox" class="pm-batch-box">
+    <label class="checkbox-row">
+      <input id="PM_BATCH_MODE" type="checkbox" onchange="togglePMBatchMode()">
+      <span>Create PM for multiple stores</span>
+    </label>
+    <div class="muted">Use this only when the same programmed maintenance order must be created for several stores.</div>
+
+    <div id="pmBatchStores" style="display:none;">
+      <div class="mini-label">NSN list</div>
+      <textarea id="PM_BATCH_NSNS" placeholder="Type NSN numbers separated by comma, space or one per line. Example: 4801, 4143, 11472" oninput="updatePMStoreCount()"></textarea>
+      <div class="muted">You can create PM orders directly from this NSN list. The store list below is optional.</div>
+
+      <div class="mini-label">Optional store search</div>
+      <input id="STORE_FILTER" placeholder="Search store, NSN or address" oninput="renderPMStoreList()">
+      <div class="batch-actions">
+        <button type="button" onclick="addTypedNSNsToSelection()">Add typed NSNs</button>
+        <button type="button" onclick="selectVisibleStores()">Select visible search</button>
+        <button type="button" onclick="clearSelectedStores()">Clear selected</button>
+      </div>
+      <div id="PM_STORE_COUNT" class="muted">0 selected</div>
+      <div id="PM_STORE_LIST" class="store-list">Optional store list loading in background...</div>
+    </div>
+  </div>
 
   <input id="REPORTED_EQUIPMENT" placeholder="Reported Equipment">
 
@@ -68,8 +122,29 @@
 
   <input id="MANAGER" placeholder="Manager Name">
 
+  <div id="orderAttachmentBox" class="attachment-box">
+    <div class="attachment-title">Photos and videos / Fotos y videos</div>
+    <div class="muted">Optional. Add up to 10 files. Maximum size: 25 MB per file.</div>
+    <input
+      id="ORDER_ATTACHMENTS"
+      class="attachment-input"
+      type="file"
+      multiple
+      accept="image/*,video/*"
+      onchange="addOrderAttachments(this)">
+    <label id="orderAttachmentPicker" class="attachment-picker" for="ORDER_ATTACHMENTS">
+      Select photos or videos
+    </label>
+    <div id="ORDER_ATTACHMENT_COUNT" class="muted">0 of 10 files selected</div>
+    <div id="ORDER_ATTACHMENT_PROGRESS" class="attachment-progress"></div>
+    <div id="ORDER_ATTACHMENT_BATCH_WARNING" class="attachment-warning">
+      Attachments are available for one order at a time, not for PM batch creation.
+    </div>
+    <div id="ORDER_ATTACHMENT_LIST" class="attachment-list"></div>
+  </div>
+
   <button id="createOrderBtn" class="save" onclick="saveOrder()">Create Order</button>
-  <button class="cancel" onclick="goBack()">Cancel</button>
+  <button id="cancelOrderBtn" class="cancel" onclick="goBack()">Cancel</button>
 </div>
 
 <script>
@@ -143,6 +218,13 @@ const COMPANY_ID_FROM_URL = "<?= companyId ?>";
 const BASE_URL = "<?= baseUrl ?>";
 const RETURN_TO = "<?= returnTo ?>";
 let IS_CREATING_ORDER = false;
+let PM_STORES = [];
+let PM_STORES_LOADED = false;
+let PM_SELECTED_NSNS = {};
+const ORDER_ATTACHMENT_MAX_FILES = 10;
+const ORDER_ATTACHMENT_MAX_BYTES = 25 * 1024 * 1024;
+let ORDER_ATTACHMENT_FILES = [];
+let CREATED_ORDER_RESULT = null;
 
 function getCurrentUser() {
   try {
@@ -166,21 +248,539 @@ function setCreateOrderSaving(isSaving) {
   IS_CREATING_ORDER = !!isSaving;
 
   const btn = document.getElementById("createOrderBtn");
-  if (!btn) return;
+  const cancelBtn = document.getElementById("cancelOrderBtn");
+  const attachmentInput = document.getElementById("ORDER_ATTACHMENTS");
+  const attachmentPicker = document.getElementById("orderAttachmentPicker");
+  const batch = isPMBatchMode();
 
-  btn.disabled = IS_CREATING_ORDER;
-  btn.innerText = IS_CREATING_ORDER ? "Creating order..." : "Create Order";
+  if (btn) {
+    btn.disabled = IS_CREATING_ORDER;
+
+    if (IS_CREATING_ORDER) {
+      btn.innerText = CREATED_ORDER_RESULT ? "Uploading files..." : "Creating order...";
+    } else {
+      const hasPendingUploads = CREATED_ORDER_RESULT && ORDER_ATTACHMENT_FILES.some(function(item) {
+        return item.status !== "uploaded";
+      });
+      btn.innerText = hasPendingUploads ? "Retry file upload" : "Create Order";
+    }
+  }
+
+  if (cancelBtn) cancelBtn.disabled = IS_CREATING_ORDER;
+  if (attachmentInput) attachmentInput.disabled = IS_CREATING_ORDER || batch;
+  if (attachmentPicker) {
+    attachmentPicker.classList.toggle("disabled", IS_CREATING_ORDER || batch);
+  }
+
+  renderOrderAttachments();
+}
+
+function setCreateOrderProgress(message) {
+  const btn = document.getElementById("createOrderBtn");
+  const progress = document.getElementById("ORDER_ATTACHMENT_PROGRESS");
+
+  if (btn && message) btn.innerText = message;
+  if (progress) progress.innerText = message || "";
 }
 
 function togglePMType() {
   const woType = document.getElementById("WO_TYPE").value;
   const pmType = document.getElementById("PM_TYPE");
+  const pmBatchBox = document.getElementById("pmBatchBox");
+  const batchMode = document.getElementById("PM_BATCH_MODE");
 
   if (woType === "PM_FORM") {
     pmType.style.display = "block";
+    pmBatchBox.style.display = "block";
+    loadPMStores();
   } else {
     pmType.style.display = "none";
     pmType.value = "";
+    pmBatchBox.style.display = "none";
+    if (batchMode) batchMode.checked = false;
+    PM_SELECTED_NSNS = {};
+  }
+
+  togglePMBatchMode();
+}
+
+function isPMBatchMode() {
+  const batchMode = document.getElementById("PM_BATCH_MODE");
+  return !!(batchMode && batchMode.checked && document.getElementById("WO_TYPE").value === "PM_FORM");
+}
+
+function togglePMBatchMode() {
+  const batch = isPMBatchMode();
+  const storesBox = document.getElementById("pmBatchStores");
+  const singleNsnBox = document.getElementById("singleNsnBox");
+  const attachmentBox = document.getElementById("orderAttachmentBox");
+  const attachmentInput = document.getElementById("ORDER_ATTACHMENTS");
+  const attachmentPicker = document.getElementById("orderAttachmentPicker");
+  const attachmentWarning = document.getElementById("ORDER_ATTACHMENT_BATCH_WARNING");
+
+  if (storesBox) storesBox.style.display = batch ? "block" : "none";
+  if (singleNsnBox) singleNsnBox.style.display = batch ? "none" : "block";
+  if (attachmentBox) attachmentBox.classList.toggle("disabled", batch);
+  if (attachmentInput) attachmentInput.disabled = batch || IS_CREATING_ORDER;
+  if (attachmentPicker) attachmentPicker.classList.toggle("disabled", batch || IS_CREATING_ORDER);
+  if (attachmentWarning) attachmentWarning.style.display = batch ? "block" : "none";
+
+  renderPMStoreList();
+}
+
+function loadPMStores() {
+  if (PM_STORES_LOADED) return;
+
+  const list = document.getElementById("PM_STORE_LIST");
+  if (list) list.innerHTML = "Loading stores...";
+
+  google.script.run
+    .withSuccessHandler(function(stores) {
+      PM_STORES = stores || [];
+      PM_STORES_LOADED = true;
+      renderPMStoreList();
+    })
+    .withFailureHandler(function(err) {
+      if (list) list.innerHTML = "Error loading stores: " + escapeHtmlCreateOrder(err && err.message ? err.message : err);
+    })
+    .getStoresForCreateOrder(getCompanyId(), getSessionToken());
+}
+
+function renderPMStoreList() {
+  const list = document.getElementById("PM_STORE_LIST");
+  syncPMSelectionsFromDom();
+
+  if (!list || !isPMBatchMode()) {
+    updatePMStoreCount();
+    return;
+  }
+
+  if (!PM_STORES_LOADED) {
+    list.innerHTML = '<div class="store-option">Optional store list loading in background. If you know the NSN numbers, paste them above and press Create Order.</div>';
+    updatePMStoreCount();
+    return;
+  }
+
+  const visibleStores = getVisiblePMStores();
+
+  if (!visibleStores.length) {
+    list.innerHTML = '<div class="store-option">No stores found.</div>';
+    updatePMStoreCount();
+    return;
+  }
+
+  list.innerHTML = visibleStores.map(function(store) {
+    const nsn = String(store.nsn || "");
+    const label = [
+      "NSN " + nsn,
+      store.storeName || store.client || ""
+    ].filter(Boolean).join(" - ");
+
+    return '<label class="store-option">' +
+      '<input class="pm-store-check" type="checkbox" value="' + escapeHtmlCreateOrder(nsn) + '"' +
+      (PM_SELECTED_NSNS[nsn] ? " checked" : "") +
+      ' onchange="setPMStoreSelection(this)">' +
+      '<span>' +
+      '<div class="store-title">' + escapeHtmlCreateOrder(label) + '</div>' +
+      '<div class="store-meta">' + escapeHtmlCreateOrder(store.address || "") + '</div>' +
+      '</span>' +
+      '</label>';
+  }).join("");
+
+  updatePMStoreCount();
+}
+
+function getPMStoreFilterText() {
+  const filterInput = document.getElementById("STORE_FILTER");
+  return String(filterInput ? filterInput.value || "" : "").trim().toLowerCase();
+}
+
+function normalizeNSNCreateOrder(value) {
+  return String(value || "")
+    .replace(/NSN/gi, "")
+    .replace(/#/g, "")
+    .replace(/[^0-9A-Za-z-]/g, "")
+    .trim();
+}
+
+function parsePMBatchNSNsFromText() {
+  const input = document.getElementById("PM_BATCH_NSNS");
+  const text = String(input ? input.value || "" : "");
+  const nsns = [];
+  const seen = {};
+
+  text.split(/[,\s;]+/).forEach(function(value) {
+    const nsn = normalizeNSNCreateOrder(value);
+    if (!nsn || seen[nsn]) return;
+    seen[nsn] = true;
+    nsns.push(nsn);
+  });
+
+  return nsns;
+}
+
+function storeMatchesPMFilter(store, filter) {
+  const text = [
+    store.nsn,
+    store.storeName,
+    store.client,
+    store.address
+  ].join(" ").toLowerCase();
+
+  return !filter || text.indexOf(filter) !== -1;
+}
+
+function getVisiblePMStores() {
+  const filter = getPMStoreFilterText();
+
+  return PM_STORES.filter(function(store) {
+    return storeMatchesPMFilter(store, filter);
+  });
+}
+
+function getSelectedPMStoreMap() {
+  syncPMSelectionsFromDom();
+  const map = {};
+
+  Object.keys(PM_SELECTED_NSNS).forEach(function(nsn) {
+    if (nsn) map[nsn] = true;
+  });
+
+  parsePMBatchNSNsFromText().forEach(function(nsn) {
+    map[nsn] = true;
+  });
+
+  return map;
+}
+
+function syncPMSelectionsFromDom() {
+  document.querySelectorAll(".pm-store-check:checked").forEach(function(input) {
+    if (input.value) PM_SELECTED_NSNS[String(input.value)] = true;
+  });
+
+  document.querySelectorAll(".pm-store-check:not(:checked)").forEach(function(input) {
+    if (input.value) delete PM_SELECTED_NSNS[String(input.value)];
+  });
+}
+
+function setPMStoreSelection(input) {
+  if (!input || !input.value) return;
+
+  if (input.checked) {
+    PM_SELECTED_NSNS[String(input.value)] = true;
+  } else {
+    delete PM_SELECTED_NSNS[String(input.value)];
+  }
+
+  updatePMStoreCount();
+}
+
+function getSelectedPMStoreNsns() {
+  return Object.keys(getSelectedPMStoreMap()).filter(Boolean);
+}
+
+function updatePMStoreCount() {
+  const countEl = document.getElementById("PM_STORE_COUNT");
+  if (!countEl) return;
+  const count = getSelectedPMStoreNsns().length;
+  countEl.innerText = count + " selected";
+}
+
+function addTypedNSNsToSelection() {
+  const nsns = parsePMBatchNSNsFromText();
+
+  if (!nsns.length) {
+    alert("Type at least one NSN first.");
+    return;
+  }
+
+  nsns.forEach(function(nsn) {
+    PM_SELECTED_NSNS[nsn] = true;
+  });
+
+  renderPMStoreList();
+  updatePMStoreCount();
+}
+
+function selectVisibleStores() {
+  const typedNsns = parsePMBatchNSNsFromText();
+  if (typedNsns.length) {
+    typedNsns.forEach(function(nsn) {
+      PM_SELECTED_NSNS[nsn] = true;
+    });
+
+    if (!PM_STORES_LOADED) {
+      const list = document.getElementById("PM_STORE_LIST");
+      if (list) {
+        list.innerHTML = '<div class="store-option">' +
+          typedNsns.length + ' typed NSN(s) selected. They will be validated when creating the PM orders.' +
+          '</div>';
+      }
+      updatePMStoreCount();
+      return;
+    }
+  }
+
+  if (!PM_STORES_LOADED) {
+    const typedNSN = normalizeNSNCreateOrder(getPMStoreFilterText());
+
+    if (typedNSN) {
+      PM_SELECTED_NSNS[typedNSN] = true;
+      const list = document.getElementById("PM_STORE_LIST");
+      if (list) list.innerHTML = '<div class="store-option">NSN ' + escapeHtmlCreateOrder(typedNSN) + ' selected. The store will be validated when creating the PM orders.</div>';
+      updatePMStoreCount();
+      return;
+    }
+
+    alert("The optional store list is still loading. If you know the NSN numbers, paste them in NSN list and press Create Order.");
+    return;
+  }
+
+  const visibleStores = getVisiblePMStores();
+
+  if (!visibleStores.length) {
+    alert("No stores found with the current search.");
+    return;
+  }
+
+  visibleStores.forEach(function(store) {
+    const nsn = String(store.nsn || "");
+    if (nsn) PM_SELECTED_NSNS[nsn] = true;
+  });
+
+  document.querySelectorAll(".pm-store-check").forEach(function(input) {
+    if (input.value && PM_SELECTED_NSNS[String(input.value)]) input.checked = true;
+  });
+
+  renderPMStoreList();
+  updatePMStoreCount();
+}
+
+function clearSelectedStores() {
+  PM_SELECTED_NSNS = {};
+  const manualInput = document.getElementById("PM_BATCH_NSNS");
+  if (manualInput) manualInput.value = "";
+
+  document.querySelectorAll(".pm-store-check").forEach(function(input) {
+    input.checked = false;
+  });
+  updatePMStoreCount();
+}
+
+function escapeHtmlCreateOrder(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function addOrderAttachments(input) {
+  if (!input) return;
+
+  if (isPMBatchMode()) {
+    input.value = "";
+    alert("Attachments are not available when creating PM orders in a batch.");
+    return;
+  }
+
+  const selectedFiles = Array.from(input.files || []);
+  const rejected = [];
+
+  selectedFiles.forEach(function(file) {
+    if (ORDER_ATTACHMENT_FILES.length >= ORDER_ATTACHMENT_MAX_FILES) {
+      rejected.push(file.name + ": maximum of 10 files reached");
+      return;
+    }
+
+    if (!isAllowedOrderAttachment(file)) {
+      rejected.push(file.name + ": only photos and videos are allowed");
+      return;
+    }
+
+    if (Number(file.size || 0) > ORDER_ATTACHMENT_MAX_BYTES) {
+      rejected.push(file.name + ": exceeds 25 MB");
+      return;
+    }
+
+    const duplicate = ORDER_ATTACHMENT_FILES.some(function(item) {
+      return item.file.name === file.name &&
+        item.file.size === file.size &&
+        item.file.lastModified === file.lastModified;
+    });
+
+    if (duplicate) return;
+
+    ORDER_ATTACHMENT_FILES.push({
+      id: createOrderAttachmentId(),
+      file: file,
+      status: "pending",
+      uploaded: null
+    });
+  });
+
+  input.value = "";
+  renderOrderAttachments();
+
+  if (rejected.length) {
+    alert("Some files were not added:\n\n" + rejected.join("\n"));
+  }
+}
+
+function isAllowedOrderAttachment(file) {
+  const mimeType = String(file && file.type || "").toLowerCase();
+  if (mimeType.indexOf("image/") === 0 || mimeType.indexOf("video/") === 0) {
+    return true;
+  }
+
+  return /\.(jpe?g|png|gif|webp|heic|heif|bmp|tiff?|mp4|mov|m4v|webm|avi|mpe?g|3gp)$/i
+    .test(String(file && file.name || ""));
+}
+
+function createOrderAttachmentId() {
+  if (window.crypto && typeof window.crypto.randomUUID === "function") {
+    return window.crypto.randomUUID();
+  }
+
+  return "upload-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+}
+
+function removeOrderAttachment(uploadId) {
+  if (IS_CREATING_ORDER || CREATED_ORDER_RESULT) return;
+
+  ORDER_ATTACHMENT_FILES = ORDER_ATTACHMENT_FILES.filter(function(item) {
+    return item.id !== uploadId;
+  });
+
+  renderOrderAttachments();
+}
+
+function renderOrderAttachments() {
+  const count = document.getElementById("ORDER_ATTACHMENT_COUNT");
+  const list = document.getElementById("ORDER_ATTACHMENT_LIST");
+  if (!count || !list) return;
+
+  count.innerText =
+    ORDER_ATTACHMENT_FILES.length +
+    " of " +
+    ORDER_ATTACHMENT_MAX_FILES +
+    " files selected";
+
+  list.innerHTML = ORDER_ATTACHMENT_FILES.map(function(item) {
+    const statusLabels = {
+      pending: "Ready",
+      reading: "Preparing...",
+      uploading: "Uploading...",
+      uploaded: "Uploaded",
+      error: "Upload failed - retry available"
+    };
+
+    return '<div class="attachment-item">' +
+      '<div class="attachment-info">' +
+        '<div class="attachment-name">' + escapeHtmlCreateOrder(item.file.name) + '</div>' +
+        '<div class="attachment-meta">' +
+          escapeHtmlCreateOrder(formatOrderAttachmentSize(item.file.size)) +
+          ' - ' +
+          escapeHtmlCreateOrder(statusLabels[item.status] || item.status || "Ready") +
+        '</div>' +
+      '</div>' +
+      '<button type="button" class="attachment-remove"' +
+        ((IS_CREATING_ORDER || CREATED_ORDER_RESULT) ? " disabled" : "") +
+        ' onclick="removeOrderAttachment(\'' + item.id + '\')">Remove</button>' +
+      '</div>';
+  }).join("");
+}
+
+function formatOrderAttachmentSize(bytes) {
+  const size = Number(bytes || 0);
+  if (size < 1024) return size + " B";
+  if (size < 1024 * 1024) return (size / 1024).toFixed(1) + " KB";
+  return (size / 1024 / 1024).toFixed(1) + " MB";
+}
+
+function orderAttachmentToBase64(file) {
+  return new Promise(function(resolve, reject) {
+    const reader = new FileReader();
+
+    reader.onload = function() {
+      const result = String(reader.result || "");
+      resolve(result.split(",")[1] || "");
+    };
+
+    reader.onerror = function() {
+      reject(new Error("Could not read " + file.name + "."));
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
+
+function createOrderOnServer(payload, batchPM) {
+  return new Promise(function(resolve, reject) {
+    const runner = google.script.run
+      .withSuccessHandler(resolve)
+      .withFailureHandler(reject);
+
+    if (batchPM) {
+      runner.createPMWorkOrdersBatchFromApp(payload, getSessionToken());
+    } else {
+      runner.createWorkOrderFromApp(payload, getSessionToken());
+    }
+  });
+}
+
+function uploadOrderAttachmentOnServer(payload) {
+  return new Promise(function(resolve, reject) {
+    google.script.run
+      .withSuccessHandler(resolve)
+      .withFailureHandler(reject)
+      .uploadWorkOrderAttachment(payload, getSessionToken());
+  });
+}
+
+async function uploadSelectedOrderAttachments(woNumber, companyId) {
+  const pendingFiles = ORDER_ATTACHMENT_FILES.filter(function(item) {
+    return item.status !== "uploaded";
+  });
+
+  for (let index = 0; index < pendingFiles.length; index++) {
+    const item = pendingFiles[index];
+
+    try {
+      item.status = "reading";
+      setCreateOrderProgress(
+        "Preparing file " + (index + 1) + " of " + pendingFiles.length + "..."
+      );
+      renderOrderAttachments();
+
+      const base64 = await orderAttachmentToBase64(item.file);
+
+      item.status = "uploading";
+      setCreateOrderProgress(
+        "Uploading file " + (index + 1) + " of " + pendingFiles.length + "..."
+      );
+      renderOrderAttachments();
+
+      item.uploaded = await uploadOrderAttachmentOnServer({
+        companyId: companyId,
+        woNumber: woNumber,
+        uploadId: item.id,
+        name: item.file.name,
+        mimeType: item.file.type,
+        data: base64
+      });
+      item.status = "uploaded";
+      renderOrderAttachments();
+    } catch (err) {
+      item.status = "error";
+      renderOrderAttachments();
+      throw new Error(
+        "Could not upload " +
+        item.file.name +
+        ": " +
+        (err && err.message ? err.message : err)
+      );
+    }
   }
 }
 
@@ -199,10 +799,39 @@ function loadHeader() {
     .getCompanyName(companyId);
 }
 
-function saveOrder() {
+async function saveOrder() {
   if (IS_CREATING_ORDER) return;
 
   const companyId = getCompanyId();
+
+  if (CREATED_ORDER_RESULT) {
+    setCreateOrderSaving(true);
+
+    try {
+      await uploadSelectedOrderAttachments(CREATED_ORDER_RESULT.woNumber, companyId);
+      setAppSessionItem("lastWO", CREATED_ORDER_RESULT.woNumber);
+      setAppSessionItem(
+        "lastWOMessage",
+        "Orden creada: " +
+          CREATED_ORDER_RESULT.woNumber +
+          " con " +
+          ORDER_ATTACHMENT_FILES.length +
+          " archivo(s)."
+      );
+      TOP_NAV.href = getReturnUrl();
+    } catch (err) {
+      setCreateOrderSaving(false);
+      alert(
+        "La orden " +
+        CREATED_ORDER_RESULT.woNumber +
+        " ya fue creada, pero falta subir uno o mas archivos.\n\n" +
+        (err && err.message ? err.message : err) +
+        "\n\nPresione Retry file upload para reintentar sin crear otra orden."
+      );
+    }
+
+    return;
+  }
 
   const payload = {
     COMPANY_ID: companyId,
@@ -215,6 +844,13 @@ function saveOrder() {
     MANAGER: document.getElementById("MANAGER").value.trim()
   };
 
+  const batchPM = payload.WO_TYPE === "PM_FORM" && isPMBatchMode();
+
+  if (batchPM) {
+    payload.STORE_NSNS = getSelectedPMStoreNsns();
+    payload.NSN = "";
+  }
+
   if (!payload.WO_TYPE) {
     alert("Select Order Type.");
     return;
@@ -225,20 +861,72 @@ function saveOrder() {
     return;
   }
 
+  if (!batchPM && !payload.NSN) {
+    alert("NSN # is required.");
+    return;
+  }
+
+  if (batchPM && (!payload.STORE_NSNS || !payload.STORE_NSNS.length)) {
+    alert("Select at least one store.");
+    return;
+  }
+
+  if (batchPM && ORDER_ATTACHMENT_FILES.length) {
+    alert("Attachments can only be added when creating one order at a time.");
+    return;
+  }
+
   setCreateOrderSaving(true);
 
-  google.script.run
-    .withSuccessHandler(function(res) {
-      setAppSessionItem("lastWO", res.woNumber);
-      setAppSessionItem("lastWOMessage", "Orden creada: " + res.woNumber);
+  try {
+    const res = await createOrderOnServer(payload, batchPM);
+    CREATED_ORDER_RESULT = res;
 
-      TOP_NAV.href = getReturnUrl();
-    })
-    .withFailureHandler(function(err) {
-      setCreateOrderSaving(false);
-      alert(err && err.message ? err.message : err);
-    })
-    .createWorkOrderFromApp(payload, getSessionToken());
+    if (batchPM) {
+      const woNumbers = (res && res.woNumbers) || [];
+      setAppSessionItem("lastWO", woNumbers[0] || "");
+      setAppSessionItem(
+        "lastWOMessage",
+        "PM creados: " +
+          ((res && res.count) || woNumbers.length) +
+          " ordenes. " +
+          woNumbers.join(", ")
+      );
+    } else {
+      setAppSessionItem("lastWO", res.woNumber);
+
+      if (ORDER_ATTACHMENT_FILES.length) {
+        await uploadSelectedOrderAttachments(res.woNumber, companyId);
+      }
+
+      setAppSessionItem(
+        "lastWOMessage",
+        "Orden creada: " +
+          res.woNumber +
+          (ORDER_ATTACHMENT_FILES.length
+            ? " con " + ORDER_ATTACHMENT_FILES.length + " archivo(s)."
+            : "")
+      );
+    }
+
+    TOP_NAV.href = getReturnUrl();
+  } catch (err) {
+    setCreateOrderSaving(false);
+
+    if (CREATED_ORDER_RESULT && !batchPM) {
+      alert(
+        "La orden " +
+        CREATED_ORDER_RESULT.woNumber +
+        " ya fue creada, pero falta subir uno o mas archivos.\n\n" +
+        (err && err.message ? err.message : err) +
+        "\n\nPresione Retry file upload para reintentar sin crear otra orden."
+      );
+      return;
+    }
+
+    CREATED_ORDER_RESULT = null;
+    alert(err && err.message ? err.message : err);
+  }
 }
 
 function goBack() {
