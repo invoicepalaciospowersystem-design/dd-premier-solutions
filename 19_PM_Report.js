@@ -124,12 +124,35 @@ function uploadPMFile_(fileObj) {
 
   const file = folder.createFile(blob);
 
+  if (String(file.getMimeType() || "").toLowerCase().indexOf("image/") === 0) {
+    enablePMPhotoLinkView_(file);
+  }
+
   return {
     id: file.getId(),
     url: file.getUrl(),
     name: file.getName(),
     mimeType: file.getMimeType()
   };
+}
+
+function enablePMPhotoLinkView_(file) {
+  if (!file) throw new Error("No se pudo preparar la foto para el reporte.");
+
+  try {
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch (err) {
+    try {
+      file.setTrashed(true);
+    } catch (rollbackErr) {
+      Logger.log("PM photo upload rollback error: " + rollbackErr);
+    }
+
+    throw new Error(
+      "No se pudo habilitar la foto para verla desde el reporte. " +
+      String(err && err.message ? err.message : err)
+    );
+  }
 }
 
 function createPMReportFolder(data) {
@@ -561,6 +584,7 @@ function insertPMFilesAtMarker_(body, marker, urls, title) {
       if (mime.indexOf("image/") === 0) {
         const img = cell.appendParagraph(" ").appendInlineImage(file.getBlob());
         normalizePMImageSize_(img);
+        img.setLinkUrl(file.getUrl());
       } else {
         cell.appendParagraph("Archivo / Video registrado");
       }
