@@ -6,7 +6,7 @@ function generatePdfFromCloseOrder_(invoiceRow) {
 
   const clientName = invoiceRow.CLIENTE || "SIN_CLIENTE";
   const nsNumber = invoiceRow.NS || "SIN_NS";
-  const submittedAt = invoiceRow.Timestamp || new Date();
+  const submittedAt = invoiceRow.DATE_INVOICE || invoiceRow.INVOICE_DATE || invoiceRow.Timestamp || new Date();
 
   const monthFolderName = formatMonthFolder_(submittedAt);
   const clientFolder = getOrCreateFolder_(invoicesRoot, safeFolderName_(clientName));
@@ -28,7 +28,7 @@ function regenerateInvoiceEnglishPdf_(invoiceRow) {
 
   const clientName = normalizedRow.CLIENTE || "SIN_CLIENTE";
   const nsNumber = normalizedRow.NS || "SIN_NS";
-  const submittedAt = normalizedRow.Timestamp || new Date();
+  const submittedAt = normalizedRow.DATE_INVOICE || normalizedRow.INVOICE_DATE || normalizedRow.Timestamp || new Date();
 
   const monthFolderName = formatMonthFolder_(submittedAt);
   const clientFolder = getOrCreateFolder_(invoicesRoot, safeFolderName_(clientName));
@@ -44,7 +44,7 @@ function generateOnePdfFromTemplate_(invoiceRow, targetFolder, langTag, doTransl
   const invoiceNo = invoiceRow.Invoice || "NO-INVOICE";
   const clientName = invoiceRow.CLIENTE || "Cliente";
   const nsNumber = invoiceRow.NS || "NS";
-  const submittedAt = invoiceRow.Timestamp || new Date();
+  const submittedAt = invoiceRow.DATE_INVOICE || invoiceRow.INVOICE_DATE || invoiceRow.Timestamp || new Date();
 
   const stamp = Utilities.formatDate(new Date(submittedAt), CFG.TIMEZONE, "yyyyMMdd-HHmm");
 
@@ -440,7 +440,7 @@ function buildPlaceholderMapFromInvoice_(r) {
   return {
     invoice_number: r.Invoice || "",
     wo_number: r.WO_NUMBER || "",
-    invoice_date: Utilities.formatDate(new Date(r.Timestamp || new Date()), CFG.TIMEZONE, "MM/dd/yyyy"),
+    invoice_date: Utilities.formatDate(new Date(r.DATE_INVOICE || r.INVOICE_DATE || r.Timestamp || new Date()), CFG.TIMEZONE, "MM/dd/yyyy"),
 
     nombre_cliente: r.CLIENTE || "",
     vendor_id: r.VENDOR_ID || "",

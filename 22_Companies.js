@@ -14,8 +14,6 @@ const COMPANY_ADMIN_COLUMNS = [
   "CITY",
   "STATE",
   "ZIP",
-  "TWILIO_FROM",
-  "SMS_ENABLED",
   "LOGIN_TITLE",
   "LOGIN_SUBTITLE",
   "LOGIN_OWNER_NAME",
@@ -71,7 +69,6 @@ function saveCompanyAdmin(rowNumber, data, sessionToken) {
   data.COMPANY_ID = companyId;
   data.COMPANY_NAME = companyName;
   data.ACTIVE = String(data.ACTIVE || "YES").trim().toUpperCase();
-  data.SMS_ENABLED = String(data.SMS_ENABLED || "YES").trim().toUpperCase();
 
   const values = headers.map(function(h) {
     return data[h] !== undefined ? data[h] : "";
@@ -88,6 +85,7 @@ function saveCompanyAdmin(rowNumber, data, sessionToken) {
     companyName: companyName
   });
 
+  touchAppCacheVersion_();
   return true;
 }
 
@@ -123,6 +121,7 @@ function toggleCompanyActiveAdmin(rowNumber, sessionToken) {
     active: next
   });
 
+  touchAppCacheVersion_();
   return true;
 }
 

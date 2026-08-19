@@ -15,6 +15,10 @@
     .emergency { border-left-color: red; }
     .normal { border-left-color: green; }
     .status { background: #eee; padding: 5px 10px; border-radius: 999px; font-size: 12px; display: inline-block; margin-bottom: 10px; }
+    .tech-assessment { display:none; background:#ecfdf5; border:1px solid #a7f3d0; border-left:5px solid #16a34a; border-radius:10px; padding:11px; margin-top:10px; white-space:pre-wrap; }
+    .tech-assessment.visible { display:block; }
+    .tech-assessment-toggle { width:100%; margin-top:10px; background:#0f766e; color:#fff; font-weight:bold; }
+    .tech-assessment-row + .tech-assessment-row { margin-top:9px; }
     .actions { margin-top: 10px; display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
     textarea { width: 100%; min-height: 50px; margin-top: 8px; box-sizing:border-box; }
     a { font-size: 13px; margin-right: 8px; }
@@ -167,6 +171,7 @@
     <option>REQUEST PARTS</option>
     <option>PARTS IN TRANSIT</option>
     <option>PARTS IN STORE</option>
+    <option>READY FOR BILLING</option>
     <option>COMPLETED</option>
     <option>CLOSED</option>
   </select>
@@ -344,6 +349,9 @@ if (!requireLogin()) {
 
 let data = [];
 let ACTIVE_COMPANY_ID = URL_COMPANY_ID;
+let ORDERS_RENDER_LIMIT = 80;
+const ORDERS_RENDER_STEP = 80;
+let ORDERS_FILTER_KEY = "";
 
 function getCurrentUser() {
   try {
@@ -495,6 +503,8 @@ function load() {
   google.script.run
     .withSuccessHandler(function(res) {
       data = res || [];
+      ORDERS_RENDER_LIMIT = 80;
+      ORDERS_FILTER_KEY = "";
       render();
 
       setTimeout(function() {
@@ -630,6 +640,12 @@ function render() {
   const nsnFilter = document.getElementById("filterNSN").value.toLowerCase();
   const techFilter = document.getElementById("filterTech").value;
   const priorityFilter = document.getElementById("filterPriority").value;
+  const filterKey = [search, statusFilter, nsnFilter, techFilter, priorityFilter].join("|");
+
+  if (filterKey !== ORDERS_FILTER_KEY) {
+    ORDERS_RENDER_LIMIT = 80;
+    ORDERS_FILTER_KEY = filterKey;
+  }
 
   const filtered = data.filter(function(o) {
     const text = JSON.stringify(o).toLowerCase();
@@ -645,8 +661,24 @@ function render() {
 
   renderStatusMetrics(filtered);
 
+  const visible = filtered.slice(0, ORDERS_RENDER_LIMIT);
+  const moreHtml = filtered.length > visible.length
+    ? `
+      <div style="grid-column:1/-1; text-align:center; padding:16px;">
+        <button onclick="loadMoreOrders()" style="background:#111827; color:white; padding:12px 18px; border-radius:10px; border:0; font-weight:bold;">
+          Cargar mas (${visible.length} de ${filtered.length})
+        </button>
+      </div>
+    `
+    : "";
+
   document.getElementById("cards").innerHTML =
-    filtered.length ? filtered.map(function(o) { return card(o); }).join("") : "No work orders found.";
+    visible.length ? visible.map(function(o) { return card(o); }).join("") + moreHtml : "No work orders found.";
+}
+
+function loadMoreOrders() {
+  ORDERS_RENDER_LIMIT += ORDERS_RENDER_STEP;
+  render();
 }
 
 function statusMatchesFilter(status, filterValue) {
@@ -692,6 +724,7 @@ function getBtnClass(currentStatus, targetStatus) {
     "REQUEST PARTS",
     "PARTS IN TRANSIT",
     "PARTS IN STORE",
+    "READY FOR BILLING",
     "COMPLETED",
     "CLOSED"
   ];
@@ -717,6 +750,7 @@ function card(o) {
   const equipment = o.REPORTED_EQUIPMENT || o["Reported Equipment"] || o["REPORTED EQUIPMENT"] || "No especificado";
   const woNumber = String(o.WO_NUMBER || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
   const companyId = String(o.COMPANY_ID || ACTIVE_COMPANY_ID || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  const hasAttachmentFiles = !!String(o.FOLDER_URL || "").trim() || Number(o.ATTACHMENT_COUNT || 0) > 0;
 
   const currentTechs = String(o.TECHNICIAN || "")
     .split(",")
@@ -749,6 +783,10 @@ function card(o) {
       <div><b>Prioridad:</b> ${o.ORDER_PRIORITY || ""}</div>
 
       <div><b>Problema:</b><br>${o.REPORTED_PROBLEM_ES || o.REPORTED_PROBLEM_ORIGINAL || ""}</div>
+      ${renderTechnicianAssessment(o)}
+      ${hasAttachmentFiles ? `
+        <div><b>Archivos:</b> ${Number(o.ATTACHMENT_COUNT || 0)} foto(s)/video(s)</div>
+      ` : ""}
 
       <textarea id="note_${row}" placeholder="Notas internas">${o.NOTES || ""}</textarea>
 
@@ -776,6 +814,14 @@ function card(o) {
       <div class="actions">
         <button onclick="saveNotes(${row})">Guardar Notas</button>
 
+        ${hasAttachmentFiles ? `
+          <button
+            style="background:#2563eb;color:white;font-weight:bold;"
+            onclick="openOrderAttachmentGallery(${row}, '${woNumber}', '${companyId}')">
+            Fotos / Videos
+          </button>
+        ` : ""}
+
         ${canCreateSpecialInvoice() && !isPMOrderCard(o) ? `
           <button
             class="btn-special"
@@ -802,6 +848,56 @@ function card(o) {
       </div>
     </div>
   `;
+}
+
+function renderTechnicianAssessment(o) {
+  o = o || {};
+  const problemFound = String(o.TECH_PROBLEM_FOUND || "").trim();
+  const proposedSolution = String(o.TECH_PROPOSED_SOLUTION || "").trim();
+  const startedAt = String(o.DATE_WORK_STARTED || "").trim();
+  const startedBy = String(o.WORK_STARTED_BY || "").trim();
+  const row = Number(o.ROW_NUMBER || 0);
+
+  if (!problemFound && !proposedSolution) return "";
+
+  return `
+    <button
+      type="button"
+      class="tech-assessment-toggle"
+      aria-expanded="false"
+      onclick="toggleTechnicianAssessment(${row}, this)">
+      Ver diagnostico del tecnico
+    </button>
+    <div id="technicianAssessment_${row}" class="tech-assessment">
+      <div class="tech-assessment-row"><b>Problema encontrado por el tecnico:</b><br>${escapeHtmlClient(problemFound)}</div>
+      <div class="tech-assessment-row"><b>Solucion propuesta:</b><br>${escapeHtmlClient(proposedSolution)}</div>
+      ${(startedAt || startedBy) ? `<div class="tech-assessment-row"><b>Inicio del trabajo:</b> ${escapeHtmlClient(startedAt)}${startedBy ? " por " + escapeHtmlClient(startedBy) : ""}</div>` : ""}
+    </div>
+  `;
+}
+
+function toggleTechnicianAssessment(row, button) {
+  const detail = document.getElementById("technicianAssessment_" + Number(row));
+  if (!detail) return;
+
+  const isOpen = detail.classList.toggle("visible");
+  if (button) {
+    button.innerText = isOpen ? "Ocultar diagnostico del tecnico" : "Ver diagnostico del tecnico";
+    button.setAttribute("aria-expanded", isOpen ? "true" : "false");
+  }
+}
+
+function openOrderAttachmentGallery(row, woNumber, companyId) {
+  companyId = String(companyId || ACTIVE_COMPANY_ID || "").trim().toUpperCase();
+
+  TOP_NAV.href =
+    BASE_URL +
+    "?view=orderFiles" +
+    "&row=" + encodeURIComponent(row) +
+    "&wo=" + encodeURIComponent(woNumber || "") +
+    "&companyId=" + encodeURIComponent(companyId) +
+    ownerPortalParam() +
+    "&returnTo=" + encodeURIComponent(getOrdersReturnUrl(companyId));
 }
 
 function getSelectedTechs(row) {
@@ -925,6 +1021,7 @@ function renderStatusMetrics(list) {
     "REQUEST PARTS",
     "PARTS IN TRANSIT",
     "PARTS IN STORE",
+    "READY FOR BILLING",
     "COMPLETED",
     "CLOSED"
   ];

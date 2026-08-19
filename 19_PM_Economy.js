@@ -12,8 +12,8 @@ const PM_ECO_CFG = {
   INVOICE_SUBTOTAL: 391.67,
   TAX_RATE: 0.07,
 
-  // Economía real D&D
-  DD_PAYMENT: 125,
+  // Economía real D&D: los $100 del técnico salen de los $225 de D&D.
+  DD_PAYMENT: 225,
   TECH_PAY: 100,
   PALACIOS_PAYMENT: 125,
   SUPPLIES_RESERVE: 41.67,
@@ -71,7 +71,6 @@ function savePMEconomy(pmData) {
 
   const amount = roundPMMoney_(
     ddPayment +
-    techPay +
     palaciosPayment +
     suppliesReserve
   );
@@ -84,7 +83,16 @@ function savePMEconomy(pmData) {
     );
   }
 
-  const profit = roundPMMoney_(PM_ECO_CFG.DD_PROFIT);
+  const profit = roundPMMoney_(ddPayment - techPay);
+
+  if (Math.abs(profit - roundPMMoney_(PM_ECO_CFG.DD_PROFIT)) > 0.01) {
+    throw new Error(
+      "La ganancia PM de D&D no cuadra. " +
+      "D&D recibe: $" + ddPayment.toFixed(2) +
+      " | Técnico: $" + techPay.toFixed(2) +
+      " | Ganancia esperada: $" + PM_ECO_CFG.DD_PROFIT.toFixed(2)
+    );
+  }
 
   const completedDate =
     pmData.DATE_COMPLETED ||
@@ -167,16 +175,17 @@ function savePMEconomy(pmData) {
       techPay,
 
     NOTES:
-      "PM Invoice Total: $" + invoiceTotal.toFixed(2) +
-      " | Subtotal: $" + subtotal.toFixed(2) +
-      " | Tax: $" + tax.toFixed(2) +
-      " | PM Total Amount: $" + amount.toFixed(2) +
-      " | D&D Premier: $" + ddPayment.toFixed(2) +
-      " | Tech Pay: $" + techPay.toFixed(2) +
-      " | Palacios Power System: $" + palaciosPayment.toFixed(2) +
-      " | PM Supplies Reserve: $" + suppliesReserve.toFixed(2) +
-      " | D&D Profit: $" + profit.toFixed(2) +
-      " | Split Check: $" + amount.toFixed(2),
+      buildPMEconomyNotes_(
+        invoiceTotal,
+        subtotal,
+        tax,
+        amount,
+        ddPayment,
+        techPay,
+        palaciosPayment,
+        suppliesReserve,
+        profit
+      ),
 
     INV_SOURCE:
       "PM",
@@ -248,6 +257,8 @@ function savePMEconomy(pmData) {
     ).setValues([rowValues]);
   }
 
+  touchAppCacheVersion_();
+
   return {
     success: true,
     woNumber: woNumber,
@@ -266,7 +277,7 @@ function savePMEconomy(pmData) {
 
 function getPMEconomyData(companyId, role, sessionToken) {
   companyId = String(companyId || PM_ECO_CFG.COMPANY_ID || CFG.DEFAULT_COMPANY_ID).trim().toUpperCase();
-  requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"], companyId);
+  const session = requireSession_(sessionToken, ["OWNER", "ADMIN", "ECONOMIA"], companyId);
 
   const sh = SpreadsheetApp
     .getActiveSpreadsheet()
@@ -286,6 +297,7 @@ function getPMEconomyData(companyId, role, sessionToken) {
     return String(h || "").trim();
   });
   headers = ensurePMEconomyHeaders_(sh, headers);
+  repairCurrentPeriodPMLegacyRows_(sh, headers, companyId, session);
   data = sh.getDataRange().getValues();
   headers = data[0].map(function(h) {
     return String(h || "").trim();
@@ -394,6 +406,150 @@ function updatePMEconomyRow(rowNumber, updates, sessionToken) {
 
 function roundPMMoney_(n) {
   return Math.round(Number(n || 0) * 100) / 100;
+}
+
+function buildPMEconomyNotes_(
+  invoiceTotal,
+  subtotal,
+  tax,
+  amount,
+  ddPayment,
+  techPay,
+  palaciosPayment,
+  suppliesReserve,
+  profit
+) {
+  return "PM Invoice Total: $" + roundPMMoney_(invoiceTotal).toFixed(2) +
+    " | Subtotal: $" + roundPMMoney_(subtotal).toFixed(2) +
+    " | Tax: $" + roundPMMoney_(tax).toFixed(2) +
+    " | PM Total Amount: $" + roundPMMoney_(amount).toFixed(2) +
+    " | D&D Premier: $" + roundPMMoney_(ddPayment).toFixed(2) +
+    " | Tech Pay: $" + roundPMMoney_(techPay).toFixed(2) +
+    " | Palacios Power System: $" + roundPMMoney_(palaciosPayment).toFixed(2) +
+    " | PM Supplies Reserve: $" + roundPMMoney_(suppliesReserve).toFixed(2) +
+    " | D&D Profit: $" + roundPMMoney_(profit).toFixed(2) +
+    " | Split Check: $" + roundPMMoney_(amount).toFixed(2);
+}
+
+function repairCurrentPeriodPMLegacyRows_(sh, headers, companyId, actor) {
+  if (!sh || sh.getLastRow() < 2) {
+    return { repaired: 0, rows: [], invoices: [] };
+  }
+
+  headers = (headers || []).map(function(header) {
+    return String(header || "").trim();
+  });
+
+  const required = [
+    "COMPANY_ID",
+    "AMOUNT",
+    "COST",
+    "PROFIT",
+    "DD_PAYMENT",
+    "PALACIOS_PAYMENT",
+    "SUPPLIES_RESERVE",
+    "PM_TOTAL_AMOUNT",
+    "TECH_LABOR_COST",
+    "NOTES"
+  ];
+  if (required.some(function(header) { return headers.indexOf(header) === -1; })) {
+    return { repaired: 0, rows: [], invoices: [] };
+  }
+
+  const period = getCurrentEconomyPeriod();
+  const values = sh.getRange(2, 1, sh.getLastRow() - 1, headers.length).getValues();
+  const repairedRows = [];
+  const repairedInvoices = [];
+
+  values.forEach(function(row, index) {
+    if (isMonthCloseMarkerRow_(row, headers) || isSoftDeletedRow_(row, headers)) return;
+
+    const rowCompany = String(
+      getHeaderValueFlexible_(row, headers, ["COMPANY_ID"]) || PM_ECO_CFG.COMPANY_ID
+    ).trim().toUpperCase();
+    if (rowCompany !== companyId) return;
+
+    const obj = {};
+    headers.forEach(function(header, columnIndex) {
+      obj[header] = row[columnIndex];
+    });
+    normalizePMEconomyObjectPeriodFields_(obj);
+    if (String(obj.PERIOD_LABEL || obj.ACCOUNTING_PERIOD || "") !== period.label) return;
+
+    const amount = roundPMMoney_(obj.PM_TOTAL_AMOUNT || obj.AMOUNT);
+    const ddPayment = roundPMMoney_(obj.DD_PAYMENT);
+    const techPay = roundPMMoney_(obj.TECH_LABOR_COST || obj.COST);
+    const profit = roundPMMoney_(obj.PROFIT);
+    const palaciosPayment = roundPMMoney_(obj.PALACIOS_PAYMENT);
+    const suppliesReserve = roundPMMoney_(obj.SUPPLIES_RESERVE);
+    const isLegacyNetClassification =
+      Math.abs(amount - PM_ECO_CFG.INVOICE_SUBTOTAL) <= 0.01 &&
+      Math.abs(ddPayment - PM_ECO_CFG.DD_PROFIT) <= 0.01 &&
+      Math.abs(techPay - PM_ECO_CFG.TECH_PAY) <= 0.01 &&
+      Math.abs(profit - PM_ECO_CFG.DD_PROFIT) <= 0.01 &&
+      Math.abs(palaciosPayment - PM_ECO_CFG.PALACIOS_PAYMENT) <= 0.01 &&
+      Math.abs(suppliesReserve - PM_ECO_CFG.SUPPLIES_RESERVE) <= 0.01;
+
+    if (!isLegacyNetClassification) return;
+
+    const tax = roundPMMoney_(PM_ECO_CFG.INVOICE_SUBTOTAL * PM_ECO_CFG.TAX_RATE);
+    const invoiceTotal = roundPMMoney_(PM_ECO_CFG.INVOICE_SUBTOTAL + tax);
+    const rowNumber = index + 2;
+
+    obj.AMOUNT = PM_ECO_CFG.INVOICE_SUBTOTAL;
+    obj.COST = PM_ECO_CFG.TECH_PAY;
+    obj.PROFIT = PM_ECO_CFG.DD_PROFIT;
+    obj.DD_PAYMENT = PM_ECO_CFG.DD_PAYMENT;
+    obj.PALACIOS_PAYMENT = PM_ECO_CFG.PALACIOS_PAYMENT;
+    obj.SUPPLIES_RESERVE = PM_ECO_CFG.SUPPLIES_RESERVE;
+    obj.PM_TOTAL_AMOUNT = PM_ECO_CFG.INVOICE_SUBTOTAL;
+    obj.TECH_LABOR_COST = PM_ECO_CFG.TECH_PAY;
+    obj.NOTES = buildPMEconomyNotes_(
+      invoiceTotal,
+      PM_ECO_CFG.INVOICE_SUBTOTAL,
+      tax,
+      PM_ECO_CFG.INVOICE_SUBTOTAL,
+      PM_ECO_CFG.DD_PAYMENT,
+      PM_ECO_CFG.TECH_PAY,
+      PM_ECO_CFG.PALACIOS_PAYMENT,
+      PM_ECO_CFG.SUPPLIES_RESERVE,
+      PM_ECO_CFG.DD_PROFIT
+    );
+
+    sh.getRange(rowNumber, 1, 1, headers.length).setValues([
+      headers.map(function(header) {
+        return obj[header] !== undefined ? obj[header] : "";
+      })
+    ]);
+    repairedRows.push(rowNumber);
+    repairedInvoices.push(String(obj.INVOICE_NUMBER || obj.WO_NUMBER || rowNumber));
+  });
+
+  if (repairedRows.length) {
+    addAuditLog_(
+      "PM_ECONOMY",
+      "PM_GROSS_CLASSIFICATION_REPAIRED",
+      companyId,
+      "PM_ECONOMY",
+      period.label,
+      actor,
+      {
+        period: period.label,
+        rows: repairedRows,
+        invoices: repairedInvoices,
+        ddGrossPayment: PM_ECO_CFG.DD_PAYMENT,
+        technicianExpense: PM_ECO_CFG.TECH_PAY,
+        ddNetProfit: PM_ECO_CFG.DD_PROFIT
+      }
+    );
+    touchAppCacheVersion_();
+  }
+
+  return {
+    repaired: repairedRows.length,
+    rows: repairedRows,
+    invoices: repairedInvoices
+  };
 }
 
 function ensurePMEconomyHeaders_(sh, headers) {

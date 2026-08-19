@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manuales Tecnicos</title>
+  <style>
+    :root {
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #d7dde8;
+      --navy: #111827;
+      --red: #dc2626;
+      --blue: #2563eb;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, sans-serif;
+      color: var(--ink);
+      background: #f5f7fb;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background:
+        linear-gradient(rgba(248, 250, 252, .80), rgba(248, 250, 252, .86)),
+        var(--company-bg, none);
+      background-position: center;
+      background-size: cover;
+    }
+
+    .shell {
+      width: min(1180px, calc(100% - 32px));
+      margin: 34px auto 48px;
+    }
+
+    .top {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 22px;
+      color: #fff;
+      background: rgba(17, 24, 39, .96);
+      border-radius: 10px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, .18);
+    }
+
+    .top small {
+      color: #9ca3af;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .top h1 {
+      margin: 4px 0 0;
+      font-size: 28px;
+    }
+
+    .top p {
+      margin: 6px 0 0;
+      color: #cbd5e1;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #fff;
+      background: var(--navy);
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      color: #111827;
+      background: #e5e7eb;
+    }
+
+    button.primary {
+      background: var(--red);
+    }
+
+    button.danger {
+      background: #b91c1c;
+    }
+
+    button:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+
+    .panel {
+      margin-top: 16px;
+      padding: 16px;
+      background: rgba(255, 255, 255, .94);
+      border-radius: 10px;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, .10);
+    }
+
+    .filters {
+      display: grid;
+      grid-template-columns: 2fr 1fr auto;
+      gap: 10px;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 11px 12px;
+      font: inherit;
+      background: #fff;
+    }
+
+    textarea {
+      min-height: 86px;
+      resize: vertical;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: #334155;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 14px;
+      margin-top: 16px;
+    }
+
+    .card {
+      padding: 14px;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-left: 5px solid var(--blue);
+      border-radius: 10px;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, .08);
+    }
+
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 18px;
+    }
+
+    .meta {
+      display: grid;
+      gap: 4px;
+      margin: 10px 0;
+      color: #334155;
+      font-size: 13px;
+    }
+
+    .meta b {
+      color: #0f172a;
+    }
+
+    .notes {
+      color: #475569;
+      font-size: 13px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .empty {
+      grid-column: 1 / -1;
+      padding: 34px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .status {
+      margin-top: 12px;
+      color: #334155;
+      font-weight: 700;
+    }
+
+    .status.error {
+      color: #b91c1c;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(15, 23, 42, .55);
+    }
+
+    .modal.show {
+      display: flex;
+    }
+
+    .dialog {
+      width: min(720px, 100%);
+      padding: 18px;
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, .35);
+    }
+
+    .dialog-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .dialog-header h2 {
+      margin: 0;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .full {
+      grid-column: 1 / -1;
+    }
+
+    @media (max-width: 760px) {
+      .shell {
+        width: calc(100% - 20px);
+        margin-top: 18px;
+      }
+
+      .top {
+        display: block;
+      }
+
+      .actions {
+        margin-top: 14px;
+      }
+
+      .filters,
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <?!= include("AppBackButton"); ?>
+
+  <main class="shell">
+    <section class="top">
+      <div>
+        <small>Biblioteca tecnica</small>
+        <h1>Manuales Tecnicos</h1>
+        <p id="companyLabel">Company: Loading...</p>
+      </div>
+      <div class="actions">
+        <button type="button" onclick="loadManuals()">Actualizar</button>
+        <button type="button" id="addManualBtn" class="primary" onclick="openManualForm()" hidden>Nuevo manual</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="filters">
+        <input id="searchInput" type="search" placeholder="Buscar por equipo, marca, modelo, serial o titulo..." oninput="renderManuals()">
+        <select id="typeFilter" onchange="renderManuals()">
+          <option value="">Todos los tipos</option>
+        </select>
+        <button type="button" class="secondary" onclick="clearFilters()">Limpiar</button>
+      </div>
+      <div id="status" class="status">Cargando manuales...</div>
+      <div id="manualGrid" class="grid"></div>
+    </section>
+  </main>
+
+  <div id="manualModal" class="modal" role="dialog" aria-modal="true">
+    <div class="dialog">
+      <div class="dialog-header">
+        <h2 id="manualModalTitle">Nuevo manual</h2>
+        <button type="button" class="secondary" onclick="closeManualForm()">Cerrar</button>
+      </div>
+      <form id="manualForm" onsubmit="saveManual(event)">
+        <input type="hidden" id="manualId">
+        <div class="form-grid">
+          <label class="full">
+            Titulo
+            <input id="manualTitle" required placeholder="Ej. Frymaster service manual">
+          </label>
+          <label>
+            Tipo de equipo
+            <input id="manualEquipmentType" placeholder="Fryer, walk-in cooler, RTU...">
+          </label>
+          <label>
+            Marca
+            <input id="manualBrand" placeholder="Henny Penny, Frymaster...">
+          </label>
+          <label>
+            Modelo
+            <input id="manualModel" placeholder="Modelo">
+          </label>
+          <label>
+            Serial
+            <input id="manualSerial" placeholder="Opcional">
+          </label>
+          <label class="full">
+            URL del manual
+            <input id="manualUrl" required placeholder="https://..." inputmode="url">
+          </label>
+          <label>
+            Fuente
+            <input id="manualSource" placeholder="Parts Town, fabricante, Drive...">
+          </label>
+          <label class="full">
+            Notas
+            <textarea id="manualNotes" placeholder="Notas utiles para el tecnico"></textarea>
+          </label>
+        </div>
+        <div class="card-actions" style="justify-content:flex-end;margin-top:16px">
+          <button type="button" class="secondary" onclick="closeManualForm()">Cancelar</button>
+          <button type="submit" class="primary" id="saveManualBtn">Guardar manual</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const TEMPLATE_COMPANY_ID = "<?= companyId ?>";
+    let manualsState = {
+      companyId: "",
+      companyName: "",
+      canEdit: false,
+      manuals: [],
+      saving: false
+    };
+
+    document.addEventListener("DOMContentLoaded", function() {
+      loadManuals();
+    });
+
+    function getStoredUser() {
+      try {
+        return JSON.parse(getAppSessionItem("pps_user") || "{}");
+      } catch (err) {
+        return {};
+      }
+    }
+
+    function getSessionToken() {
+      const user = getStoredUser();
+      return String(getAppSessionItem("pps_session_token") || user.sessionToken || user.token || "").trim();
+    }
+
+    function getActiveCompanyId() {
+      const params = new URLSearchParams(window.location.search);
+      const user = getStoredUser();
+      return String(
+        TEMPLATE_COMPANY_ID ||
+        params.get("companyId") ||
+        getAppSessionItem("owner_selected_company_ALL") ||
+        getAppSessionItem("pps_login_company") ||
+        user.companyId ||
+        "PPS"
+      ).trim().toUpperCase();
+    }
+
+    function setStatus(message, isError) {
+      const el = document.getElementById("status");
+      el.textContent = message || "";
+      el.classList.toggle("error", Boolean(isError));
+    }
+
+    function loadManuals() {
+      manualsState.companyId = getActiveCompanyId();
+      setStatus("Cargando manuales...", false);
+      document.getElementById("manualGrid").innerHTML = "";
+
+      google.script.run
+        .withSuccessHandler(function(data) {
+          manualsState.companyId = String(data.companyId || manualsState.companyId || "").toUpperCase();
+          manualsState.companyName = data.companyName || manualsState.companyId;
+          manualsState.canEdit = Boolean(data.canEdit);
+          manualsState.manuals = Array.isArray(data.manuals) ? data.manuals : [];
+
+          document.getElementById("companyLabel").textContent = "Company: " + manualsState.companyName;
+          document.getElementById("addManualBtn").hidden = !manualsState.canEdit;
+
+          populateTypeFilter();
+          renderManuals();
+        })
+        .withFailureHandler(function(err) {
+          setStatus("ERROR: " + (err && err.message ? err.message : err), true);
+        })
+        .getEquipmentManuals(manualsState.companyId, getSessionToken());
+    }
+
+    function populateTypeFilter() {
+      const select = document.getElementById("typeFilter");
+      const current = select.value;
+      const types = {};
+
+      manualsState.manuals.forEach(function(manual) {
+        const type = String(manual.equipmentType || "").trim();
+        if (type) types[type] = true;
+      });
+
+      select.innerHTML = '<option value="">Todos los tipos</option>' +
+        Object.keys(types).sort().map(function(type) {
+          return '<option value="' + escapeAttr(type) + '">' + escapeHtml(type) + '</option>';
+        }).join("");
+
+      if (current && types[current]) select.value = current;
+    }
+
+    function renderManuals() {
+      const query = String(document.getElementById("searchInput").value || "").trim().toLowerCase();
+      const type = String(document.getElementById("typeFilter").value || "").trim();
+      const grid = document.getElementById("manualGrid");
+      const filtered = manualsState.manuals.filter(function(manual) {
+        if (type && String(manual.equipmentType || "") !== type) return false;
+        if (!query) return true;
+        return [
+          manual.title,
+          manual.equipmentType,
+          manual.brand,
+          manual.model,
+          manual.serial,
+          manual.source,
+          manual.notes
+        ].join(" ").toLowerCase().indexOf(query) !== -1;
+      });
+
+      setStatus(filtered.length + " manuales encontrados", false);
+
+      if (!filtered.length) {
+        grid.innerHTML = '<div class="empty">No hay manuales para esta busqueda.</div>';
+        return;
+      }
+
+      grid.innerHTML = filtered.map(renderManualCard).join("");
+    }
+
+    function renderManualCard(manual) {
+      const editButtons = manualsState.canEdit
+        ? '<button type="button" class="secondary" onclick="openManualForm(\'' + escapeJs(manual.id) + '\')">Editar</button>' +
+          '<button type="button" class="danger" onclick="deleteManual(\'' + escapeJs(manual.id) + '\')">Eliminar</button>'
+        : "";
+
+      return '<article class="card">' +
+        '<h3>' + escapeHtml(manual.title || "Manual") + '</h3>' +
+        '<div class="meta">' +
+        metaLine("Equipo", manual.equipmentType) +
+        metaLine("Marca", manual.brand) +
+        metaLine("Modelo", manual.model) +
+        metaLine("Serial", manual.serial) +
+        metaLine("Fuente", manual.source) +
+        '</div>' +
+        (manual.notes ? '<div class="notes">' + escapeHtml(manual.notes) + '</div>' : "") +
+        '<div class="card-actions">' +
+        '<button type="button" onclick="openManualUrl(\'' + escapeJs(manual.manualUrl) + '\')">Abrir manual</button>' +
+        editButtons +
+        '</div>' +
+        '</article>';
+    }
+
+    function metaLine(label, value) {
+      if (!value) return "";
+      return '<div><b>' + escapeHtml(label) + ':</b> ' + escapeHtml(value) + '</div>';
+    }
+
+    function clearFilters() {
+      document.getElementById("searchInput").value = "";
+      document.getElementById("typeFilter").value = "";
+      renderManuals();
+    }
+
+    function openManualUrl(url) {
+      if (!url) return;
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+
+    function openManualForm(id) {
+      if (!manualsState.canEdit) return;
+      const manual = id ? manualsState.manuals.find(function(item) { return item.id === id; }) : null;
+
+      document.getElementById("manualModalTitle").textContent = manual ? "Editar manual" : "Nuevo manual";
+      document.getElementById("manualId").value = manual ? manual.id : "";
+      document.getElementById("manualTitle").value = manual ? manual.title || "" : "";
+      document.getElementById("manualEquipmentType").value = manual ? manual.equipmentType || "" : "";
+      document.getElementById("manualBrand").value = manual ? manual.brand || "" : "";
+      document.getElementById("manualModel").value = manual ? manual.model || "" : "";
+      document.getElementById("manualSerial").value = manual ? manual.serial || "" : "";
+      document.getElementById("manualUrl").value = manual ? manual.manualUrl || "" : "";
+      document.getElementById("manualSource").value = manual ? manual.source || "" : "";
+      document.getElementById("manualNotes").value = manual ? manual.notes || "" : "";
+      document.getElementById("manualModal").classList.add("show");
+    }
+
+    function closeManualForm() {
+      document.getElementById("manualModal").classList.remove("show");
+    }
+
+    function saveManual(event) {
+      event.preventDefault();
+      if (manualsState.saving) return;
+
+      const payload = {
+        id: document.getElementById("manualId").value,
+        companyId: manualsState.companyId || getActiveCompanyId(),
+        title: document.getElementById("manualTitle").value,
+        equipmentType: document.getElementById("manualEquipmentType").value,
+        brand: document.getElementById("manualBrand").value,
+        model: document.getElementById("manualModel").value,
+        serial: document.getElementById("manualSerial").value,
+        manualUrl: document.getElementById("manualUrl").value,
+        source: document.getElementById("manualSource").value,
+        notes: document.getElementById("manualNotes").value
+      };
+
+      manualsState.saving = true;
+      document.getElementById("saveManualBtn").disabled = true;
+      setStatus("Guardando manual...", false);
+
+      google.script.run
+        .withSuccessHandler(function(data) {
+          manualsState.saving = false;
+          document.getElementById("saveManualBtn").disabled = false;
+          closeManualForm();
+          manualsState.canEdit = Boolean(data.canEdit);
+          manualsState.manuals = Array.isArray(data.manuals) ? data.manuals : [];
+          populateTypeFilter();
+          renderManuals();
+        })
+        .withFailureHandler(function(err) {
+          manualsState.saving = false;
+          document.getElementById("saveManualBtn").disabled = false;
+          setStatus("ERROR: " + (err && err.message ? err.message : err), true);
+        })
+        .saveEquipmentManual(payload, getSessionToken());
+    }
+
+    function deleteManual(id) {
+      if (!manualsState.canEdit || !id) return;
+      if (!confirm("Eliminar este manual de la biblioteca?")) return;
+
+      setStatus("Eliminando manual...", false);
+
+      google.script.run
+        .withSuccessHandler(function(data) {
+          manualsState.manuals = Array.isArray(data.manuals) ? data.manuals : [];
+          populateTypeFilter();
+          renderManuals();
+        })
+        .withFailureHandler(function(err) {
+          setStatus("ERROR: " + (err && err.message ? err.message : err), true);
+        })
+        .deleteEquipmentManual(id, manualsState.companyId || getActiveCompanyId(), getSessionToken());
+    }
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value);
+    }
+
+    function escapeJs(value) {
+      return String(value || "")
+        .replace(/\\/g, "\\\\")
+        .replace(/'/g, "\\'")
+        .replace(/\r?\n/g, " ");
+    }
+  </script>
+</body>
+</html>

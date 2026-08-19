@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>McDonald's Stores</title>
+  <style>
+    :root {
+      --ink:#111827;
+      --muted:#64748b;
+      --line:#dbe2ea;
+      --blue:#2563eb;
+      --red:#dc2626;
+    }
+
+    * { box-sizing:border-box; }
+
+    body {
+      margin:0;
+      min-height:100vh;
+      padding:18px;
+      font-family:Arial, sans-serif;
+      color:var(--ink);
+      background:#f3f4f6;
+    }
+
+    .shell {
+      width:min(1180px, 100%);
+      margin:0 auto 40px;
+    }
+
+    .hero,
+    .panel {
+      background:#ffffff;
+      border-radius:14px;
+      box-shadow:0 4px 16px rgba(15,23,42,.09);
+    }
+
+    .hero {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:16px;
+      padding:20px;
+      color:#ffffff;
+      background:#111827;
+      border-left:7px solid var(--red);
+    }
+
+    .hero h1 {
+      margin:0;
+      font-size:28px;
+    }
+
+    .hero p {
+      margin:7px 0 0;
+      color:#cbd5e1;
+      font-size:14px;
+    }
+
+    .refresh {
+      border:0;
+      border-radius:9px;
+      padding:11px 15px;
+      color:#ffffff;
+      background:var(--blue);
+      font-weight:bold;
+      cursor:pointer;
+    }
+
+    .panel {
+      margin-top:16px;
+      padding:18px;
+    }
+
+    .search {
+      width:100%;
+      padding:12px 14px;
+      border:1px solid var(--line);
+      border-radius:10px;
+      font:inherit;
+    }
+
+    .status {
+      margin-top:12px;
+      color:var(--muted);
+      font-size:13px;
+      font-weight:bold;
+    }
+
+    .status.error { color:#b91c1c; }
+
+    .grid {
+      display:grid;
+      grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));
+      gap:12px;
+      margin-top:14px;
+    }
+
+    .store-card {
+      padding:15px;
+      border:1px solid #e5e7eb;
+      border-left:5px solid var(--blue);
+      border-radius:11px;
+      background:#f8fafc;
+    }
+
+    .nsn {
+      margin-bottom:7px;
+      font-size:18px;
+      font-weight:bold;
+    }
+
+    .client {
+      margin-bottom:7px;
+      color:#475569;
+      font-size:13px;
+    }
+
+    .address {
+      font-size:14px;
+      line-height:1.45;
+    }
+
+    .map-link {
+      display:inline-flex;
+      align-items:center;
+      padding:6px 9px;
+      border-radius:7px;
+      color:var(--blue);
+      background:#eff6ff;
+      font-weight:bold;
+      text-decoration:none;
+    }
+
+    .map-link.apple {
+      color:#111827;
+      background:#e5e7eb;
+    }
+
+    .map-actions {
+      display:flex;
+      gap:7px;
+      flex-wrap:wrap;
+      margin-top:8px;
+    }
+
+    .map-link:hover { text-decoration:underline; }
+
+    .empty {
+      grid-column:1 / -1;
+      padding:34px;
+      color:var(--muted);
+      text-align:center;
+    }
+
+    @media (max-width:640px) {
+      body { padding:10px; }
+      .hero { align-items:flex-start; flex-direction:column; }
+      .hero h1 { font-size:24px; }
+      .refresh { width:100%; }
+      .grid { grid-template-columns:1fr; }
+    }
+  </style>
+  <?!= include("AppWatermark"); ?>
+</head>
+<body class="app-watermark" style="--company-watermark-logo:<?!= watermarkLogoCss ?>;">
+  <?!= include("AppBackButton"); ?>
+
+  <main class="shell">
+    <section class="hero">
+      <div>
+        <h1>McDonald's Stores</h1>
+        <p id="companyLabel">Tiendas, NSN y direcciones de la empresa.</p>
+      </div>
+      <button class="refresh" type="button" onclick="loadStores()">Actualizar</button>
+    </section>
+
+    <section class="panel">
+      <input
+        id="storeSearch"
+        class="search"
+        type="search"
+        placeholder="Buscar por NSN, cliente o direccion"
+        aria-label="Buscar tienda"
+        oninput="renderStores()">
+      <div id="status" class="status">Cargando tiendas...</div>
+      <div id="storeGrid" class="grid"></div>
+    </section>
+  </main>
+
+  <script>
+    const TEMPLATE_COMPANY_ID = String("<?= companyId ?>").trim().toUpperCase();
+    let STORE_DIRECTORY = [];
+
+    function getStoredUser() {
+      try {
+        return JSON.parse(getAppSessionItem("pps_user") || "{}");
+      } catch (err) {
+        return {};
+      }
+    }
+
+    function getSessionToken() {
+      const user = getStoredUser();
+      return String(getAppSessionItem("pps_session_token") || user.sessionToken || user.SESSION_TOKEN || "").trim();
+    }
+
+    function getCompanyId() {
+      const params = new URLSearchParams(window.location.search || "");
+      const user = getStoredUser();
+      return String(
+        TEMPLATE_COMPANY_ID ||
+        params.get("companyId") ||
+        user.companyId ||
+        user.COMPANY_ID ||
+        getAppSessionItem("pps_login_company") ||
+        ""
+      ).trim().toUpperCase();
+    }
+
+    function setStatus(message, isError) {
+      const status = document.getElementById("status");
+      status.textContent = message || "";
+      status.classList.toggle("error", Boolean(isError));
+    }
+
+    function loadStores() {
+      const companyId = getCompanyId();
+      const token = getSessionToken();
+
+      if (!companyId || !token) {
+        setStatus("No se pudo detectar la sesion o la empresa. Regresa al dashboard e intenta nuevamente.", true);
+        document.getElementById("storeGrid").innerHTML = "";
+        return;
+      }
+
+      setStatus("Cargando tiendas...", false);
+      document.getElementById("storeGrid").innerHTML = "";
+      document.getElementById("companyLabel").textContent = "Company: " + companyId;
+
+      google.script.run
+        .withSuccessHandler(function(stores) {
+          STORE_DIRECTORY = Array.isArray(stores) ? stores : [];
+          renderStores();
+        })
+        .withFailureHandler(function(err) {
+          STORE_DIRECTORY = [];
+          setStatus("ERROR: " + (err && err.message ? err.message : err), true);
+        })
+        .getTechnicianStoreDirectory(companyId, token);
+    }
+
+    function renderStores() {
+      const query = String(document.getElementById("storeSearch").value || "").trim().toLowerCase();
+      const filtered = STORE_DIRECTORY.filter(function(store) {
+        if (!query) return true;
+        return [store.nsn, store.client, store.address]
+          .join(" ")
+          .toLowerCase()
+          .indexOf(query) !== -1;
+      });
+
+      setStatus(
+        filtered.length + (filtered.length === 1 ? " tienda" : " tiendas") +
+        (query ? " encontradas" : " disponibles"),
+        false
+      );
+
+      const grid = document.getElementById("storeGrid");
+      if (!filtered.length) {
+        grid.innerHTML = '<div class="empty">No hay tiendas para mostrar.</div>';
+        return;
+      }
+
+      grid.innerHTML = filtered.map(function(store) {
+        const nsn = escapeHtml(store.nsn || "N/A");
+        const client = escapeHtml(store.client || "");
+        const address = String(store.address || "").trim();
+
+        return `
+          <article class="store-card">
+            <div class="nsn">NSN ${nsn}</div>
+            ${client ? `<div class="client">${client}</div>` : ""}
+            <div class="address"><b>Direccion:</b> ${renderMapLinks(address)}</div>
+          </article>
+        `;
+      }).join("");
+    }
+
+    function renderMapLinks(address) {
+      if (!address) return "No disponible";
+      const googleUrl = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(address);
+      const appleUrl = "https:" + "/" + "/" + "maps.apple.com/?q=" + encodeURIComponent(address);
+      return escapeHtml(address) +
+        '<div class="map-actions">' +
+          '<a class="map-link" href="' + googleUrl + '" target="_blank" rel="noopener noreferrer">Google Maps</a>' +
+          '<a class="map-link apple" href="' + appleUrl + '" target="_blank" rel="noopener noreferrer">Apple Maps</a>' +
+        '</div>';
+    }
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    document.addEventListener("DOMContentLoaded", loadStores);
+  </script>
+</body>
+</html>

@@ -467,6 +467,9 @@ let METRIC_PERIOD_INITIALIZED = false;
 let MCD_PAYMENT_PREVIEW_READY = false;
 let MANUAL_HOURS = [];
 let MANUAL_TECH_OPTIONS = [];
+let ECONOMY_RENDER_LIMIT = 40;
+const ECONOMY_RENDER_STEP = 40;
+let ECONOMY_RENDER_FILTER_KEY = "";
 
 function getCurrentUser() {
   try {
@@ -711,6 +714,8 @@ function load() {
       .withSuccessHandler(function(res) {
         ECONOMY = res || [];
         MANUAL_HOURS = [];
+        ECONOMY_RENDER_LIMIT = 40;
+        ECONOMY_RENDER_FILTER_KEY = "";
         loadPeriodFilter();
         render();
       })
@@ -725,6 +730,8 @@ function load() {
   google.script.run
     .withSuccessHandler(function(res) {
       ECONOMY = res || [];
+      ECONOMY_RENDER_LIMIT = 40;
+      ECONOMY_RENDER_FILTER_KEY = "";
       loadPeriodFilter();
       loadManualHoursForActiveCompany(function() {
         render();
@@ -767,6 +774,23 @@ function render() {
   const status = document.getElementById("statusFilter").value;
   const period = document.getElementById("periodFilter").value;
   const periodMode = String(document.getElementById("metricPeriodMode").value || "period");
+  const periodMonth = document.getElementById("metricPeriodMonth").value;
+  const periodYear = document.getElementById("metricPeriodYear").value;
+  const filterKey = [
+    VIEW_MODE,
+    search,
+    status,
+    period,
+    periodMode,
+    periodMonth,
+    periodYear,
+    ECONOMY_METRIC_FILTER
+  ].join("|");
+
+  if (filterKey !== ECONOMY_RENDER_FILTER_KEY) {
+    ECONOMY_RENDER_LIMIT = 40;
+    ECONOMY_RENDER_FILTER_KEY = filterKey;
+  }
 
   const baseFiltered = ECONOMY.filter(function(o) {
     const text = JSON.stringify(o).toLowerCase();
@@ -779,11 +803,26 @@ function render() {
 
   renderEconomyMetrics(baseFiltered);
   const filtered = applyEconomyMetricFilter(baseFiltered);
+  const visible = filtered.slice(0, ECONOMY_RENDER_LIMIT);
+  const moreHtml = filtered.length > visible.length
+    ? `
+      <div style="grid-column:1/-1; text-align:center; padding:16px;">
+        <button onclick="loadMoreEconomyRecords()" style="background:#111827; color:white; padding:12px 18px; border-radius:10px; border:0; font-weight:bold;">
+          Cargar mas (${visible.length} de ${filtered.length})
+        </button>
+      </div>
+    `
+    : "";
 
   document.getElementById("cards").innerHTML =
-    filtered.length
-      ? filtered.map(card).join("")
+    visible.length
+      ? visible.map(card).join("") + moreHtml
       : "No economy records found.";
+}
+
+function loadMoreEconomyRecords() {
+  ECONOMY_RENDER_LIMIT += ECONOMY_RENDER_STEP;
+  render();
 }
 
 function initMetricPeriodControls() {
@@ -909,11 +948,11 @@ function getEconomyMetricCards(m) {
       { key:"invoiced", label:"Invoiced", value:m.invoiced, note:"Ready for payment", tone:"warning" },
       { key:"paid", label:"Paid", value:m.paid, note:"Closed payments", tone:"success" },
       { key:"amount", label:"PM Total", value:formatMoney(m.amount), note:"Subtotal before tax", tone:"info" },
-      { key:"ddPayment", label:"D&D Premier", value:formatMoney(m.ddPayment), note:"D&D PM charge", tone:"success" },
-      { key:"techPay", label:"Tech Pay", value:formatMoney(m.techPay), note:"PM technician pay", tone:"warning" },
+      { key:"ddPayment", label:"D&D Premier bruto", value:formatMoney(m.ddPayment), note:"Incluye el pago al técnico", tone:"success" },
+      { key:"techPay", label:"Pago técnicos PM", value:formatMoney(m.techPay), note:"Sale del bruto de D&D", tone:"warning" },
       { key:"palaciosPayment", label:"Palacios", value:formatMoney(m.palaciosPayment), note:"PPS PM share", tone:"info" },
       { key:"suppliesReserve", label:"PM Supplies", value:formatMoney(m.suppliesReserve), note:"Filters and algae tablets", tone:"warning" },
-      { key:"profit", label:"D&D Profit", value:formatMoney(m.profit), note:"D&D Premier profit", tone:m.profit >= 0 ? "success" : "danger" },
+      { key:"profit", label:"D&D neto", value:formatMoney(m.profit), note:"Bruto D&D menos técnicos", tone:m.profit >= 0 ? "success" : "danger" },
       { key:"hours", label:"Hours", value:m.hours.toFixed(2), note:"Registered hours", tone:"neutral" }
     ];
   }
@@ -1293,7 +1332,7 @@ function getPmDerivedValues(record, noteTextOverride) {
     tax: 27.42,
     total: 419.09,
     amount: 391.67,
-    ddPayment: 125,
+    ddPayment: 225,
     techPay: 100,
     palaciosPayment: 125,
     suppliesReserve: 41.67,
@@ -1315,22 +1354,35 @@ function getPmDerivedValues(record, noteTextOverride) {
   const suppliesReserve = parseEconomyNumber(safeRecord.SUPPLIES_RESERVE) ||
     noteSummary.suppliesReserve ||
     legacyPmDefaults.suppliesReserve;
-  const ddPayment = parseEconomyNumber(safeRecord.DD_PAYMENT) ||
+  let ddPayment = parseEconomyNumber(safeRecord.DD_PAYMENT) ||
     noteSummary.ddPayment ||
     noteSummary.ddProfit ||
     parseEconomyNumber(safeRecord.PROFIT) ||
     legacyPmDefaults.ddPayment;
+  const explicitPalaciosPayment = parseEconomyNumber(safeRecord.PALACIOS_PAYMENT) ||
+    noteSummary.palaciosPayment ||
+    legacyPmDefaults.palaciosPayment;
+  const explicitProfit = String(safeRecord.PROFIT || "").trim() !== ""
+    ? parseEconomyNumber(safeRecord.PROFIT)
+    : (noteSummary.ddProfit !== undefined ? noteSummary.ddProfit : 0);
+  const isLegacyNetClassification =
+    ddPayment > 0 &&
+    techPay > 0 &&
+    explicitProfit > 0 &&
+    Math.abs(ddPayment - explicitProfit) <= 0.01 &&
+    Math.abs(amount - (ddPayment + techPay + explicitPalaciosPayment + suppliesReserve)) <= 0.02;
+
+  if (isLegacyNetClassification) {
+    ddPayment += techPay;
+  }
+
   const palaciosPayment = parseEconomyNumber(safeRecord.PALACIOS_PAYMENT) ||
     noteSummary.palaciosPayment ||
-    Math.max(0, amount - ddPayment - techPay - suppliesReserve);
+    Math.max(0, amount - ddPayment - suppliesReserve);
   const tax = noteSummary.invoiceTax !== undefined
     ? noteSummary.invoiceTax
     : (parseEconomyNumber(safeRecord.TAX) || legacyPmDefaults.tax);
-  const profit = String(safeRecord.PROFIT || "").trim() !== ""
-    ? parseEconomyNumber(safeRecord.PROFIT)
-    : (noteSummary.ddProfit !== undefined
-      ? noteSummary.ddProfit
-      : ddPayment);
+  const profit = ddPayment - techPay;
   const subtotal = noteSummary.invoiceSubtotal !== undefined
     ? noteSummary.invoiceSubtotal
     : legacyPmDefaults.subtotal;
@@ -1386,12 +1438,12 @@ function renderPMSummary(o) {
       </div>
 
       <div class="pm-row">
-        <span>D&D Premier:</span>
+        <span>D&D Premier (bruto):</span>
         <b>${formatMoney(pmValues.ddPayment)}</b>
       </div>
 
       <div class="pm-row">
-        <span>Tech Pay:</span>
+        <span>Pago al técnico (sale de D&D):</span>
         <b>${formatMoney(pmValues.techPay)}</b>
       </div>
 
@@ -1407,11 +1459,11 @@ function renderPMSummary(o) {
 
       <div class="pm-row">
         <span>Split Check:</span>
-        <b>${formatMoney(pmValues.ddPayment + pmValues.techPay + pmValues.palaciosPayment + pmValues.suppliesReserve)}</b>
+        <b>${formatMoney(pmValues.ddPayment + pmValues.palaciosPayment + pmValues.suppliesReserve)}</b>
       </div>
 
       <div class="pm-row">
-        <span>D&D Profit:</span>
+        <span>D&D neto después del técnico:</span>
         <b>${formatMoney(pmValues.profit)}</b>
       </div>
     </div>
@@ -1529,11 +1581,11 @@ function card(o) {
         <div class="row" style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:10px;">
           <b>Economía D&D:</b><br>
           Total PM antes de tax: <b>${formatMoney(pmValues.amount)}</b><br>
-          D&D Premier: <b>${formatMoney(pmValues.ddPayment)}</b><br>
+          D&D Premier bruto: <b>${formatMoney(pmValues.ddPayment)}</b><br>
           D&D paga al técnico: <b>${formatMoney(pmTechPay)}</b><br>
           Palacios Power System: <b>${formatMoney(pmValues.palaciosPayment)}</b><br>
           Reserva filtros/pastillas: <b>${formatMoney(pmValues.suppliesReserve)}</b><br>
-          Ganancia D&D: <b>${formatMoney(pmProfit)}</b>
+          Neto D&D: <b>${formatMoney(pmProfit)}</b>
         </div>
       ` : `
         <div class="row">

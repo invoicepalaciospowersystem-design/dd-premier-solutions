@@ -5,6 +5,8 @@
 function getOwnerExecutiveDashboard(sessionToken, companyId, periodMode, periodYear, periodMonth) {
   const session = requireSession_(sessionToken, ["OWNER"]);
   const requestedCompany = String(companyId || "").trim().toUpperCase();
+
+  return withAppCache_(["owner-executive-dashboard", requestedCompany, periodMode, periodYear, periodMonth], 60, function() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const periodScope = buildAdminPeriodScope_(periodMode, periodYear, periodMonth);
   const companies = getExecutiveCompanies_(ss);
@@ -76,6 +78,7 @@ function getOwnerExecutiveDashboard(sessionToken, companyId, periodMode, periodY
   });
 
   return dashboard;
+  });
 }
 
 function getAdminCompanyDashboard(sessionToken, companyId, periodMode, periodYear, periodMonth) {
@@ -90,6 +93,7 @@ function getAdminCompanyDashboard(sessionToken, companyId, periodMode, periodYea
     throw new Error("No se pudo determinar la compania del admin.");
   }
 
+  return withAppCache_(["admin-company-dashboard", role, companyScope, periodMode, periodYear, periodMonth], 60, function() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const periodScope = buildAdminPeriodScope_(periodMode, periodYear, periodMonth);
   const companies = getExecutiveCompanies_(ss);
@@ -155,6 +159,7 @@ function getAdminCompanyDashboard(sessionToken, companyId, periodMode, periodYea
   });
 
   return dashboard;
+  });
 }
 
 function getEconomyModuleDashboard(sessionToken, companyId, periodMode, periodYear, periodMonth) {
@@ -169,6 +174,7 @@ function getEconomyModuleDashboard(sessionToken, companyId, periodMode, periodYe
     throw new Error("No se pudo determinar la compania de economia.");
   }
 
+  return withAppCache_(["economy-module-dashboard", role, companyScope, periodMode, periodYear, periodMonth], 60, function() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const periodScope = buildAdminPeriodScope_(periodMode, periodYear, periodMonth);
   const companies = getExecutiveCompanies_(ss);
@@ -211,6 +217,7 @@ function getEconomyModuleDashboard(sessionToken, companyId, periodMode, periodYe
   collectAdminEconomyFinancials_(ss, dashboard, companyScope, periodScope);
 
   return dashboard;
+  });
 }
 
 function buildAdminPeriodScope_(periodMode, periodYear, periodMonth) {
@@ -778,6 +785,10 @@ function collectExecutiveWorkOrders_(ss, dashboard, perCompany, companyMap, requ
         technician: String(getExecutiveValue_(row, headers, ["TECHNICIAN", "TECH"]) || "").trim(),
         priority: String(getExecutiveValue_(row, headers, ["ORDER_PRIORITY", "PRIORITY"]) || "").trim(),
         storeName: String(getExecutiveValue_(row, headers, ["STORE_NAME", "STORE"]) || "").trim(),
+        techProblemFound: String(getExecutiveValue_(row, headers, ["TECH_PROBLEM_FOUND"]) || "").trim(),
+        techProposedSolution: String(getExecutiveValue_(row, headers, ["TECH_PROPOSED_SOLUTION"]) || "").trim(),
+        workStartedAt: formatExecutiveDateTime_(getExecutiveValue_(row, headers, ["DATE_WORK_STARTED"])),
+        workStartedBy: String(getExecutiveValue_(row, headers, ["WORK_STARTED_BY"]) || "").trim(),
         createdAt: createdAt ? Utilities.formatDate(createdAt, CFG.TIMEZONE, "MM/dd/yyyy") : "",
         ageDays: ageDays,
         isOpen: isOpen,
@@ -813,6 +824,14 @@ function collectExecutiveWorkOrders_(ss, dashboard, perCompany, companyMap, requ
   }
 
   return woCompanyMap;
+}
+
+function formatExecutiveDateTime_(value) {
+  if (!value) return "";
+  const dateValue = parseExecutiveDate_(value);
+  return dateValue
+    ? Utilities.formatDate(dateValue, CFG.TIMEZONE, "MM/dd/yyyy hh:mm a")
+    : String(value || "").trim();
 }
 
 function collectExecutiveInvoices_(ss, dashboard, perCompany, companyMap, requestedCompany, woCompanyMap, periodScope) {

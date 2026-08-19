@@ -1220,6 +1220,32 @@
       line-height:1.35;
     }
 
+    .module-inline-metric {
+      display:inline-flex;
+      align-items:baseline;
+      gap:7px;
+      margin-top:11px;
+      padding:7px 10px;
+      border:1px solid #dbeafe;
+      border-radius:8px;
+      background:#eff6ff;
+      color:#1e3a8a;
+      font-size:12px;
+      font-weight:bold;
+    }
+
+    .module-inline-metric.has-pending {
+      border-color:#fecaca;
+      background:#fef2f2;
+      color:#991b1b;
+    }
+
+    .module-inline-metric-value {
+      font-size:24px;
+      line-height:1;
+      color:inherit;
+    }
+
     .module-footer {
       display:flex;
       justify-content:space-between;
@@ -1582,6 +1608,30 @@
       line-height:1.35;
       overflow-wrap:anywhere;
     }
+
+    .dashboard-assessment-toggle {
+      width:100%;
+      min-height:38px;
+      margin-top:9px;
+      padding:8px 10px;
+      border:0;
+      border-radius:8px;
+      background:#0f766e;
+      color:#ffffff;
+      cursor:pointer;
+      font-weight:bold;
+    }
+
+    .dashboard-assessment-details {
+      display:none;
+      margin-top:8px;
+      padding:9px;
+      border:1px solid #a7f3d0;
+      border-radius:8px;
+      background:#ecfdf5;
+    }
+
+    .dashboard-assessment-details.visible { display:block; }
 
     .dash-layout {
       display:grid;
@@ -2350,6 +2400,7 @@
         </select>
         <input id="ownerPeriodYear" class="admin-period-input" type="number" min="2020" max="2100" step="1" onchange="loadOwnerDashboard()">
         <button class="dash-refresh" onclick="loadOwnerDashboard()">Actualizar</button>
+        <button class="dash-refresh" onclick="openModule('?view=manualInvoice')">Invoice Manual D&amp;D</button>
       </div>
     </div>
 
@@ -2660,6 +2711,14 @@ const MODULES = [
     url: "?view=economy"
   },
   {
+    title: "Invoice pendientes de facturacion",
+    icon: "INV",
+    desc: "Revisar horas, partes y precios antes de crear y enviar el invoice.",
+    metric: "pendingInvoices",
+    roles: ["OWNER", "ADMIN", "ORDENES"],
+    url: "?view=invoiceReview"
+  },
+  {
     title: "Contabilidad",
     icon: "CT",
     desc: "Cortes contables, taxes, pagos e inversionistas.",
@@ -2707,6 +2766,27 @@ const MODULES = [
     desc: "Vista de ordenes para tecnicos.",
     roles: ["TECH"],
     url: "?view=tech&tech="
+  },
+  {
+    title: "McDonald's Stores",
+    icon: "NSN",
+    desc: "Lista de tiendas con NSN, direcciones y acceso directo a Maps.",
+    roles: ["TECH"],
+    url: "?view=techStores"
+  },
+  {
+    title: "Manuales Tecnicos",
+    icon: "MT",
+    desc: "Biblioteca de manuales, diagramas y documentos tecnicos.",
+    roles: ["OWNER", "ADMIN", "TECH"],
+    url: "?view=equipmentManuals"
+  },
+  {
+    title: "Historial de Trabajo",
+    icon: "HT",
+    desc: "Reparaciones anteriores organizadas por tienda, equipo y modelo.",
+    roles: ["OWNER", "ADMIN", "ORDENES", "TECH"],
+    url: "?view=workHistory"
   },
   {
     title: "Supervisor Portal",
@@ -3026,6 +3106,7 @@ function renderModules() {
             <div class="module-copy">
               <div class="module-title">${m.title}</div>
               <div class="module-desc">${m.desc}</div>
+              ${renderModuleInlineMetric(m)}
             </div>
           </div>
           <div class="module-footer">
@@ -3036,7 +3117,40 @@ function renderModules() {
       `;
     }).join("");
 
+  loadPendingInvoiceModuleMetric();
   loadEconomyModuleDashboard();
+}
+
+function renderModuleInlineMetric(module) {
+  if (!module || module.metric !== "pendingInvoices") return "";
+
+  return `
+    <div id="pendingInvoiceModuleMetric" class="module-inline-metric" aria-live="polite">
+      <span id="pendingInvoiceModuleMetricValue" class="module-inline-metric-value">...</span>
+      <span>pendientes</span>
+    </div>
+  `;
+}
+
+function loadPendingInvoiceModuleMetric() {
+  const metric = document.getElementById("pendingInvoiceModuleMetric");
+  const value = document.getElementById("pendingInvoiceModuleMetricValue");
+  if (!metric || !value || !CURRENT_USER) return;
+
+  value.innerText = "...";
+  metric.classList.remove("has-pending");
+
+  google.script.run
+    .withSuccessHandler(function(count) {
+      count = Math.max(0, Number(count || 0));
+      value.innerText = String(count);
+      metric.classList.toggle("has-pending", count > 0);
+    })
+    .withFailureHandler(function() {
+      value.innerText = "—";
+      metric.classList.remove("has-pending");
+    })
+    .getPendingInvoiceDraftCount(getActiveCompanyId(), getSessionToken());
 }
 
 function loadEconomyModuleDashboard() {
@@ -3460,6 +3574,7 @@ function onOwnerCompanyChange() {
   loadOwnerDashboard();
   loadAdminDashboard();
   loadEconomyModuleDashboard();
+  loadPendingInvoiceModuleMetric();
 }
 
 function updateOwnerScopeText() {
@@ -3864,6 +3979,9 @@ function getAdminMetricItems(filterKey, data) {
 }
 
 function renderAdminOrderPreviewCard(item) {
+  const hasAssessment = !!(item.techProblemFound || item.techProposedSolution);
+  const assessmentId = buildDashboardAssessmentId("adminAssessment", item.woNumber);
+
   return `
     <div class="supervisor-order-card ${escapeHtmlMain(item.tone || "info")}">
       <div class="supervisor-order-top">
@@ -3877,8 +3995,42 @@ function renderAdminOrderPreviewCard(item) {
       <div class="supervisor-order-meta"><b>Priority:</b> ${escapeHtmlMain(item.priority || "")}</div>
       <div class="supervisor-order-meta"><b>Store:</b> ${escapeHtmlMain(item.storeName || "")}</div>
       <div class="supervisor-order-meta"><b>Created:</b> ${escapeHtmlMain(item.createdAt || "")}</div>
+      ${hasAssessment ? `
+        <button
+          type="button"
+          class="dashboard-assessment-toggle"
+          data-show-label="Ver diagnostico"
+          data-hide-label="Ocultar diagnostico"
+          aria-expanded="false"
+          onclick="toggleDashboardAssessment('${assessmentId}', this)">
+          Ver diagnostico
+        </button>
+        <div id="${assessmentId}" class="dashboard-assessment-details">
+          ${item.techProblemFound ? `<div class="supervisor-order-meta"><b>Problema encontrado:</b><br>${escapeHtmlMain(item.techProblemFound)}</div>` : ""}
+          ${item.techProposedSolution ? `<div class="supervisor-order-meta"><b>Solucion propuesta:</b><br>${escapeHtmlMain(item.techProposedSolution)}</div>` : ""}
+          ${(item.workStartedAt || item.workStartedBy) ? `<div class="supervisor-order-meta"><b>Inicio del trabajo:</b> ${escapeHtmlMain(item.workStartedAt || "")}${item.workStartedBy ? " por " + escapeHtmlMain(item.workStartedBy) : ""}</div>` : ""}
+        </div>
+      ` : ""}
     </div>
   `;
+}
+
+function buildDashboardAssessmentId(prefix, value) {
+  return String(prefix || "assessment") + "_" +
+    String(value || "order").replace(/[^a-zA-Z0-9_-]/g, "_");
+}
+
+function toggleDashboardAssessment(detailId, button) {
+  const detail = document.getElementById(detailId);
+  if (!detail) return;
+
+  const isOpen = detail.classList.toggle("visible");
+  if (button) {
+    button.innerText = isOpen
+      ? (button.getAttribute("data-hide-label") || "Ocultar diagnostico")
+      : (button.getAttribute("data-show-label") || "Ver diagnostico");
+    button.setAttribute("aria-expanded", isOpen ? "true" : "false");
+  }
 }
 
 function renderAdminEconomyPreviewCard(item) {
@@ -4138,7 +4290,13 @@ function renderSupervisorOrderPreviewCard(order) {
   const nsn = order.NSN || order["NSN #"] || "";
   const address = order.STORE_ADDRESS || order.ADDRESS || "";
   const problem = getSupervisorDisplayProblem(order);
+  const techProblemFound = String(order.TECH_PROBLEM_FOUND || "").trim();
+  const techProposedSolution = String(order.TECH_PROPOSED_SOLUTION || "").trim();
+  const workStartedAt = String(order.DATE_WORK_STARTED || "").trim();
+  const workStartedBy = String(order.WORK_STARTED_BY || "").trim();
   const reportedBy = getSupervisorReportedBy(order);
+  const hasAssessment = !!(techProblemFound || techProposedSolution);
+  const assessmentId = buildDashboardAssessmentId("supervisorAssessment", wo);
 
   return `
     <div class="supervisor-order-card ${escapeHtmlMain(tone)}">
@@ -4156,6 +4314,22 @@ function renderSupervisorOrderPreviewCard(order) {
       <div class="supervisor-order-meta"><b>Priority:</b> ${escapeHtmlMain(priority || "")}</div>
       <div class="supervisor-order-meta"><b>Address:</b> ${escapeHtmlMain(address || "")}</div>
       ${problem ? `<div class="supervisor-order-meta"><b>Issue:</b> ${escapeHtmlMain(String(problem).slice(0, 180))}</div>` : ""}
+      ${hasAssessment ? `
+        <button
+          type="button"
+          class="dashboard-assessment-toggle"
+          data-show-label="View technician diagnosis"
+          data-hide-label="Hide technician diagnosis"
+          aria-expanded="false"
+          onclick="toggleDashboardAssessment('${assessmentId}', this)">
+          View technician diagnosis
+        </button>
+        <div id="${assessmentId}" class="dashboard-assessment-details">
+          ${techProblemFound ? `<div class="supervisor-order-meta"><b>Problem found by technician:</b><br>${escapeHtmlMain(techProblemFound)}</div>` : ""}
+          ${techProposedSolution ? `<div class="supervisor-order-meta"><b>Proposed solution:</b><br>${escapeHtmlMain(techProposedSolution)}</div>` : ""}
+          ${(workStartedAt || workStartedBy) ? `<div class="supervisor-order-meta"><b>Work started:</b> ${escapeHtmlMain(workStartedAt)}${workStartedBy ? " by " + escapeHtmlMain(workStartedBy) : ""}</div>` : ""}
+        </div>
+      ` : ""}
     </div>
   `;
 }
@@ -4258,6 +4432,7 @@ function translateDashboardStatusToEnglish(value) {
   if (status.includes("INVOICED") || status.includes("FACTURADO")) return "Invoiced";
   if (status.includes("CLOSED") || status.includes("CERRAD")) return "Closed";
   if (status.includes("COMPLETED") || status.includes("COMPLETADO")) return "Completed";
+  if (status.includes("READY FOR BILLING")) return "Ready for Billing";
   if (status.includes("PARTS READY") || status.includes("PARTS RECEIVED") || status.includes("PIEZAS RECIBID")) return "Parts Ready";
   if (status.includes("PARTS IN TRANSIT") || status.includes("PARTS TRANSIT")) return "Parts in Transit";
   if (status.includes("REQUEST PART") || status.includes("PARTS REQUESTED") || status.includes("SOLICIT")) return "Parts Requested";

@@ -2,6 +2,7 @@
 <html>
 <head>
   <base target="_top">
+  <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
@@ -19,6 +20,14 @@
     .special-invoice-toggle input { width:auto; margin:0; }
     .special-invoice-fields { display:none; margin-top:10px; }
     .special-invoice-help { color:#7c2d12; font-size:13px; margin:6px 0 10px; line-height:1.35; }
+    .field-help { color:#6b7280; font-size:13px; margin:0 0 10px; line-height:1.35; }
+    .start-work-summary { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:10px 0 16px; }
+    .start-work-item { padding:12px; border:1px solid #bbf7d0; border-left:5px solid #16a34a; border-radius:10px; background:#f0fdf4; }
+    .start-work-item b { display:block; margin-bottom:6px; color:#166534; }
+    .start-work-value { white-space:pre-wrap; line-height:1.4; }
+    @media (max-width:620px) {
+      .start-work-summary { grid-template-columns:1fr; }
+    }
   </style>
   <?!= include("AppWatermark"); ?>
 </head>
@@ -28,42 +37,57 @@
 <?!= include("AppBackButton"); ?>
 
 <div class="box">
-  <h2>Cierre de Orden</h2>
+  <h2>Reporte de servicio</h2>
   <div id="orderInfo">Cargando...</div>
 </div>
 
 <div class="box">
   <div id="pmInfo" class="pm-note" style="display:none;"></div>
 
+  <h3>Fecha del servicio / invoice</h3>
+  <input id="INVOICE_DATE_MANUAL" type="date" required>
+  <div class="field-help">
+    Esta fecha sera conservada cuando Administracion cree el invoice.
+  </div>
+
   <div id="repairWorkBox">
-    <h3>Trabajo realizado</h3>
-    <textarea id="WORK_PERFORMED" placeholder="Describa el trabajo realizado"></textarea>
-    <input id="HORAS" type="number" step="0.25" placeholder="Horas trabajadas">
+    <h3>Informacion registrada al iniciar el trabajo</h3>
+    <div class="start-work-summary">
+      <div class="start-work-item">
+        <b>Problema encontrado</b>
+        <div id="START_PROBLEM_FOUND" class="start-work-value">Cargando...</div>
+      </div>
+      <div class="start-work-item">
+        <b>Solucion prevista</b>
+        <div id="START_PROPOSED_SOLUTION" class="start-work-value">Cargando...</div>
+      </div>
+    </div>
+
+    <h3>Como termino el trabajo *</h3>
+    <textarea id="WORK_COMPLETION_RESULT" placeholder="Explique el resultado final: que se reparo, ajusto o quedo pendiente..." required></textarea>
+    <div class="field-help">
+      El reporte para facturacion unira automaticamente el problema encontrado, la solucion prevista y este resultado final.
+    </div>
+    <input id="HORAS" type="number" min="0" step="0.25" placeholder="Horas trabajadas" required>
+    <div class="field-help">
+      Puede dejar 0 horas. Si registra tiempo, use incrementos de 0.25.
+      Administracion podra revisar estas horas antes de facturar.
+    </div>
   </div>
 
-  <div id="specialInvoiceBox" class="box special-invoice-box">
-    <label class="special-invoice-toggle">
-      <input id="SPECIAL_INVOICE" type="checkbox" onchange="toggleSpecialInvoiceFields()">
-      Invoice especial / cobro manual
-    </label>
-    <div class="special-invoice-help">
-      Solo Admin / Ordenes. Usa esto cuando el invoice se cobre diferente:
-      escribes manualmente el total de materiales cobrados y el subtotal antes de tax.
-    </div>
-    <div id="specialInvoiceFields" class="special-invoice-fields">
-      <input id="MANUAL_PARTS_TOTAL" type="number" step="0.01" min="0" placeholder="Materiales cobrados manualmente">
-      <input id="MANUAL_SUB_TOTAL" type="number" step="0.01" min="0" placeholder="Sub total manual antes de tax">
-    </div>
+  <div id="materialsBox">
+  <h3 id="materialsHeading">Materiales / piezas usadas</h3>
+  <div id="materialsHelp" class="field-help">
+    Escriba cantidad, numero de parte y descripcion. Los precios los completara Administracion.
+    Si no se usaron materiales, deje esta seccion vacia.
   </div>
-
-  <h3>Materiales / Piezas usadas</h3>
 
   <div class="box">
     <b>Item 1</b>
     <input id="I1_QTY" type="number" step="0.01" placeholder="Qty">
     <input id="I1_PART" placeholder="Part #">
     <input id="I1_DESC" placeholder="Description">
-    <input id="I1_UNIT" type="number" step="0.01" placeholder="Unit Price">
+    <input id="I1_UNIT" type="hidden" value="">
   </div>
 
   <div class="box">
@@ -71,7 +95,7 @@
     <input id="I2_QTY" type="number" step="0.01" placeholder="Qty">
     <input id="I2_PART" placeholder="Part #">
     <input id="I2_DESC" placeholder="Description">
-    <input id="I2_UNIT" type="number" step="0.01" placeholder="Unit Price">
+    <input id="I2_UNIT" type="hidden" value="">
   </div>
 
   <div class="box">
@@ -79,7 +103,7 @@
     <input id="I3_QTY" type="number" step="0.01" placeholder="Qty">
     <input id="I3_PART" placeholder="Part #">
     <input id="I3_DESC" placeholder="Description">
-    <input id="I3_UNIT" type="number" step="0.01" placeholder="Unit Price">
+    <input id="I3_UNIT" type="hidden" value="">
   </div>
 
   <div class="box">
@@ -87,9 +111,10 @@
     <input id="I4_QTY" type="number" step="0.01" placeholder="Qty">
     <input id="I4_PART" placeholder="Part #">
     <input id="I4_DESC" placeholder="Description">
-    <input id="I4_UNIT" type="number" step="0.01" placeholder="Unit Price">
+    <input id="I4_UNIT" type="hidden" value="">
   </div>
 
+  <div id="pmPurchaseBox" style="display:none;">
   <input id="PURCHASE_RECEIPT" placeholder="Vale de compra">
 
   <select id="PURCHASE_LOCATION">
@@ -99,6 +124,8 @@
     <option>Supply House</option>
     <option>Otro</option>
   </select>
+  </div>
+  </div>
 
   <div id="repairEquipmentBox">
     <h3>Datos del equipo</h3>
@@ -110,7 +137,7 @@
   <textarea id="NOTES" placeholder="Notas adicionales"></textarea>
 
   <h3>Firma del Cliente</h3>
-  <input id="SIGNATURE_NAME" placeholder="Nombre del cliente que firma">
+  <input id="SIGNATURE_NAME" placeholder="Nombre del cliente que firma" required>
 
   <button id="saveBtn" class="save" onclick="saveClose()" disabled>
     Cargando orden...
@@ -182,8 +209,6 @@ const WO_NUMBER_FROM_URL = "<?= wo ?>";
 const TECH_NAME = "<?= techName ?>";
 const BASE_URL = "<?= baseUrl ?>";
 const RETURN_TO = "<?= returnTo ?>";
-const SPECIAL_INVOICE_FROM_URL = /^(1|true|yes)$/i.test(String("<?= specialInvoice ?>").trim());
-
 let ORDER = null;
 let ORDER_READY = false;
 let IS_SAVING_CLOSE_ORDER = false;
@@ -199,47 +224,6 @@ function getCurrentUser() {
 function getSessionToken() {
   const user = getCurrentUser();
   return user.sessionToken || user.SESSION_TOKEN || "";
-}
-
-function getCurrentRole() {
-  const user = getCurrentUser();
-  return String(user.role || user.ROLE || "").trim().toUpperCase();
-}
-
-function canUseSpecialInvoice() {
-  return ["OWNER", "ADMIN", "ORDENES"].indexOf(getCurrentRole()) !== -1;
-}
-
-function setupSpecialInvoiceBox() {
-  const box = document.getElementById("specialInvoiceBox");
-  if (!box) return;
-
-  const allowed = canUseSpecialInvoice() && !isPMOrder();
-  box.style.display = allowed ? "block" : "none";
-
-  if (allowed && SPECIAL_INVOICE_FROM_URL) {
-    const check = document.getElementById("SPECIAL_INVOICE");
-    if (check) check.checked = true;
-    toggleSpecialInvoiceFields();
-  }
-
-  if (!allowed) {
-    const check = document.getElementById("SPECIAL_INVOICE");
-    if (check) check.checked = false;
-    toggleSpecialInvoiceFields();
-  }
-}
-
-function toggleSpecialInvoiceFields() {
-  const check = document.getElementById("SPECIAL_INVOICE");
-  const fields = document.getElementById("specialInvoiceFields");
-  if (!fields) return;
-  fields.style.display = check && check.checked ? "block" : "none";
-}
-
-function isSpecialInvoiceEnabled() {
-  const check = document.getElementById("SPECIAL_INVOICE");
-  return !!(check && check.checked && canUseSpecialInvoice() && !isPMOrder());
 }
 
 function isPMOrder() {
@@ -269,11 +253,11 @@ function load() {
 
       ORDER_READY = true;
       renderOrder();
+      renderStartWorkSummary();
       applyPMMode();
-      setupSpecialInvoiceBox();
 
       document.getElementById("saveBtn").disabled = false;
-      document.getElementById("saveBtn").innerText = "Guardar y completar orden";
+      document.getElementById("saveBtn").innerText = getSaveButtonLabel();
     })
     .withFailureHandler(function(err) {
       ORDER_READY = false;
@@ -310,6 +294,18 @@ function renderOrder() {
   `;
 }
 
+function renderStartWorkSummary() {
+  const problemFound = String(ORDER && ORDER.TECH_PROBLEM_FOUND || "").trim();
+  const proposedSolution = String(ORDER && ORDER.TECH_PROPOSED_SOLUTION || "").trim();
+  const completionResult = String(ORDER && ORDER.WORK_COMPLETION_RESULT || "").trim();
+
+  document.getElementById("START_PROBLEM_FOUND").textContent =
+    problemFound || "No se registro un problema encontrado al iniciar.";
+  document.getElementById("START_PROPOSED_SOLUTION").textContent =
+    proposedSolution || "No se registro una solucion prevista al iniciar.";
+  document.getElementById("WORK_COMPLETION_RESULT").value = completionResult;
+}
+
 function applyPMMode() {
   if (!isPMOrder()) return;
 
@@ -320,10 +316,17 @@ function applyPMMode() {
 
   document.getElementById("repairWorkBox").style.display = "none";
   document.getElementById("repairEquipmentBox").style.display = "none";
+  document.getElementById("materialsHeading").innerText = "Materiales usados en PM";
+  document.getElementById("materialsHelp").innerText =
+    "Escriba la cantidad, el numero de parte y la descripcion de los materiales usados.";
+  document.getElementById("pmPurchaseBox").style.display = "block";
 
-  document.getElementById("WORK_PERFORMED").value = "";
+  document.getElementById("WORK_COMPLETION_RESULT").value = "";
   document.getElementById("HORAS").value = "";
-  setupSpecialInvoiceBox();
+}
+
+function getSaveButtonLabel() {
+  return isPMOrder() ? "Guardar y crear invoice PM" : "Enviar para facturacion";
 }
 
 function money(v) {
@@ -359,42 +362,58 @@ function saveClose() {
 
   const isPM = isPMOrder();
   const hours = isPM ? "" : document.getElementById("HORAS").value;
-  let parts = isPM ? 0 : getPartsTotal();
-  const work = isPM ? "" : document.getElementById("WORK_PERFORMED").value.trim();
-  const specialInvoice = isSpecialInvoiceEnabled();
-  let manualPartsTotal = "";
-  let manualSubTotal = "";
+  const invoiceDate = document.getElementById("INVOICE_DATE_MANUAL").value;
+  const parts = isPM ? getPartsTotal() : 0;
+  const completionResult = isPM
+    ? ""
+    : document.getElementById("WORK_COMPLETION_RESULT").value.trim();
+  const problemFound = String(ORDER.TECH_PROBLEM_FOUND || "").trim();
+  const proposedSolution = String(ORDER.TECH_PROPOSED_SOLUTION || "").trim();
+  const work = isPM
+    ? ""
+    : buildCompletionReport(problemFound, proposedSolution, completionResult);
+  const signature = document.getElementById("SIGNATURE_NAME").value.trim();
 
-  if (!isPM && !specialInvoice && (!hours || !work)) {
-    alert("Horas y Trabajo Realizado son obligatorios.");
+  if (!invoiceDate) {
+    alert("La fecha del servicio / invoice es obligatoria.");
     return;
   }
 
-  if (!isPM && specialInvoice && !work) {
-    alert("Trabajo Realizado es obligatorio.");
+  if (!isPM && (!hours || !completionResult)) {
+    alert("Horas y Como termino el trabajo son obligatorios.");
     return;
   }
 
-  if (specialInvoice) {
-    manualPartsTotal = money(document.getElementById("MANUAL_PARTS_TOTAL").value);
-    manualSubTotal = money(document.getElementById("MANUAL_SUB_TOTAL").value);
+  if (!isPM) {
+    const numericHours = Number(hours);
+    if (!isFinite(numericHours) || numericHours < 0) {
+      alert("Las horas no pueden ser negativas.");
+      return;
+    }
+    if (Math.abs(numericHours * 4 - Math.round(numericHours * 4)) > 0.0001) {
+      alert("Las horas deben escribirse en incrementos de 0.25.");
+      return;
+    }
+  }
 
-    if (manualSubTotal <= 0) {
-      alert("En invoice especial debes poner un Sub Total manual mayor que 0.");
+  if (!signature) {
+    alert("La firma o nombre del cliente es obligatorio.");
+    return;
+  }
+
+  for (let itemNumber = 1; itemNumber <= 4; itemNumber++) {
+    const material = getItem(itemNumber);
+    const hasMaterial = material.qty || material.part || material.desc;
+
+    if (hasMaterial && material.qty <= 0) {
+      alert("La cantidad del material " + itemNumber + " debe ser mayor que 0.");
       return;
     }
 
-    if (manualPartsTotal < 0) {
-      alert("Los materiales cobrados no pueden ser negativos.");
+    if (hasMaterial && !material.part && !material.desc) {
+      alert("Escriba el numero de parte o la descripcion del material " + itemNumber + ".");
       return;
     }
-
-    if (manualSubTotal < manualPartsTotal) {
-      alert("El Sub Total manual no puede ser menor que los materiales cobrados.");
-      return;
-    }
-
-    parts = manualPartsTotal;
   }
 
   IS_SAVING_CLOSE_ORDER = true;
@@ -409,6 +428,7 @@ function saveClose() {
     PM_TYPE: ORDER.PM_TYPE || "",
     NSN: ORDER.NSN,
     CLIENT: ORDER.CLIENT,
+    INVOICE_DATE_MANUAL: invoiceDate,
 
     STORE_ADDRESS: ORDER.STORE_ADDRESS || "",
     STORE_STREET: ORDER.STORE_STREET || "",
@@ -426,9 +446,6 @@ function saveClose() {
 
     HORAS: hours,
     PARTS_TOTAL: parts,
-    SPECIAL_INVOICE: specialInvoice ? "YES" : "",
-    MANUAL_PARTS_TOTAL: specialInvoice ? manualPartsTotal : "",
-    MANUAL_SUB_TOTAL: specialInvoice ? manualSubTotal : "",
 
     I1_QTY: getItem(1).qty,
     I1_PART: getItem(1).part,
@@ -456,6 +473,9 @@ function saveClose() {
 
     PURCHASE_RECEIPT: document.getElementById("PURCHASE_RECEIPT").value.trim(),
     PURCHASE_LOCATION: document.getElementById("PURCHASE_LOCATION").value,
+    TECH_PROBLEM_FOUND: problemFound,
+    TECH_PROPOSED_SOLUTION: proposedSolution,
+    WORK_COMPLETION_RESULT: completionResult,
     WORK_PERFORMED: work,
 
     EQUIPMENT_MAKE: document.getElementById("EQUIPMENT_MAKE").value.trim(),
@@ -463,7 +483,7 @@ function saveClose() {
     EQUIPMENT_SERIAL: document.getElementById("EQUIPMENT_SERIAL").value.trim(),
 
     NOTES: document.getElementById("NOTES").value.trim(),
-    SIGNATURE: document.getElementById("SIGNATURE_NAME").value.trim()
+    SIGNATURE: signature
   };
 
   google.script.run
@@ -471,7 +491,7 @@ function saveClose() {
       rememberCloseOrderMessage(
         isPM
           ? "PM completado, invoice autom\u00e1tico creado."
-          : "Orden completada correctamente. Invoice creado."
+          : "Reporte enviado. El invoice esta pendiente de revision por Administracion."
       );
 
       const closeTech = TECH_NAME || (ORDER && ORDER.TECHNICIAN) || "";
@@ -480,12 +500,22 @@ function saveClose() {
     .withFailureHandler(function(err) {
       IS_SAVING_CLOSE_ORDER = false;
       document.getElementById("saveBtn").disabled = false;
-      document.getElementById("saveBtn").innerText = "Guardar y completar orden";
+      document.getElementById("saveBtn").innerText = getSaveButtonLabel();
 
       const msg = err && err.message ? err.message : JSON.stringify(err);
-      alert("ERROR guardando invoice: " + msg);
+      alert("ERROR guardando reporte: " + msg);
     })
     .saveCloseOrder(payload, getSessionToken());
+}
+
+function buildCompletionReport(problemFound, proposedSolution, completionResult) {
+  const sections = [];
+
+  if (problemFound) sections.push("Problema encontrado:\n" + problemFound);
+  if (proposedSolution) sections.push("Solucion prevista:\n" + proposedSolution);
+  if (completionResult) sections.push("Resultado final:\n" + completionResult);
+
+  return sections.join("\n\n");
 }
 
 function getCloseOrderReturnUrl(tech) {
@@ -494,7 +524,7 @@ function getCloseOrderReturnUrl(tech) {
 
 function showCloseReturnLink(url) {
   document.getElementById("orderInfo").innerHTML =
-    "<b>Invoice creado correctamente.</b><br>" +
+    "<b>" + (isPMOrder() ? "Invoice PM creado correctamente." : "Reporte enviado para facturacion.") + "</b><br>" +
     "Presiona el boton para volver a la pantalla anterior.<br><br>" +
     "<a class='return-btn' href='" + escapeAttr(url) + "' target='_top'>Volver</a>";
 }
@@ -520,6 +550,12 @@ function rememberCloseOrderMessage(message) {
 }
 
 window.onload = function() {
+  const dateInput = document.getElementById("INVOICE_DATE_MANUAL");
+  if (dateInput && !dateInput.value) {
+    const now = new Date();
+    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+    dateInput.value = local.toISOString().slice(0, 10);
+  }
   load();
 };
 </script>

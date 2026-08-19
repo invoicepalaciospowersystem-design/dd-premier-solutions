@@ -13,6 +13,7 @@ function getCustomerOrdersBySupervisor(supervisorName, sessionToken, companyId) 
     companyId = String(session.companyId || companyId || "").trim().toUpperCase();
   }
 
+  return withAppCache_(["supervisor-orders", companyId, supervisorName], 90, function() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = ss.getSheetByName(CFG.SHEET_WORK_ORDERS);
 
@@ -43,6 +44,8 @@ function getCustomerOrdersBySupervisor(supervisorName, sessionToken, companyId) 
   }
 
   const result = [];
+  const storeMap = getStoreMapByCompany_(companyId);
+  const invoicePdfMap = getInvoicePdfMapByCompany_(companyId);
 
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
@@ -68,10 +71,12 @@ function getCustomerOrdersBySupervisor(supervisorName, sessionToken, companyId) 
 
     obj.ROW_NUMBER = i + 1;
 
-    enrichWorkOrderObject_(obj);
+    enrichWorkOrderObjectFromStoreMap_(obj, storeMap);
     localizeSupervisorOrderForEnglish_(obj);
 
-    obj.PDF_EN_URL = getInvoicePdfByWO(obj.WO_NUMBER);
+    obj.PDF_EN_URL =
+      invoicePdfMap[String(obj.WO_NUMBER || "").trim()] ||
+      ensurePdfUrlViewableForPortal_(obj.PDF_EN_URL || "");
     obj.HAS_INVOICE_PDF = obj.PDF_EN_URL ? "YES" : "NO";
 
     obj.QUOTE_EN_URL = ensurePdfUrlViewableForPortal_(obj.QUOTE_EN_URL || "");
@@ -86,6 +91,7 @@ function getCustomerOrdersBySupervisor(supervisorName, sessionToken, companyId) 
   }
 
   return result.reverse();
+  });
 }
 
 function sanitizeSupervisorOrderPayload_(obj) {
@@ -303,6 +309,47 @@ function getInvoicePdfByWO(woNumber) {
   }
 
   return "";
+}
+
+function getInvoicePdfMapByCompany_(companyId) {
+  companyId = String(companyId || "").trim().toUpperCase();
+
+  return withAppCache_(["invoice-pdf-map", companyId], 90, function() {
+    const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("INVOICES");
+    if (!sh) return {};
+
+    const data = sh.getDataRange().getValues();
+    if (data.length < 2) return {};
+
+    const headers = data[0].map(function(h) {
+      return String(h).trim();
+    });
+
+    const idxCompany = headers.indexOf("COMPANY_ID");
+    const idxWO = headers.indexOf("WO_NUMBER");
+    const idxPdfEn = headers.indexOf("PDF_EN_URL");
+    const idxPdfEs = headers.indexOf("PDF_ES_URL");
+
+    if (idxWO === -1) return {};
+
+    const map = {};
+
+    for (let i = data.length - 1; i >= 1; i--) {
+      const row = data[i];
+      const rowCompany = idxCompany >= 0 ? String(row[idxCompany] || "").trim().toUpperCase() : companyId;
+      const woNumber = String(row[idxWO] || "").trim();
+
+      if (!woNumber) continue;
+      if (companyId && rowCompany && rowCompany !== companyId) continue;
+      if (map[woNumber]) continue;
+
+      const pdfEn = idxPdfEn >= 0 ? String(row[idxPdfEn] || "").trim() : "";
+      const pdfEs = idxPdfEs >= 0 ? String(row[idxPdfEs] || "").trim() : "";
+      map[woNumber] = ensurePdfUrlViewableForPortal_(pdfEn || pdfEs || "");
+    }
+
+    return map;
+  });
 }
 
 function getSupervisorCompany(supervisorName) {

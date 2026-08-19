@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <?!= include("AppBackButton"); ?>
+  <style>
+    :root {
+      --dd-red:#dc2626;
+      --dd-dark:#111827;
+      --dd-border:#d1d5db;
+      --dd-muted:#64748b;
+      --dd-bg:#f3f4f6;
+    }
+
+    * {
+      box-sizing:border-box;
+    }
+
+    body {
+      margin:0;
+      min-height:100vh;
+      padding:18px;
+      font-family:Arial, sans-serif;
+      color:#111827;
+      background:
+        radial-gradient(circle at 12% 0%, rgba(220,38,38,.13), transparent 34%),
+        linear-gradient(135deg, #f8fafc 0%, #eef2f7 52%, #e5e7eb 100%);
+    }
+
+    .shell {
+      width:min(1120px, 100%);
+      margin:0 auto 32px;
+    }
+
+    .hero {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:16px;
+      margin-bottom:14px;
+      padding:18px 20px;
+      border-radius:14px;
+      background:#111827;
+      color:#fff;
+      box-shadow:0 16px 36px rgba(15,23,42,.18);
+    }
+
+    .hero h1 {
+      margin:0;
+      font-size:24px;
+      line-height:1.1;
+    }
+
+    .hero p {
+      margin:6px 0 0;
+      color:#cbd5e1;
+      font-size:13px;
+    }
+
+    .badge {
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:34px;
+      padding:8px 12px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.22);
+      background:rgba(255,255,255,.08);
+      color:#fff;
+      font-size:12px;
+      font-weight:bold;
+      white-space:nowrap;
+    }
+
+    .panel {
+      border-top:5px solid var(--dd-red);
+      border-radius:14px;
+      background:rgba(255,255,255,.96);
+      box-shadow:0 12px 28px rgba(15,23,42,.12);
+      overflow:hidden;
+    }
+
+    .panel-head {
+      padding:18px 20px 6px;
+    }
+
+    .panel-head h2 {
+      margin:0;
+      font-size:20px;
+    }
+
+    .panel-head p {
+      margin:6px 0 0;
+      color:var(--dd-muted);
+      font-size:13px;
+    }
+
+    .grid {
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:14px;
+      padding:18px 20px 4px;
+    }
+
+    .section-title {
+      grid-column:1 / -1;
+      margin:8px 0 -2px;
+      padding-top:10px;
+      border-top:1px solid #e5e7eb;
+      font-size:13px;
+      font-weight:800;
+      letter-spacing:.02em;
+      color:#374151;
+      text-transform:uppercase;
+    }
+
+    label {
+      display:block;
+      margin-bottom:6px;
+      font-size:12px;
+      font-weight:bold;
+      color:#374151;
+    }
+
+    input,
+    textarea,
+    select {
+      width:100%;
+      min-height:42px;
+      padding:10px 12px;
+      border:1px solid var(--dd-border);
+      border-radius:10px;
+      background:#fff;
+      color:#111827;
+      font-size:14px;
+      outline:none;
+    }
+
+    textarea {
+      min-height:116px;
+      resize:vertical;
+      line-height:1.45;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      border-color:#2563eb;
+      box-shadow:0 0 0 3px rgba(37,99,235,.13);
+    }
+
+    .full {
+      grid-column:1 / -1;
+    }
+
+    .money-grid {
+      grid-column:1 / -1;
+      display:grid;
+      grid-template-columns:repeat(5, minmax(0, 1fr));
+      gap:12px;
+    }
+
+    .materials-head {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      margin-bottom:8px;
+    }
+
+    .materials-head label {
+      margin:0;
+    }
+
+    .materials-table {
+      border:1px solid #e5e7eb;
+      border-radius:12px;
+      overflow:hidden;
+      background:#fff;
+    }
+
+    .materials-labels,
+    .material-row {
+      display:grid;
+      grid-template-columns:110px minmax(0, 1fr) 46px;
+      gap:10px;
+      align-items:center;
+    }
+
+    .materials-labels {
+      padding:10px 12px;
+      background:#f3f4f6;
+      color:#374151;
+      font-size:11px;
+      font-weight:800;
+      text-transform:uppercase;
+    }
+
+    .material-row {
+      padding:10px 12px;
+      border-top:1px solid #e5e7eb;
+    }
+
+    .material-row input {
+      min-height:38px;
+    }
+
+    .material-remove {
+      min-height:38px;
+      border:1px solid #fecaca;
+      border-radius:9px;
+      background:#fef2f2;
+      color:#991b1b;
+      cursor:pointer;
+      font-weight:900;
+    }
+
+    .mini-btn {
+      min-height:34px;
+      border:0;
+      border-radius:9px;
+      padding:8px 12px;
+      background:#111827;
+      color:#fff;
+      cursor:pointer;
+      font-size:12px;
+      font-weight:bold;
+    }
+
+    .actions {
+      display:flex;
+      align-items:center;
+      justify-content:flex-end;
+      gap:10px;
+      padding:18px 20px 20px;
+      border-top:1px solid #e5e7eb;
+      background:#f8fafc;
+    }
+
+    .btn {
+      min-height:42px;
+      border:0;
+      border-radius:10px;
+      padding:10px 16px;
+      cursor:pointer;
+      font-weight:bold;
+      color:#fff;
+      background:#111827;
+      box-shadow:0 8px 18px rgba(15,23,42,.16);
+    }
+
+    .btn.secondary {
+      color:#111827;
+      background:#e5e7eb;
+      box-shadow:none;
+    }
+
+    .btn.primary {
+      background:var(--dd-red);
+    }
+
+    .btn:disabled {
+      opacity:.6;
+      cursor:not-allowed;
+    }
+
+    .notice {
+      display:none;
+      margin:14px 20px 0;
+      padding:12px 14px;
+      border-radius:10px;
+      border:1px solid #bfdbfe;
+      background:#eff6ff;
+      color:#1e3a8a;
+      font-size:13px;
+      line-height:1.45;
+    }
+
+    .notice.error {
+      border-color:#fecaca;
+      background:#fef2f2;
+      color:#991b1b;
+    }
+
+    .notice.success {
+      border-color:#bbf7d0;
+      background:#f0fdf4;
+      color:#166534;
+    }
+
+    .result-links {
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin-top:10px;
+    }
+
+    .result-links a {
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:34px;
+      padding:8px 12px;
+      border-radius:9px;
+      background:#111827;
+      color:#fff;
+      font-weight:bold;
+      text-decoration:none;
+    }
+
+    .hint {
+      margin-top:5px;
+      color:var(--dd-muted);
+      font-size:12px;
+    }
+
+    @media (max-width:900px) {
+      body {
+        padding:10px;
+      }
+
+      .hero {
+        align-items:flex-start;
+        flex-direction:column;
+      }
+
+      .grid,
+      .money-grid,
+      .materials-labels,
+      .material-row {
+        grid-template-columns:1fr;
+      }
+
+      .materials-labels span:last-child {
+        display:none;
+      }
+
+      .actions {
+        flex-direction:column;
+        align-items:stretch;
+      }
+
+      .btn {
+        width:100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell" id="content">
+    <div class="hero">
+      <div>
+        <h1>D&amp;D Premier Manual Invoice</h1>
+        <p>Invoice manual con logo y datos de D&amp;D Premier Solutions Corp.</p>
+      </div>
+      <div class="badge">OWNER ONLY</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Crear invoice manual</h2>
+        <p>La fecha es opcional. Si la dejas vacia, el sistema usa la fecha actual al generar el invoice.</p>
+      </div>
+
+      <div id="notice" class="notice"></div>
+
+      <form id="manualInvoiceForm" onsubmit="submitManualInvoice(event)">
+        <div class="grid">
+          <div class="section-title">Datos del invoice</div>
+
+          <div>
+            <label for="invoiceDate">Fecha del invoice</label>
+            <input id="invoiceDate" type="date">
+          </div>
+
+          <div>
+            <label for="woNumber">Referencia / WO opcional</label>
+            <input id="woNumber" type="text" placeholder="Ej. DD-001">
+          </div>
+
+          <div>
+            <label for="customerName">Cliente *</label>
+            <input id="customerName" type="text" required placeholder="Nombre del cliente">
+          </div>
+
+          <div>
+            <label for="customerEmail">Email del cliente</label>
+            <input id="customerEmail" type="email" placeholder="cliente@empresa.com">
+          </div>
+
+          <div>
+            <label for="vendorId">Vendor ID</label>
+            <input id="vendorId" type="text" placeholder="Opcional">
+          </div>
+
+          <div>
+            <label for="nsn">NSN / Store</label>
+            <input id="nsn" type="text" placeholder="Opcional">
+          </div>
+
+          <div class="section-title">Direccion del cliente</div>
+
+          <div class="full">
+            <label for="customerStreet">Direccion</label>
+            <input id="customerStreet" type="text" placeholder="Street address">
+          </div>
+
+          <div>
+            <label for="customerCity">Ciudad</label>
+            <input id="customerCity" type="text">
+          </div>
+
+          <div>
+            <label for="customerState">Estado / ZIP</label>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+              <input id="customerState" type="text" placeholder="FL">
+              <input id="customerZip" type="text" placeholder="33055">
+            </div>
+          </div>
+
+          <div class="section-title">Descripcion</div>
+
+          <div class="full">
+            <label for="reportedProblem">Problema reportado</label>
+            <textarea id="reportedProblem" placeholder="Describe el problema reportado o motivo del invoice."></textarea>
+          </div>
+
+          <div class="full">
+            <label for="description">Descripcion / trabajo realizado *</label>
+            <textarea id="description" required placeholder="Describe el trabajo, servicio o concepto que se va a cobrar."></textarea>
+          </div>
+
+          <div class="full">
+            <div class="materials-head">
+              <label>Lista de materiales usados</label>
+              <button class="mini-btn" type="button" onclick="addMaterialRow()">+ Agregar material</button>
+            </div>
+            <div class="materials-table">
+              <div class="materials-labels">
+                <span>QTY</span>
+                <span>Descripcion del material</span>
+                <span></span>
+              </div>
+              <div id="materialsRows"></div>
+            </div>
+            <div class="hint">Cada material saldra dividido en el PDF como QTY y descripcion. El precio total se controla abajo en Materiales.</div>
+          </div>
+
+          <div class="full">
+            <label for="notes">Notas internas o visibles</label>
+            <textarea id="notes" placeholder="Opcional"></textarea>
+          </div>
+
+          <div class="section-title">Totales manuales</div>
+
+          <div class="money-grid">
+            <div>
+              <label for="partsTotal">Materiales</label>
+              <input id="partsTotal" type="number" min="0" step="0.01" value="0">
+            </div>
+
+            <div>
+              <label for="laborTotal">Labor / Servicio</label>
+              <input id="laborTotal" type="number" min="0" step="0.01" value="0">
+            </div>
+
+            <div>
+              <label for="subtotal">Subtotal</label>
+              <input id="subtotal" type="number" min="0" step="0.01" placeholder="Auto si queda vacio">
+            </div>
+
+            <div>
+              <label for="taxAmount">Tax</label>
+              <input id="taxAmount" type="number" min="0" step="0.01" placeholder="Auto si queda vacio">
+              <div class="hint">Puedes ponerlo manual.</div>
+            </div>
+
+            <div>
+              <label for="total">Total</label>
+              <input id="total" type="number" min="0" step="0.01" placeholder="Auto si queda vacio">
+            </div>
+          </div>
+
+          <div class="section-title">Datos de D&amp;D</div>
+
+          <div>
+            <label for="billingCompanyName">Compania que factura</label>
+            <input id="billingCompanyName" type="text" value="D&D Premier Solutions Corp">
+          </div>
+
+          <div>
+            <label for="billingCompanyEmail">Email</label>
+            <input id="billingCompanyEmail" type="email" value="ddpremiersolutions.corp@gmail.com">
+          </div>
+
+          <div class="full">
+            <label for="billingCompanyAddress">Direccion de D&amp;D</label>
+            <input id="billingCompanyAddress" type="text" placeholder="Opcional">
+          </div>
+
+          <div>
+            <label for="billingCompanyPhone">Telefono</label>
+            <input id="billingCompanyPhone" type="text" placeholder="Opcional">
+          </div>
+
+          <div>
+            <label for="billingCompanyWebsite">Website</label>
+            <input id="billingCompanyWebsite" type="text" value="https://ddpremiersolutionscorp.com">
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn secondary" type="button" onclick="recalcTotals()">Recalcular total</button>
+          <button class="btn primary" id="saveManualInvoiceBtn" type="submit">Crear invoice PDF</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const DD_LOGO_FILE_ID = "1GGfAknbHvUbCFkLX_zICGGDwF8wGxlBJ";
+    let manualInvoiceSaving = false;
+
+    window.addEventListener("load", function() {
+      try {
+        requireOwnerSession();
+        resetMaterialRows();
+      } catch (err) {
+        renderBlocked(err.message || "Sesion no valida.");
+      }
+    });
+
+    function getCurrentUser() {
+      try {
+        return JSON.parse(getAppSessionItem("pps_user") || "{}");
+      } catch (err) {
+        return {};
+      }
+    }
+
+    function getSessionToken() {
+      const user = getCurrentUser();
+      return String(user.sessionToken || user.token || "").trim();
+    }
+
+    function requireOwnerSession() {
+      const user = getCurrentUser();
+      const role = String(user.role || user.ROLE || "").trim().toUpperCase();
+      if (!getSessionToken() || role !== "OWNER") {
+        throw new Error("Solo OWNER puede crear invoices manuales de D&D.");
+      }
+    }
+
+    function renderBlocked(message) {
+      document.getElementById("content").innerHTML =
+        '<div class="panel"><div class="panel-head"><h2>Acceso restringido</h2>' +
+        '<p>' + escapeHtml(message) + '</p></div></div>';
+    }
+
+    function moneyValue(id) {
+      const raw = String(document.getElementById(id).value || "").replace(/[^0-9.-]/g, "");
+      const value = Number(raw);
+      return isFinite(value) ? Math.round(value * 100) / 100 : 0;
+    }
+
+    function setMoneyValue(id, value) {
+      document.getElementById(id).value = (Math.round(Number(value || 0) * 100) / 100).toFixed(2);
+    }
+
+    function recalcTotals() {
+      const parts = moneyValue("partsTotal");
+      const labor = moneyValue("laborTotal");
+      const tax = moneyValue("taxAmount");
+      const subtotal = Math.round((parts + labor) * 100) / 100;
+      setMoneyValue("subtotal", subtotal);
+      setMoneyValue("total", subtotal + tax);
+    }
+
+    function submitManualInvoice(event) {
+      event.preventDefault();
+      if (manualInvoiceSaving) return;
+
+      try {
+        requireOwnerSession();
+      } catch (err) {
+        showNotice(err.message || "Sesion no valida.", "error");
+        return;
+      }
+
+      const payload = buildPayload();
+      if (!payload.customerName || !payload.description) {
+        showNotice("Completa el cliente y la descripcion antes de crear el invoice.", "error");
+        return;
+      }
+
+      setSaving(true);
+      showNotice("Creando invoice manual y generando PDFs...", "");
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          setSaving(false);
+          showResult(result);
+        })
+        .withFailureHandler(function(err) {
+          setSaving(false);
+          showNotice("ERROR creando invoice manual: " + (err && err.message ? err.message : err), "error");
+        })
+        .createDDPremierManualInvoice(payload, getSessionToken());
+    }
+
+    function buildPayload() {
+      const materialItems = getMaterialItems();
+      return {
+        invoiceDate: field("invoiceDate"),
+        woNumber: field("woNumber"),
+        customerName: field("customerName"),
+        customerEmail: field("customerEmail"),
+        vendorId: field("vendorId"),
+        nsn: field("nsn"),
+        customerStreet: field("customerStreet"),
+        customerCity: field("customerCity"),
+        customerState: field("customerState"),
+        customerZip: field("customerZip"),
+        reportedProblem: field("reportedProblem"),
+        description: field("description"),
+        workPerformed: field("description"),
+        materialsItems: materialItems,
+        materialsUsed: formatMaterialsForSheet(materialItems),
+        notes: field("notes"),
+        partsTotal: moneyValue("partsTotal"),
+        laborTotal: moneyValue("laborTotal"),
+        subtotal: moneyPayloadValue("subtotal"),
+        taxAmount: moneyPayloadValue("taxAmount"),
+        total: moneyPayloadValue("total"),
+        billingCompanyName: field("billingCompanyName") || "D&D Premier Solutions Corp",
+        billingCompanyAddress: field("billingCompanyAddress"),
+        billingCompanyPhone: field("billingCompanyPhone"),
+        billingCompanyEmail: field("billingCompanyEmail") || "ddpremiersolutions.corp@gmail.com",
+        billingCompanyWebsite: field("billingCompanyWebsite") || "https://ddpremiersolutionscorp.com",
+        billingLogoFileId: DD_LOGO_FILE_ID
+      };
+    }
+
+    function field(id) {
+      return String(document.getElementById(id).value || "").trim();
+    }
+
+    function addMaterialRow(qty, description) {
+      const container = document.getElementById("materialsRows");
+      if (!container) return;
+
+      const row = document.createElement("div");
+      row.className = "material-row";
+      row.innerHTML =
+        '<input class="material-qty" type="text" inputmode="decimal" placeholder="QTY" value="' + escapeAttr(qty || "") + '">' +
+        '<input class="material-description" type="text" placeholder="Descripcion del material" value="' + escapeAttr(description || "") + '">' +
+        '<button class="material-remove" type="button" title="Quitar material" onclick="removeMaterialRow(this)">x</button>';
+      container.appendChild(row);
+    }
+
+    function removeMaterialRow(button) {
+      const row = button && button.closest ? button.closest(".material-row") : null;
+      if (row) row.remove();
+      ensureMaterialRow();
+    }
+
+    function ensureMaterialRow() {
+      const container = document.getElementById("materialsRows");
+      if (container && !container.querySelector(".material-row")) {
+        addMaterialRow();
+      }
+    }
+
+    function resetMaterialRows() {
+      const container = document.getElementById("materialsRows");
+      if (!container) return;
+      container.innerHTML = "";
+      addMaterialRow();
+    }
+
+    function getMaterialItems() {
+      const rows = Array.prototype.slice.call(document.querySelectorAll("#materialsRows .material-row"));
+      return rows.map(function(row) {
+        const qtyInput = row.querySelector(".material-qty");
+        const descriptionInput = row.querySelector(".material-description");
+        return {
+          qty: String(qtyInput ? qtyInput.value : "").trim(),
+          description: String(descriptionInput ? descriptionInput.value : "").trim()
+        };
+      }).filter(function(item) {
+        return item.qty || item.description;
+      });
+    }
+
+    function formatMaterialsForSheet(items) {
+      return (items || []).map(function(item) {
+        const qty = String(item.qty || "").trim();
+        const description = String(item.description || "").trim();
+        return (qty ? qty + " | " : "") + description;
+      }).join("\n");
+    }
+
+    function moneyPayloadValue(id) {
+      return field(id) === "" ? "" : moneyValue(id);
+    }
+
+    function setSaving(isSaving) {
+      manualInvoiceSaving = Boolean(isSaving);
+      const btn = document.getElementById("saveManualInvoiceBtn");
+      btn.disabled = manualInvoiceSaving;
+      btn.textContent = manualInvoiceSaving ? "Creando..." : "Crear invoice PDF";
+    }
+
+    function showResult(result) {
+      if (!result || !result.ok) {
+        showNotice("No se recibio confirmacion del invoice.", "error");
+        return;
+      }
+
+      const total = Number(result.total || 0).toFixed(2);
+      const links = [];
+      if (result.pdfEsUrl) {
+        links.push('<a href="' + escapeAttr(result.pdfEsUrl) + '" target="_blank">Abrir PDF ES</a>');
+      }
+      if (result.pdfEnUrl) {
+        links.push('<a href="' + escapeAttr(result.pdfEnUrl) + '" target="_blank">Abrir PDF EN</a>');
+      }
+
+      showNotice(
+        '<strong>Invoice #' + escapeHtml(result.invoiceNumber || "") + ' creado.</strong><br>' +
+        'Total: $' + total +
+        '<div class="result-links">' + links.join("") + '</div>',
+        "success",
+        true
+      );
+      document.getElementById("manualInvoiceForm").reset();
+      resetMaterialRows();
+      document.getElementById("billingCompanyName").value = "D&D Premier Solutions Corp";
+      document.getElementById("billingCompanyEmail").value = "ddpremiersolutions.corp@gmail.com";
+      document.getElementById("billingCompanyWebsite").value = "https://ddpremiersolutionscorp.com";
+      setMoneyValue("partsTotal", 0);
+      setMoneyValue("laborTotal", 0);
+      document.getElementById("subtotal").value = "";
+      document.getElementById("taxAmount").value = "";
+      document.getElementById("total").value = "";
+    }
+
+    function showNotice(message, type, html) {
+      const box = document.getElementById("notice");
+      box.className = "notice" + (type ? " " + type : "");
+      box.style.display = "block";
+      if (html) {
+        box.innerHTML = message;
+      } else {
+        box.textContent = message;
+      }
+      box.scrollIntoView({ behavior:"smooth", block:"nearest" });
+    }
+
+    function escapeHtml(value) {
+      return String(value === undefined || value === null ? "" : value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value).replace(/`/g, "&#096;");
+    }
+  </script>
+</body>
+</html>

@@ -140,9 +140,20 @@
     }
 
     .map-link {
+      display:inline-flex;
+      align-items:center;
+      margin:3px 3px 0 0;
+      padding:4px 7px;
+      border-radius:6px;
       color:#2563eb;
+      background:#eff6ff;
       font-weight:bold;
       text-decoration:none;
+    }
+
+    .map-link.apple {
+      color:#111827;
+      background:#e5e7eb;
     }
 
     .map-link:hover {
@@ -205,6 +216,142 @@
       font-size:14px;
     }
 
+    .tech-assessment {
+      display:none;
+      background:#ecfdf5;
+      border:1px solid #a7f3d0;
+      border-left:5px solid #16a34a;
+      padding:11px;
+      border-radius:10px;
+      margin-top:10px;
+      font-size:14px;
+      white-space:pre-wrap;
+    }
+
+    .tech-assessment.visible { display:block; }
+    .tech-assessment-toggle {
+      width:100%;
+      margin-top:10px;
+      background:#0f766e;
+    }
+
+    .tech-assessment-row + .tech-assessment-row { margin-top:9px; }
+
+    .work-start-modal {
+      display:none;
+      position:fixed;
+      inset:0;
+      z-index:10000;
+      background:#f1f5f9;
+      align-items:stretch;
+      justify-content:stretch;
+      padding:0;
+      overflow:hidden;
+    }
+
+    .work-start-dialog {
+      width:100%;
+      height:100vh;
+      height:100dvh;
+      max-height:none;
+      overflow:hidden;
+      background:#ffffff;
+      border-radius:0;
+      box-shadow:none;
+      padding:0;
+      box-sizing:border-box;
+      display:flex;
+      flex-direction:column;
+    }
+
+    .work-start-header {
+      flex:none;
+      background:#111827;
+      color:#ffffff;
+      padding:16px 22px;
+      box-shadow:0 2px 8px rgba(15,23,42,.2);
+    }
+    .work-start-header-inner,
+    .work-start-body-inner,
+    .work-start-footer-inner {
+      width:min(1050px, 100%);
+      margin:0 auto;
+      box-sizing:border-box;
+    }
+    .work-start-dialog h2 { margin:0 0 5px; font-size:24px; }
+    .work-start-dialog .modal-note { color:#cbd5e1; font-size:14px; }
+    .work-start-body { flex:1; min-height:0; overflow:auto; padding:20px 22px 28px; }
+    .work-start-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    .work-start-field { display:grid; gap:6px; margin-top:13px; }
+    .work-start-field label { font-size:14px; font-weight:bold; }
+    .work-start-field textarea {
+      width:100%;
+      min-height:190px;
+      padding:11px;
+      border:1px solid #cbd5e1;
+      border-radius:10px;
+      resize:vertical;
+      box-sizing:border-box;
+      font:inherit;
+    }
+    .work-start-field textarea:focus { outline:2px solid #86efac; border-color:#16a34a; }
+    .work-start-error { display:none; color:#b91c1c; font-size:13px; font-weight:bold; margin-top:10px; }
+    .work-start-footer {
+      flex:none;
+      border-top:1px solid #e2e8f0;
+      background:#ffffff;
+      padding:13px 22px;
+      box-shadow:0 -3px 12px rgba(15,23,42,.08);
+    }
+    .work-start-actions { display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+    .work-start-cancel { background:#64748b; }
+    .work-start-save { background:#16a34a; }
+    .work-start-attachment-box {
+      margin-top:20px;
+      padding:16px;
+      border:1px solid #cbd5e1;
+      background:#f8fafc;
+      border-radius:12px;
+    }
+    .work-start-attachment-title { font-size:16px; font-weight:bold; margin-bottom:5px; }
+    .work-start-attachment-note { color:#64748b; font-size:13px; line-height:1.4; }
+    .work-start-attachment-picker {
+      display:inline-block;
+      margin:12px 0 7px;
+      padding:11px 15px;
+      border-radius:10px;
+      background:#2563eb;
+      color:white;
+      font-weight:bold;
+      cursor:pointer;
+    }
+    .work-start-attachment-picker.disabled { background:#94a3b8; cursor:not-allowed; }
+    .work-start-attachment-input {
+      position:absolute;
+      width:1px;
+      height:1px;
+      opacity:0;
+      overflow:hidden;
+      pointer-events:none;
+    }
+    .work-start-attachment-count { color:#334155; font-size:13px; font-weight:bold; }
+    .work-start-attachment-list { display:grid; gap:8px; margin-top:12px; }
+    .work-start-attachment-item {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px;
+      border:1px solid #e2e8f0;
+      background:#ffffff;
+      border-radius:9px;
+    }
+    .work-start-attachment-info { min-width:0; }
+    .work-start-attachment-name { font-weight:bold; overflow-wrap:anywhere; }
+    .work-start-attachment-meta { color:#64748b; font-size:12px; margin-top:3px; }
+    .work-start-attachment-remove { width:auto; margin:0; padding:7px 10px; background:#dc2626; font-size:12px; }
+    .work-start-attachment-progress { margin-top:9px; color:#1d4ed8; font-size:13px; font-weight:bold; }
+
     .actions {
       margin-top:10px;
       display:flex;
@@ -256,6 +403,12 @@
         width:100%;
         box-sizing:border-box;
       }
+      .work-start-header { padding:13px 14px; }
+      .work-start-body { padding:10px 14px 20px; }
+      .work-start-footer { padding:10px 14px; }
+      .work-start-form-grid { grid-template-columns:1fr; gap:0; }
+      .work-start-field textarea { min-height:135px; }
+      .work-start-actions button { flex:1; min-width:130px; }
     }
   </style>
   <?!= include("AppWatermark"); ?>
@@ -329,6 +482,62 @@
 
 <div id="orders" class="grid">Cargando...</div>
 
+<div id="workStartModal" class="work-start-modal" role="dialog" aria-modal="true" aria-labelledby="workStartTitle">
+  <div class="work-start-dialog">
+    <div class="work-start-header">
+      <div class="work-start-header-inner">
+        <h2 id="workStartTitle">Iniciar trabajo</h2>
+        <div id="workStartOrderLabel" class="modal-note"></div>
+      </div>
+    </div>
+
+    <div class="work-start-body">
+      <div class="work-start-body-inner">
+        <div class="work-start-form-grid">
+          <div class="work-start-field">
+            <label for="techProblemFound">Problema encontrado *</label>
+            <textarea id="techProblemFound" maxlength="5000" placeholder="Describa lo que encontro al revisar el equipo..."></textarea>
+          </div>
+
+          <div class="work-start-field">
+            <label for="techProposedSolution">Solucion que se le dara al problema *</label>
+            <textarea id="techProposedSolution" maxlength="5000" placeholder="Describa la reparacion, ajuste o accion que se realizara..."></textarea>
+          </div>
+        </div>
+
+        <div class="work-start-attachment-box">
+          <div class="work-start-attachment-title">Fotos y videos (opcional)</div>
+          <div class="work-start-attachment-note">
+            Puede agregar hasta 10 archivos en total por orden. Cada foto o video puede pesar hasta 25 MB.
+          </div>
+          <input
+            id="TECH_WORK_ATTACHMENTS"
+            class="work-start-attachment-input"
+            type="file"
+            accept="image/*,video/*"
+            multiple
+            onchange="addTechWorkAttachments(this)">
+          <label id="techWorkAttachmentPicker" class="work-start-attachment-picker" for="TECH_WORK_ATTACHMENTS">
+            Seleccionar fotos o videos
+          </label>
+          <div id="TECH_WORK_ATTACHMENT_COUNT" class="work-start-attachment-count"></div>
+          <div id="TECH_WORK_ATTACHMENT_PROGRESS" class="work-start-attachment-progress"></div>
+          <div id="TECH_WORK_ATTACHMENT_LIST" class="work-start-attachment-list"></div>
+        </div>
+
+        <div id="workStartError" class="work-start-error"></div>
+      </div>
+    </div>
+
+    <div class="work-start-footer">
+      <div class="work-start-footer-inner work-start-actions">
+        <button id="workStartCancel" type="button" class="work-start-cancel" onclick="closeStartWorkModal()">Cancelar</button>
+        <button id="workStartSave" type="button" class="work-start-save" onclick="saveAndStartTechWork()">Guardar e iniciar trabajo</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 function navigateApp(url) {
   const target = String(url || "").trim();
@@ -398,6 +607,13 @@ const UNITED_REFRIGERATION_ACCOUNT =
 let ACTIVE_TECH_ORDERS = [];
 let CURRENT_TECH_MONTHLY_SUMMARY = null;
 let CURRENT_TECH_INVOICE_SUMMARY = null;
+let ACTIVE_WORK_START_ROW = 0;
+let WORK_START_SAVING = false;
+let ACTIVE_WORK_START_ORDER = null;
+const TECH_WORK_ATTACHMENT_MAX_FILES = 10;
+const TECH_WORK_ATTACHMENT_MAX_BYTES = 25 * 1024 * 1024;
+let WORK_START_EXISTING_ATTACHMENT_COUNT = 0;
+let WORK_START_ATTACHMENT_FILES = [];
 
 function getCurrentUser() {
   try {
@@ -542,6 +758,11 @@ function card(o) {
   const equipment = o.REPORTED_EQUIPMENT || o.REPORTED_EQUIPMENT_EN || o["REPORTED EQUIPMENT"] || "No especificado";
   const problem = o.REPORTED_PROBLEM_ES || o.REPORTED_PROBLEM_EN || o.REPORTED_PROBLEM_ORIGINAL || "";
   const address = o.STORE_ADDRESS || "No disponible";
+  const hasAttachmentFiles = !!String(o.FOLDER_URL || "").trim() || Number(o.ATTACHMENT_COUNT || 0) > 0;
+  const techProblemFound = String(o.TECH_PROBLEM_FOUND || "").trim();
+  const techProposedSolution = String(o.TECH_PROPOSED_SOLUTION || "").trim();
+  const workStartedAt = String(o.DATE_WORK_STARTED || "").trim();
+  const workStartedBy = String(o.WORK_STARTED_BY || "").trim();
 
   const assignedAge = getAssignedAgeText(o);
 
@@ -568,8 +789,33 @@ function card(o) {
         <b>Problema:</b><br>${problem}
       </div>
 
+      ${(techProblemFound || techProposedSolution) ? `
+        <button
+          type="button"
+          class="tech-assessment-toggle"
+          aria-expanded="false"
+          onclick="toggleTechAssessment(${row}, this)">
+          Ver diagnostico
+        </button>
+        <div id="techAssessment_${row}" class="tech-assessment">
+          <div class="tech-assessment-row"><b>Problema encontrado por el tecnico:</b><br>${escapeHtmlTech(techProblemFound)}</div>
+          <div class="tech-assessment-row"><b>Solucion propuesta:</b><br>${escapeHtmlTech(techProposedSolution)}</div>
+          ${(workStartedAt || workStartedBy) ? `<div class="tech-assessment-row"><b>Inicio:</b> ${escapeHtmlTech(workStartedAt)}${workStartedBy ? " por " + escapeHtmlTech(workStartedBy) : ""}</div>` : ""}
+        </div>
+      ` : ""}
+
+      ${hasAttachmentFiles ? `
+        <div class="actions">
+          <button
+            style="background:#2563eb;"
+            onclick="openTechAttachmentGallery(${row}, '${o.WO_NUMBER || ""}')">
+            Fotos / Videos (${Number(o.ATTACHMENT_COUNT || 0)})
+          </button>
+        </div>
+      ` : ""}
+
       <div class="actions">
-        <button class="btn ${isActive('IN PROGRESS')}" onclick="updateStatus(${row}, 'IN PROGRESS')">
+        <button class="btn ${isActive('IN PROGRESS')}" onclick="openStartWorkModal(${row})">
           Iniciar Trabajo
         </button>
 
@@ -609,15 +855,31 @@ function card(o) {
   `;
 }
 
+function openTechAttachmentGallery(row, woNumber) {
+  TOP_NAV.href =
+    BASE_URL +
+    "?view=orderFiles" +
+    "&row=" + encodeURIComponent(row) +
+    "&wo=" + encodeURIComponent(woNumber || "") +
+    "&companyId=" + encodeURIComponent(getCurrentCompanyId()) +
+    "&returnTo=" + encodeURIComponent(getTechReturnUrl());
+}
+
 function renderAddressMapLink(address) {
   address = String(address || "").trim();
   if (!address || address === "No disponible") return "No disponible";
 
-  return `<a class="map-link" href="${buildGoogleMapsUrl(address)}" target="_blank" rel="noopener noreferrer">${escapeHtmlTech(address)}</a>`;
+  return `${escapeHtmlTech(address)}<br>
+    <a class="map-link" href="${buildGoogleMapsUrl(address)}" target="_blank" rel="noopener noreferrer">Google Maps</a>
+    <a class="map-link apple" href="${buildAppleMapsUrl(address)}" target="_blank" rel="noopener noreferrer">Apple Maps</a>`;
 }
 
 function buildGoogleMapsUrl(address) {
   return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(address);
+}
+
+function buildAppleMapsUrl(address) {
+  return "https://maps.apple.com/?q=" + encodeURIComponent(address);
 }
 
 function escapeHtmlTech(value) {
@@ -627,6 +889,17 @@ function escapeHtmlTech(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function toggleTechAssessment(row, button) {
+  const detail = document.getElementById("techAssessment_" + Number(row));
+  if (!detail) return;
+
+  const isOpen = detail.classList.toggle("visible");
+  if (button) {
+    button.innerText = isOpen ? "Ocultar diagnostico" : "Ver diagnostico";
+    button.setAttribute("aria-expanded", isOpen ? "true" : "false");
+  }
 }
 
 function updateStatus(row, status) {
@@ -639,6 +912,307 @@ function updateStatus(row, status) {
       alert(err.message);
     })
     .updateTechOrderStatus(row, status, getSessionToken());
+}
+
+function openStartWorkModal(row) {
+  const order = ACTIVE_TECH_ORDERS.find(function(item) {
+    return Number(item.ROW_NUMBER) === Number(row);
+  });
+
+  if (!order) {
+    alert("No se pudo encontrar la orden. Actualice la pagina e intente nuevamente.");
+    return;
+  }
+
+  TOP_NAV.href =
+    BASE_URL +
+    "?view=startWork" +
+    "&row=" + encodeURIComponent(row) +
+    "&wo=" + encodeURIComponent(order.WO_NUMBER || "") +
+    "&tech=" + encodeURIComponent(TECH_NAME) +
+    "&companyId=" + encodeURIComponent(getCurrentCompanyId()) +
+    "&returnTo=" + encodeURIComponent(getTechReturnUrl());
+}
+
+function closeStartWorkModal() {
+  if (WORK_START_SAVING) return;
+  document.getElementById("workStartModal").style.display = "none";
+  document.body.style.overflow = "";
+  ACTIVE_WORK_START_ROW = 0;
+  ACTIVE_WORK_START_ORDER = null;
+  WORK_START_EXISTING_ATTACHMENT_COUNT = 0;
+  WORK_START_ATTACHMENT_FILES = [];
+}
+
+function setWorkStartSaving(isSaving, saveLabel) {
+  WORK_START_SAVING = !!isSaving;
+
+  const saveButton = document.getElementById("workStartSave");
+  const cancelButton = document.getElementById("workStartCancel");
+  const attachmentInput = document.getElementById("TECH_WORK_ATTACHMENTS");
+  const attachmentPicker = document.getElementById("techWorkAttachmentPicker");
+  const slotsUsed = WORK_START_EXISTING_ATTACHMENT_COUNT + WORK_START_ATTACHMENT_FILES.length;
+  const pickerDisabled = WORK_START_SAVING || slotsUsed >= TECH_WORK_ATTACHMENT_MAX_FILES;
+
+  if (saveButton) {
+    saveButton.disabled = WORK_START_SAVING;
+    saveButton.innerText = saveLabel || "Guardar e iniciar trabajo";
+  }
+  if (cancelButton) cancelButton.disabled = WORK_START_SAVING;
+  if (attachmentInput) attachmentInput.disabled = pickerDisabled;
+  if (attachmentPicker) attachmentPicker.classList.toggle("disabled", pickerDisabled);
+
+  renderTechWorkAttachments();
+}
+
+function addTechWorkAttachments(input) {
+  if (!input || WORK_START_SAVING) return;
+
+  const selectedFiles = Array.from(input.files || []);
+  const rejected = [];
+
+  selectedFiles.forEach(function(file) {
+    const slotsUsed = WORK_START_EXISTING_ATTACHMENT_COUNT + WORK_START_ATTACHMENT_FILES.length;
+
+    if (slotsUsed >= TECH_WORK_ATTACHMENT_MAX_FILES) {
+      rejected.push(file.name + ": se alcanzo el maximo de 10 archivos");
+      return;
+    }
+
+    if (!isAllowedTechWorkAttachment(file)) {
+      rejected.push(file.name + ": solo se permiten fotos y videos");
+      return;
+    }
+
+    if (Number(file.size || 0) > TECH_WORK_ATTACHMENT_MAX_BYTES) {
+      rejected.push(file.name + ": excede 25 MB");
+      return;
+    }
+
+    const duplicate = WORK_START_ATTACHMENT_FILES.some(function(item) {
+      return item.file.name === file.name &&
+        item.file.size === file.size &&
+        item.file.lastModified === file.lastModified;
+    });
+
+    if (duplicate) return;
+
+    WORK_START_ATTACHMENT_FILES.push({
+      id: createTechWorkAttachmentId(),
+      file: file,
+      status: "pending",
+      uploaded: null
+    });
+  });
+
+  input.value = "";
+  setWorkStartSaving(false);
+
+  if (rejected.length) {
+    alert("Algunos archivos no fueron agregados:\n\n" + rejected.join("\n"));
+  }
+}
+
+function isAllowedTechWorkAttachment(file) {
+  const mimeType = String(file && file.type || "").toLowerCase();
+  if (mimeType.indexOf("image/") === 0 || mimeType.indexOf("video/") === 0) {
+    return true;
+  }
+
+  return /\.(jpe?g|png|gif|webp|heic|heif|bmp|tiff?|mp4|mov|m4v|webm|avi|mpe?g|3gp)$/i
+    .test(String(file && file.name || ""));
+}
+
+function createTechWorkAttachmentId() {
+  if (window.crypto && typeof window.crypto.randomUUID === "function") {
+    return window.crypto.randomUUID();
+  }
+
+  return "tech-upload-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+}
+
+function removeTechWorkAttachment(uploadId) {
+  if (WORK_START_SAVING) return;
+
+  WORK_START_ATTACHMENT_FILES = WORK_START_ATTACHMENT_FILES.filter(function(item) {
+    return item.id !== uploadId || item.status === "uploaded";
+  });
+
+  setWorkStartSaving(false);
+}
+
+function renderTechWorkAttachments() {
+  const count = document.getElementById("TECH_WORK_ATTACHMENT_COUNT");
+  const list = document.getElementById("TECH_WORK_ATTACHMENT_LIST");
+  if (!count || !list) return;
+
+  const total = WORK_START_EXISTING_ATTACHMENT_COUNT + WORK_START_ATTACHMENT_FILES.length;
+  const existingText = WORK_START_EXISTING_ATTACHMENT_COUNT
+    ? " (" + WORK_START_EXISTING_ATTACHMENT_COUNT + " ya guardado" +
+      (WORK_START_EXISTING_ATTACHMENT_COUNT === 1 ? "" : "s") + ")"
+    : "";
+
+  count.innerText = total + " de " + TECH_WORK_ATTACHMENT_MAX_FILES + " archivos" + existingText;
+
+  list.innerHTML = WORK_START_ATTACHMENT_FILES.map(function(item) {
+    const statusLabels = {
+      pending: "Listo para cargar",
+      reading: "Preparando...",
+      uploading: "Subiendo...",
+      uploaded: "Guardado",
+      error: "Fallo la carga - puede reintentar"
+    };
+    const cannotRemove = WORK_START_SAVING || item.status === "uploaded";
+
+    return '<div class="work-start-attachment-item">' +
+      '<div class="work-start-attachment-info">' +
+        '<div class="work-start-attachment-name">' + escapeHtmlTech(item.file.name) + '</div>' +
+        '<div class="work-start-attachment-meta">' +
+          escapeHtmlTech(formatTechWorkAttachmentSize(item.file.size)) +
+          ' - ' +
+          escapeHtmlTech(statusLabels[item.status] || item.status || "Listo") +
+        '</div>' +
+      '</div>' +
+      '<button type="button" class="work-start-attachment-remove"' +
+        (cannotRemove ? " disabled" : "") +
+        ' onclick="removeTechWorkAttachment(\'' + item.id + '\')">Quitar</button>' +
+      '</div>';
+  }).join("");
+}
+
+function formatTechWorkAttachmentSize(bytes) {
+  const size = Number(bytes || 0);
+  if (size < 1024) return size + " B";
+  if (size < 1024 * 1024) return (size / 1024).toFixed(1) + " KB";
+  return (size / 1024 / 1024).toFixed(1) + " MB";
+}
+
+function techWorkAttachmentToBase64(file) {
+  return new Promise(function(resolve, reject) {
+    const reader = new FileReader();
+
+    reader.onload = function() {
+      const result = String(reader.result || "");
+      resolve(result.split(",")[1] || "");
+    };
+
+    reader.onerror = function() {
+      reject(new Error("No se pudo leer " + file.name + "."));
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
+
+function startTechWorkAssessmentOnServer(row, problemFound, proposedSolution) {
+  return new Promise(function(resolve, reject) {
+    google.script.run
+      .withSuccessHandler(resolve)
+      .withFailureHandler(reject)
+      .startTechWorkWithAssessment(row, problemFound, proposedSolution, getSessionToken());
+  });
+}
+
+function uploadTechWorkAttachmentOnServer(payload) {
+  return new Promise(function(resolve, reject) {
+    google.script.run
+      .withSuccessHandler(resolve)
+      .withFailureHandler(reject)
+      .uploadWorkOrderAttachment(payload, getSessionToken());
+  });
+}
+
+async function uploadSelectedTechWorkAttachments(order) {
+  const pendingFiles = WORK_START_ATTACHMENT_FILES.filter(function(item) {
+    return item.status !== "uploaded";
+  });
+  const progress = document.getElementById("TECH_WORK_ATTACHMENT_PROGRESS");
+
+  for (let index = 0; index < pendingFiles.length; index++) {
+    const item = pendingFiles[index];
+
+    try {
+      item.status = "reading";
+      if (progress) progress.innerText =
+        "Preparando archivo " + (index + 1) + " de " + pendingFiles.length + "...";
+      setWorkStartSaving(true, "Preparando archivos...");
+
+      const base64 = await techWorkAttachmentToBase64(item.file);
+
+      item.status = "uploading";
+      if (progress) progress.innerText =
+        "Subiendo archivo " + (index + 1) + " de " + pendingFiles.length + "...";
+      setWorkStartSaving(true, "Subiendo " + (index + 1) + " de " + pendingFiles.length + "...");
+
+      item.uploaded = await uploadTechWorkAttachmentOnServer({
+        companyId: getCurrentCompanyId(),
+        woNumber: order.WO_NUMBER,
+        uploadId: item.id,
+        name: item.file.name,
+        mimeType: item.file.type,
+        data: base64
+      });
+      item.status = "uploaded";
+      renderTechWorkAttachments();
+    } catch (err) {
+      item.status = "error";
+      renderTechWorkAttachments();
+      throw new Error(
+        "La informacion del trabajo fue guardada, pero no se pudo subir " +
+        item.file.name + ": " +
+        (err && err.message ? err.message : err)
+      );
+    }
+  }
+
+  if (progress && pendingFiles.length) {
+    progress.innerText = pendingFiles.length +
+      " archivo" + (pendingFiles.length === 1 ? " guardado." : "s guardados.");
+  }
+}
+
+async function saveAndStartTechWork() {
+  const problemFound = String(document.getElementById("techProblemFound").value || "").trim();
+  const proposedSolution = String(document.getElementById("techProposedSolution").value || "").trim();
+  const errorBox = document.getElementById("workStartError");
+
+  if (!problemFound || !proposedSolution) {
+    errorBox.innerText = "Debe completar el problema encontrado y la solucion propuesta.";
+    errorBox.style.display = "block";
+    (!problemFound
+      ? document.getElementById("techProblemFound")
+      : document.getElementById("techProposedSolution")
+    ).focus();
+    return;
+  }
+
+  if (!ACTIVE_WORK_START_ROW || WORK_START_SAVING) return;
+
+  errorBox.style.display = "none";
+  setWorkStartSaving(true, "Guardando informacion...");
+
+  try {
+    await startTechWorkAssessmentOnServer(
+      ACTIVE_WORK_START_ROW,
+      problemFound,
+      proposedSolution
+    );
+    await uploadSelectedTechWorkAttachments(ACTIVE_WORK_START_ORDER);
+
+    WORK_START_SAVING = false;
+    closeStartWorkModal();
+    loadOrders();
+    loadNotifications();
+  } catch (err) {
+    setWorkStartSaving(false);
+    document.getElementById("workStartSave").innerText = WORK_START_ATTACHMENT_FILES.some(function(item) {
+      return item.status !== "uploaded";
+    }) ? "Reintentar y guardar" : "Guardar e iniciar trabajo";
+    errorBox.innerText = err && err.message
+      ? err.message
+      : String(err || "No se pudo iniciar el trabajo.");
+    errorBox.style.display = "block";
+  }
 }
 
 function loadNotifications() {

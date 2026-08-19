@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      --dark:#111827;
+      --red:#dc2626;
+      --green:#15803d;
+      --blue:#1d4ed8;
+      --muted:#64748b;
+      --border:#dbe2ea;
+      --bg:#eef2f7;
+    }
+
+    * { box-sizing:border-box; }
+
+    html, body {
+      min-height:100%;
+      overflow-x:hidden;
+      overflow-y:auto;
+    }
+
+    body {
+      margin:0;
+      padding:18px;
+      font-family:Arial, sans-serif;
+      color:var(--dark);
+      background:
+        radial-gradient(circle at 8% 0%, rgba(220,38,38,.11), transparent 30%),
+        linear-gradient(135deg, #f8fafc, var(--bg));
+    }
+
+    button, input, textarea, select { font:inherit; }
+
+    .shell {
+      width:min(1240px, 100%);
+      margin:0 auto 48px;
+    }
+
+    .hero {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:16px;
+      padding:20px;
+      margin-bottom:16px;
+      border-radius:16px;
+      color:#fff;
+      background:linear-gradient(135deg, #111827, #273449);
+      box-shadow:0 16px 36px rgba(15,23,42,.18);
+    }
+
+    .hero h1 { margin:0; font-size:25px; }
+    .hero p { margin:7px 0 0; color:#cbd5e1; font-size:13px; line-height:1.4; }
+
+    .count {
+      min-width:54px;
+      padding:10px 14px;
+      border:1px solid rgba(255,255,255,.2);
+      border-radius:999px;
+      background:rgba(255,255,255,.09);
+      text-align:center;
+      font-weight:bold;
+    }
+
+    .layout {
+      display:grid;
+      grid-template-columns:320px minmax(0, 1fr);
+      gap:16px;
+      align-items:start;
+    }
+
+    .panel {
+      border-radius:15px;
+      background:rgba(255,255,255,.98);
+      box-shadow:0 12px 30px rgba(15,23,42,.1);
+      overflow:hidden;
+    }
+
+    .panel-head {
+      padding:17px 18px;
+      border-bottom:1px solid #e5e7eb;
+    }
+
+    .panel-head h2 { margin:0; font-size:18px; }
+    .panel-head p { margin:6px 0 0; color:var(--muted); font-size:12px; }
+
+    .list {
+      max-height:calc(100vh - 220px);
+      overflow:auto;
+      padding:10px;
+    }
+
+    .draft-card {
+      width:100%;
+      margin:0 0 9px;
+      padding:13px;
+      border:1px solid var(--border);
+      border-left:5px solid #f59e0b;
+      border-radius:11px;
+      background:#fff;
+      color:var(--dark);
+      text-align:left;
+      cursor:pointer;
+    }
+
+    .draft-card:hover,
+    .draft-card.active {
+      border-color:#93c5fd;
+      background:#eff6ff;
+    }
+
+    .draft-card strong { display:block; font-size:15px; }
+    .draft-card span { display:block; margin-top:5px; color:var(--muted); font-size:12px; }
+
+    .empty {
+      padding:28px 18px;
+      color:var(--muted);
+      text-align:center;
+      line-height:1.5;
+    }
+
+    .detail {
+      display:none;
+    }
+
+    .detail.visible {
+      display:block;
+    }
+
+    .section {
+      padding:18px;
+      border-bottom:1px solid #e5e7eb;
+    }
+
+    .section:last-child { border-bottom:0; }
+    .section h3 { margin:0 0 13px; font-size:16px; }
+
+    .info-grid,
+    .form-grid {
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:12px;
+    }
+
+    .info {
+      min-width:0;
+      padding:11px 12px;
+      border-radius:10px;
+      background:#f8fafc;
+      border:1px solid #e5e7eb;
+    }
+
+    .info.full,
+    .field.full { grid-column:1 / -1; }
+
+    .label,
+    label {
+      display:block;
+      margin-bottom:5px;
+      color:#475569;
+      font-size:11px;
+      font-weight:800;
+      letter-spacing:.02em;
+      text-transform:uppercase;
+    }
+
+    .value {
+      overflow-wrap:anywhere;
+      white-space:pre-wrap;
+      font-size:14px;
+      line-height:1.42;
+    }
+
+    .report-editor {
+      min-height:210px;
+      background:#fffef7;
+      border-color:#f59e0b;
+      font-size:14px;
+      line-height:1.5;
+    }
+
+    .editor-help {
+      margin:7px 0 0;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.4;
+    }
+
+    input,
+    textarea,
+    select {
+      width:100%;
+      min-height:42px;
+      padding:10px 11px;
+      border:1px solid #cbd5e1;
+      border-radius:9px;
+      background:#fff;
+      color:var(--dark);
+      outline:none;
+    }
+
+    textarea {
+      min-height:86px;
+      resize:vertical;
+      line-height:1.4;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      border-color:#2563eb;
+      box-shadow:0 0 0 3px rgba(37,99,235,.12);
+    }
+
+    .rate-note {
+      margin:8px 0 0;
+      color:var(--muted);
+      font-size:12px;
+    }
+
+    .reason {
+      display:none;
+      margin-top:12px;
+      padding:12px;
+      border-radius:10px;
+      border:1px solid #fed7aa;
+      background:#fff7ed;
+    }
+
+    .reason.visible { display:block; }
+
+    .parts {
+      display:grid;
+      gap:9px;
+    }
+
+    .part-row {
+      display:grid;
+      grid-template-columns:82px 150px minmax(180px, 1fr) 120px 110px;
+      gap:8px;
+      align-items:end;
+      padding:11px;
+      border:1px solid #e5e7eb;
+      border-radius:11px;
+      background:#f8fafc;
+    }
+
+    .amount {
+      min-height:42px;
+      display:flex;
+      align-items:center;
+      justify-content:flex-end;
+      padding:10px;
+      border-radius:9px;
+      background:#e2e8f0;
+      font-weight:bold;
+    }
+
+    .special {
+      margin-top:14px;
+      padding:12px;
+      border:1px solid #fecaca;
+      border-radius:11px;
+      background:#fff7ed;
+    }
+
+    .special-toggle {
+      display:flex;
+      align-items:center;
+      gap:9px;
+      margin:0;
+      color:#7f1d1d;
+      font-size:13px;
+      text-transform:none;
+    }
+
+    .special-toggle input {
+      width:auto;
+      min-height:auto;
+      margin:0;
+    }
+
+    .special-fields {
+      display:none;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:10px;
+      margin-top:12px;
+    }
+
+    .special-fields.visible { display:grid; }
+
+    .summary {
+      display:grid;
+      grid-template-columns:repeat(5, minmax(0, 1fr));
+      gap:8px;
+    }
+
+    .summary-card {
+      padding:12px 9px;
+      border-radius:10px;
+      background:#f1f5f9;
+      text-align:center;
+    }
+
+    .summary-card.total {
+      color:#fff;
+      background:var(--dark);
+    }
+
+    .summary-card small {
+      display:block;
+      margin-bottom:5px;
+      color:inherit;
+      opacity:.72;
+      font-weight:bold;
+      text-transform:uppercase;
+    }
+
+    .summary-card strong { font-size:17px; }
+
+    .actions {
+      display:flex;
+      align-items:center;
+      justify-content:flex-end;
+      gap:10px;
+      padding:18px;
+      background:#f8fafc;
+    }
+
+    .btn {
+      min-height:44px;
+      padding:11px 17px;
+      border:0;
+      border-radius:10px;
+      color:#fff;
+      background:var(--dark);
+      cursor:pointer;
+      font-weight:bold;
+    }
+
+    .btn.refresh { background:#334155; }
+    .btn.create { background:var(--green); }
+    .btn:disabled { background:#94a3b8; cursor:not-allowed; }
+
+    .status-message {
+      display:none;
+      margin:0 18px 18px;
+      padding:12px;
+      border-radius:10px;
+      font-size:13px;
+      line-height:1.4;
+    }
+
+    .status-message.visible { display:block; }
+    .status-message.error { color:#991b1b; background:#fef2f2; border:1px solid #fecaca; }
+    .status-message.success { color:#166534; background:#f0fdf4; border:1px solid #bbf7d0; }
+
+    @media (max-width:980px) {
+      .layout { grid-template-columns:1fr; }
+      .list { max-height:340px; }
+      .part-row { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+      .part-row .wide { grid-column:1 / -1; }
+      .summary { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+      .summary-card.total { grid-column:1 / -1; }
+    }
+
+    @media (max-width:620px) {
+      body { padding:10px; }
+      .hero { align-items:flex-start; padding:16px; }
+      .hero h1 { font-size:21px; }
+      .info-grid,
+      .form-grid,
+      .special-fields { grid-template-columns:1fr; }
+      .info.full,
+      .field.full { grid-column:auto; }
+      .part-row { grid-template-columns:1fr; }
+      .part-row .wide { grid-column:auto; }
+      .summary { grid-template-columns:1fr 1fr; }
+      .actions { align-items:stretch; flex-direction:column; }
+      .btn { width:100%; }
+    }
+  </style>
+  <?!= include("AppWatermark"); ?>
+</head>
+
+<body class="app-watermark" style="--company-watermark-logo:<?!= watermarkLogoCss ?>;">
+<?!= include("AppBackButton"); ?>
+
+<main class="shell">
+  <header class="hero">
+    <div>
+      <h1>Invoice pendientes de facturacion</h1>
+      <p>Revisa el reporte del tecnico, confirma las horas y completa las partes antes de crear el invoice.</p>
+    </div>
+    <div id="pendingCount" class="count">0</div>
+  </header>
+
+  <div class="layout">
+    <aside class="panel">
+      <div class="panel-head">
+        <h2>Listos para facturar</h2>
+        <p>Acceso para ADMIN, OWNER y ORDENES.</p>
+      </div>
+      <div id="draftList" class="list">
+        <div class="empty">Cargando reportes...</div>
+      </div>
+      <div class="actions">
+        <button class="btn refresh" type="button" onclick="loadDrafts()">Actualizar</button>
+      </div>
+    </aside>
+
+    <section class="panel">
+      <div id="detailEmpty" class="empty">
+        Selecciona un reporte pendiente para completar el invoice.
+      </div>
+
+      <div id="detail" class="detail">
+        <div class="panel-head">
+          <h2 id="detailTitle">Invoice pendiente</h2>
+          <p id="detailSubtitle"></p>
+        </div>
+
+        <div class="section">
+          <h3>Reporte del tecnico</h3>
+          <div class="info-grid">
+            <div class="info">
+              <span class="label">Fecha</span>
+              <div id="infoDate" class="value"></div>
+            </div>
+            <div class="info">
+              <span class="label">Tecnico</span>
+              <div id="infoTech" class="value"></div>
+            </div>
+            <div class="info">
+              <span class="label">NSN</span>
+              <div id="infoNsn" class="value"></div>
+            </div>
+            <div class="info">
+              <span class="label">Cliente</span>
+              <div id="infoClient" class="value"></div>
+            </div>
+            <div class="info full">
+              <span class="label">Problema reportado originalmente</span>
+              <div id="infoReportedProblem" class="value"></div>
+            </div>
+            <div class="info full">
+              <span class="label">Problema encontrado por el tecnico</span>
+              <div id="infoProblemFound" class="value"></div>
+            </div>
+            <div class="info full">
+              <span class="label">Solucion prevista al iniciar</span>
+              <div id="infoProposedSolution" class="value"></div>
+            </div>
+            <div class="info full">
+              <span class="label">Resultado final del trabajo</span>
+              <div id="infoCompletionResult" class="value"></div>
+            </div>
+            <div class="info full">
+              <label for="workPerformedEditor">Reporte completo para el invoice (editable)</label>
+              <textarea
+                id="workPerformedEditor"
+                class="report-editor"
+                maxlength="12000"
+                placeholder="Revise, corrija o enriquezca aqui la narrativa que aparecera en el invoice y en el PDF."
+              ></textarea>
+              <p class="editor-help">
+                Este sera el reporte aprobado para facturacion. Los datos originales del tecnico se conservan arriba como referencia.
+              </p>
+            </div>
+            <div class="info full">
+              <span class="label">Equipo</span>
+              <div id="infoEquipment" class="value"></div>
+            </div>
+            <div class="info full">
+              <span class="label">Notas</span>
+              <div id="infoNotes" class="value"></div>
+            </div>
+            <div class="info full">
+              <span class="label">Firma del cliente</span>
+              <div id="infoSignature" class="value"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h3>Horas facturables</h3>
+          <div class="form-grid">
+            <div class="field">
+              <label for="techHours">Horas del tecnico</label>
+              <input id="techHours" type="number" readonly>
+            </div>
+            <div class="field">
+              <label for="finalHours">Horas finales</label>
+              <input id="finalHours" type="number" min="0" step="0.25" oninput="onHoursChanged()">
+            </div>
+          </div>
+          <p class="rate-note">Primera hora: $200. Cada hora adicional: $130.</p>
+          <div id="hoursReasonBox" class="reason">
+            <label for="hoursReason">Motivo del cambio de horas</label>
+            <textarea id="hoursReason" placeholder="Explique por que se cambiaron las horas del tecnico"></textarea>
+          </div>
+        </div>
+
+        <div class="section">
+          <h3>Partes y precios</h3>
+          <div class="parts">
+            <div class="part-row">
+              <div>
+                <label for="I1_QTY">Qty</label>
+                <input id="I1_QTY" type="number" min="0" step="0.01" oninput="calculateTotals()">
+              </div>
+              <div>
+                <label for="I1_PART">Part #</label>
+                <input id="I1_PART">
+              </div>
+              <div class="wide">
+                <label for="I1_DESC">Descripcion</label>
+                <input id="I1_DESC">
+              </div>
+              <div>
+                <label for="I1_UNIT">Precio unitario</label>
+                <input id="I1_UNIT" type="number" min="0" step="0.01" oninput="calculateTotals()">
+              </div>
+              <div>
+                <span class="label">Importe</span>
+                <div id="I1_AMOUNT" class="amount">$0.00</div>
+              </div>
+            </div>
+
+            <div class="part-row">
+              <div>
+                <label for="I2_QTY">Qty</label>
+                <input id="I2_QTY" type="number" min="0" step="0.01" oninput="calculateTotals()">
+              </div>
+              <div>
+                <label for="I2_PART">Part #</label>
+                <input id="I2_PART">
+              </div>
+              <div class="wide">
+                <label for="I2_DESC">Descripcion</label>
+                <input id="I2_DESC">
+              </div>
+              <div>
+                <label for="I2_UNIT">Precio unitario</label>
+                <input id="I2_UNIT" type="number" min="0" step="0.01" oninput="calculateTotals()">
+              </div>
+              <div>
+                <span class="label">Importe</span>
+                <div id="I2_AMOUNT" class="amount">$0.00</div>
+              </div>
+            </div>
+
+            <div class="part-row">
+              <div>
+                <label for="I3_QTY">Qty</label>
+                <input id="I3_QTY" type="number" min="0" step="0.01" oninput="calculateTotals()">
+              </div>
+              <div>
+                <label for="I3_PART">Part #</label>
+                <input id="I3_PART">
+              </div>
+              <div class="wide">
+                <label for="I3_DESC">Descripcion</label>
+                <input id="I3_DESC">
+              </div>
+              <div>
+                <label for="I3_UNIT">Precio unitario</label>
+                <input id="I3_UNIT" type="number" min="0" step="0.01" oninput="calculateTotals()">
+              </div>
+              <div>
+                <span class="label">Importe</span>
+                <div id="I3_AMOUNT" class="amount">$0.00</div>
+              </div>
+            </div>
+
+            <div class="part-row">
+              <div>
+                <label for="I4_QTY">Qty</label>
+                <input id="I4_QTY" type="number" min="0" step="0.01" oninput="calculateTotals()">
+              </div>
+              <div>
+                <label for="I4_PART">Part #</label>
+                <input id="I4_PART">
+              </div>
+              <div class="wide">
+                <label for="I4_DESC">Descripcion</label>
+                <input id="I4_DESC">
+              </div>
+              <div>
+                <label for="I4_UNIT">Precio unitario</label>
+                <input id="I4_UNIT" type="number" min="0" step="0.01" oninput="calculateTotals()">
+              </div>
+              <div>
+                <span class="label">Importe</span>
+                <div id="I4_AMOUNT" class="amount">$0.00</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-grid" style="margin-top:12px;">
+            <div class="field">
+              <label for="purchaseReceipt">Vale de compra</label>
+              <input id="purchaseReceipt">
+            </div>
+            <div class="field">
+              <label for="purchaseLocation">Lugar de compra</label>
+              <select id="purchaseLocation">
+                <option value="">Seleccione</option>
+                <option>United Refrigeration</option>
+                <option>Home Depot</option>
+                <option>Supply House</option>
+                <option>Otro</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="special">
+            <label class="special-toggle">
+              <input id="specialInvoice" type="checkbox" onchange="toggleSpecialInvoice()">
+              Invoice especial / cobro manual
+            </label>
+            <div id="specialFields" class="special-fields">
+              <div>
+                <label for="manualPartsTotal">Materiales cobrados</label>
+                <input id="manualPartsTotal" type="number" min="0" step="0.01" oninput="calculateTotals()">
+              </div>
+              <div>
+                <label for="manualSubTotal">Subtotal antes de tax</label>
+                <input id="manualSubTotal" type="number" min="0" step="0.01" oninput="calculateTotals()">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h3>Resumen del invoice</h3>
+          <div class="summary">
+            <div class="summary-card">
+              <small>Labor</small>
+              <strong id="summaryLabor">$0.00</strong>
+            </div>
+            <div class="summary-card">
+              <small>Partes</small>
+              <strong id="summaryParts">$0.00</strong>
+            </div>
+            <div class="summary-card">
+              <small>Subtotal</small>
+              <strong id="summarySubtotal">$0.00</strong>
+            </div>
+            <div class="summary-card">
+              <small>Tax 7%</small>
+              <strong id="summaryTax">$0.00</strong>
+            </div>
+            <div class="summary-card total">
+              <small>Total</small>
+              <strong id="summaryTotal">$0.00</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="createBtn" class="btn create" type="button" onclick="createInvoice()">
+            Crear PDF y enviar invoice
+          </button>
+        </div>
+        <div id="statusMessage" class="status-message"></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script>
+const COMPANY_ID_FROM_URL = String("<?= companyId ?>").trim().toUpperCase();
+let DRAFTS = [];
+let SELECTED_DRAFT = null;
+let IS_CREATING = false;
+
+function getCurrentUser() {
+  try {
+    return JSON.parse(getAppSessionItem("pps_user") || "{}");
+  } catch (err) {
+    return {};
+  }
+}
+
+function getSessionToken() {
+  const user = getCurrentUser();
+  return user.sessionToken || user.SESSION_TOKEN || "";
+}
+
+function getCompanyId() {
+  const user = getCurrentUser();
+  return COMPANY_ID_FROM_URL ||
+    String(user.companyId || user.COMPANY_ID || "").trim().toUpperCase();
+}
+
+function requireInvoiceAccess() {
+  const user = getCurrentUser();
+  const role = String(user.role || user.ROLE || "").trim().toUpperCase();
+  const token = getSessionToken();
+
+  if (!token || ["OWNER", "ADMIN", "ORDENES"].indexOf(role) === -1) {
+    document.getElementById("draftList").innerHTML =
+      '<div class="empty">No autorizado. Inicia sesion como ADMIN, OWNER u ORDENES.</div>';
+    return false;
+  }
+  return true;
+}
+
+function loadDrafts() {
+  if (!requireInvoiceAccess()) return;
+
+  document.getElementById("draftList").innerHTML =
+    '<div class="empty">Cargando reportes...</div>';
+  hideMessage();
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      DRAFTS = Array.isArray(result) ? result : [];
+      document.getElementById("pendingCount").textContent = DRAFTS.length;
+      renderDraftList();
+
+      if (SELECTED_DRAFT) {
+        const refreshed = DRAFTS.find(function(draft) {
+          return draft.DRAFT_ID === SELECTED_DRAFT.DRAFT_ID;
+        });
+        if (refreshed) {
+          selectDraft(refreshed.DRAFT_ID);
+        } else {
+          clearSelection();
+        }
+      }
+    })
+    .withFailureHandler(function(err) {
+      const message = getErrorMessage(err);
+      document.getElementById("draftList").innerHTML =
+        '<div class="empty">' + escapeHtml(message) + '</div>';
+    })
+    .getPendingInvoiceDrafts(getCompanyId(), getSessionToken());
+}
+
+function renderDraftList() {
+  const list = document.getElementById("draftList");
+  if (!DRAFTS.length) {
+    list.innerHTML = '<div class="empty">No hay invoices pendientes para esta empresa.</div>';
+    return;
+  }
+
+  list.innerHTML = DRAFTS.map(function(draft) {
+    const active = SELECTED_DRAFT && SELECTED_DRAFT.DRAFT_ID === draft.DRAFT_ID
+      ? " active"
+      : "";
+    return (
+      '<button class="draft-card' + active + '" type="button" onclick="selectDraft(\'' +
+      escapeJs(draft.DRAFT_ID) + '\')">' +
+      '<strong>' + escapeHtml(draft.WO_NUMBER || "Sin WO") + '</strong>' +
+      '<span>NSN ' + escapeHtml(draft.NSN || "-") + ' · ' +
+      escapeHtml(draft.TECHNICIAN || "Sin tecnico") + '</span>' +
+      '<span>' + escapeHtml(draft.INVOICE_DATE_ISO || draft.INVOICE_DATE || "") +
+      ' · ' + escapeHtml(draft.TECH_HOURS || "0") + ' horas</span>' +
+      '</button>'
+    );
+  }).join("");
+}
+
+function selectDraft(draftId) {
+  SELECTED_DRAFT = DRAFTS.find(function(draft) {
+    return draft.DRAFT_ID === draftId;
+  }) || null;
+
+  if (!SELECTED_DRAFT) {
+    clearSelection();
+    return;
+  }
+
+  renderDraftList();
+  document.getElementById("detailEmpty").style.display = "none";
+  document.getElementById("detail").classList.add("visible");
+  document.getElementById("detailTitle").textContent =
+    "WO " + (SELECTED_DRAFT.WO_NUMBER || "");
+  document.getElementById("detailSubtitle").textContent =
+    "Reporte enviado " + (SELECTED_DRAFT.SUBMITTED_AT || "");
+
+  setText("infoDate", SELECTED_DRAFT.INVOICE_DATE_ISO || SELECTED_DRAFT.INVOICE_DATE);
+  setText("infoTech", SELECTED_DRAFT.TECHNICIAN);
+  setText("infoNsn", SELECTED_DRAFT.NSN);
+  setText("infoClient", SELECTED_DRAFT.CLIENT);
+  setText("infoReportedProblem", SELECTED_DRAFT.REPORTED_PROBLEM || "No registrado");
+  setText("infoProblemFound", SELECTED_DRAFT.TECH_PROBLEM_FOUND || "No registrado");
+  setText("infoProposedSolution", SELECTED_DRAFT.TECH_PROPOSED_SOLUTION || "No registrada");
+  setText("infoCompletionResult", SELECTED_DRAFT.WORK_COMPLETION_RESULT || "No registrado");
+  document.getElementById("workPerformedEditor").value =
+    SELECTED_DRAFT.WORK_PERFORMED || "";
+  setText(
+    "infoEquipment",
+    [
+      SELECTED_DRAFT.EQUIPMENT_MAKE,
+      SELECTED_DRAFT.EQUIPMENT_MODEL,
+      SELECTED_DRAFT.EQUIPMENT_SERIAL
+    ].filter(Boolean).join(" / ") || "No especificado"
+  );
+  setText("infoNotes", SELECTED_DRAFT.NOTES || "Sin notas");
+  setText("infoSignature", SELECTED_DRAFT.SIGNATURE);
+
+  document.getElementById("techHours").value = SELECTED_DRAFT.TECH_HOURS || "";
+  document.getElementById("finalHours").value =
+    SELECTED_DRAFT.FINAL_HOURS || SELECTED_DRAFT.TECH_HOURS || "";
+  document.getElementById("hoursReason").value = "";
+
+  resetBillingFields();
+  onHoursChanged();
+  hideMessage();
+}
+
+function clearSelection() {
+  SELECTED_DRAFT = null;
+  document.getElementById("detailEmpty").style.display = "block";
+  document.getElementById("detail").classList.remove("visible");
+  renderDraftList();
+}
+
+function resetBillingFields() {
+  for (let i = 1; i <= 4; i++) {
+    document.getElementById("I" + i + "_QTY").value =
+      SELECTED_DRAFT && SELECTED_DRAFT["I" + i + "_QTY"] || "";
+    document.getElementById("I" + i + "_PART").value =
+      SELECTED_DRAFT && SELECTED_DRAFT["I" + i + "_PART"] || "";
+    document.getElementById("I" + i + "_DESC").value =
+      SELECTED_DRAFT && SELECTED_DRAFT["I" + i + "_DESC"] || "";
+    document.getElementById("I" + i + "_UNIT").value = "";
+  }
+  document.getElementById("purchaseReceipt").value = "";
+  document.getElementById("purchaseLocation").value = "";
+  document.getElementById("specialInvoice").checked = false;
+  document.getElementById("manualPartsTotal").value = "";
+  document.getElementById("manualSubTotal").value = "";
+  toggleSpecialInvoice();
+}
+
+function onHoursChanged() {
+  const original = Number(document.getElementById("techHours").value || 0);
+  const finalHours = Number(document.getElementById("finalHours").value || 0);
+  const changed = Math.abs(original - finalHours) > 0.0001;
+  document.getElementById("hoursReasonBox").classList.toggle("visible", changed);
+  calculateTotals();
+}
+
+function toggleSpecialInvoice() {
+  const enabled = document.getElementById("specialInvoice").checked;
+  document.getElementById("specialFields").classList.toggle("visible", enabled);
+
+  if (enabled && !document.getElementById("manualPartsTotal").value) {
+    document.getElementById("manualPartsTotal").value = getPartsTotal().toFixed(2);
+  }
+  calculateTotals();
+}
+
+function getItem(number) {
+  const qty = Number(document.getElementById("I" + number + "_QTY").value || 0);
+  const unit = Number(document.getElementById("I" + number + "_UNIT").value || 0);
+  return {
+    qty: qty,
+    part: document.getElementById("I" + number + "_PART").value.trim(),
+    desc: document.getElementById("I" + number + "_DESC").value.trim(),
+    unit: unit,
+    amount: roundMoney(qty * unit)
+  };
+}
+
+function getPartsTotal() {
+  let total = 0;
+  for (let i = 1; i <= 4; i++) total += getItem(i).amount;
+  return roundMoney(total);
+}
+
+function calculateTotals() {
+  const hours = Number(document.getElementById("finalHours").value || 0);
+  const special = document.getElementById("specialInvoice").checked;
+  let labor = hours > 0 ? 200 + Math.max(hours - 1, 0) * 130 : 0;
+  let parts = getPartsTotal();
+  let subtotal = labor + parts;
+
+  for (let i = 1; i <= 4; i++) {
+    document.getElementById("I" + i + "_AMOUNT").textContent = money(getItem(i).amount);
+  }
+
+  if (special) {
+    parts = Number(document.getElementById("manualPartsTotal").value || 0);
+    subtotal = Number(document.getElementById("manualSubTotal").value || 0);
+    labor = Math.max(subtotal - parts, 0);
+  }
+
+  const tax = roundMoney(subtotal * 0.07);
+  const total = roundMoney(subtotal + tax);
+
+  setText("summaryLabor", money(labor));
+  setText("summaryParts", money(parts));
+  setText("summarySubtotal", money(subtotal));
+  setText("summaryTax", money(tax));
+  setText("summaryTotal", money(total));
+}
+
+function createInvoice() {
+  if (IS_CREATING || !SELECTED_DRAFT) return;
+
+  const finalHours = Number(document.getElementById("finalHours").value || 0);
+  const techHours = Number(SELECTED_DRAFT.TECH_HOURS || 0);
+  const reason = document.getElementById("hoursReason").value.trim();
+
+  if (finalHours < 0 || Math.abs(finalHours * 4 - Math.round(finalHours * 4)) > 0.0001) {
+    showMessage("Las horas finales pueden ser 0, no pueden ser negativas y deben usar incrementos de 0.25.", "error");
+    return;
+  }
+
+  if (Math.abs(finalHours - techHours) > 0.0001 && !reason) {
+    showMessage("Escribe el motivo del cambio de horas.", "error");
+    return;
+  }
+
+  const workPerformed = document.getElementById("workPerformedEditor").value.trim();
+  if (!workPerformed) {
+    showMessage("El reporte completo para el invoice no puede quedar vacio.", "error");
+    document.getElementById("workPerformedEditor").focus();
+    return;
+  }
+
+  const special = document.getElementById("specialInvoice").checked;
+  const manualParts = Number(document.getElementById("manualPartsTotal").value || 0);
+  const manualSubtotal = Number(document.getElementById("manualSubTotal").value || 0);
+
+  if (special && (manualSubtotal <= 0 || manualParts < 0 || manualSubtotal < manualParts)) {
+    showMessage("Revisa los totales manuales del invoice especial.", "error");
+    return;
+  }
+
+  if (!confirm(
+    "Se creara el invoice de la orden " + SELECTED_DRAFT.WO_NUMBER +
+    ", se generaran los PDF y se enviaran al cliente. Deseas continuar?"
+  )) {
+    return;
+  }
+
+  const payload = {
+    DRAFT_ID: SELECTED_DRAFT.DRAFT_ID,
+    FINAL_HOURS: finalHours,
+    HOURS_CHANGE_REASON: reason,
+    WORK_PERFORMED: workPerformed,
+    PURCHASE_RECEIPT: document.getElementById("purchaseReceipt").value.trim(),
+    PURCHASE_LOCATION: document.getElementById("purchaseLocation").value,
+    SPECIAL_INVOICE: special ? "YES" : "",
+    MANUAL_PARTS_TOTAL: special ? manualParts : 0,
+    MANUAL_SUB_TOTAL: special ? manualSubtotal : 0
+  };
+
+  for (let i = 1; i <= 4; i++) {
+    const item = getItem(i);
+    payload["I" + i + "_QTY"] = item.qty || "";
+    payload["I" + i + "_PART"] = item.part;
+    payload["I" + i + "_DESC"] = item.desc;
+    payload["I" + i + "_UNIT"] = item.unit;
+  }
+
+  IS_CREATING = true;
+  document.getElementById("createBtn").disabled = true;
+  document.getElementById("workPerformedEditor").disabled = true;
+  document.getElementById("createBtn").textContent = "Creando PDF y enviando...";
+  showMessage("Procesando invoice. No cierres esta pantalla.", "success");
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      IS_CREATING = false;
+      document.getElementById("createBtn").disabled = false;
+      document.getElementById("workPerformedEditor").disabled = false;
+      document.getElementById("createBtn").textContent = "Crear PDF y enviar invoice";
+      const invoiceNumber = result && result.invoiceNumber ? result.invoiceNumber : "";
+      alert("Invoice " + invoiceNumber + " creado correctamente.");
+      SELECTED_DRAFT = null;
+      clearSelection();
+      loadDrafts();
+    })
+    .withFailureHandler(function(err) {
+      IS_CREATING = false;
+      document.getElementById("createBtn").disabled = false;
+      document.getElementById("workPerformedEditor").disabled = false;
+      document.getElementById("createBtn").textContent = "Crear PDF y enviar invoice";
+      showMessage(getErrorMessage(err), "error");
+    })
+    .finalizeInvoiceDraft(payload, getSessionToken());
+}
+
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value === undefined || value === null || value === "" ? "-" : String(value);
+}
+
+function showMessage(message, type) {
+  const box = document.getElementById("statusMessage");
+  box.textContent = message || "";
+  box.className = "status-message visible " + (type || "");
+}
+
+function hideMessage() {
+  const box = document.getElementById("statusMessage");
+  box.textContent = "";
+  box.className = "status-message";
+}
+
+function getErrorMessage(err) {
+  return err && err.message ? err.message : String(err || "Error desconocido.");
+}
+
+function money(value) {
+  return "$" + Number(value || 0).toFixed(2);
+}
+
+function roundMoney(value) {
+  return Math.round(Number(value || 0) * 100) / 100;
+}
+
+function escapeHtml(value) {
+  return String(value === undefined || value === null ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function escapeJs(value) {
+  return String(value || "")
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'");
+}
+
+window.onload = loadDrafts;
+</script>
+</body>
+</html>

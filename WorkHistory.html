@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Historial de Trabajo</title>
+
+  <style>
+    :root {
+      --ink:#0f172a;
+      --muted:#64748b;
+      --line:#dbe2ea;
+      --navy:#111827;
+      --blue:#2563eb;
+      --green:#15803d;
+      --amber:#d97706;
+    }
+    * { box-sizing:border-box; }
+    body {
+      margin:0;
+      min-height:100vh;
+      padding:18px;
+      font-family:Arial, sans-serif;
+      color:var(--ink);
+      background:#eef2f7;
+    }
+    .shell { width:min(1280px, 100%); margin:0 auto 48px; }
+    .hero {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:16px;
+      padding:22px;
+      color:#ffffff;
+      background:linear-gradient(135deg, #111827, #1e3a5f);
+      border-left:7px solid #16a34a;
+      border-radius:15px;
+      box-shadow:0 16px 36px rgba(15,23,42,.18);
+    }
+    .hero h1 { margin:0; font-size:28px; }
+    .hero p { margin:7px 0 0; color:#cbd5e1; font-size:14px; }
+    button {
+      border:0;
+      border-radius:9px;
+      padding:11px 15px;
+      color:#ffffff;
+      background:var(--navy);
+      cursor:pointer;
+      font:inherit;
+      font-weight:bold;
+    }
+    button.refresh { background:var(--blue); }
+    .stats {
+      display:grid;
+      grid-template-columns:repeat(4, minmax(0, 1fr));
+      gap:12px;
+      margin:16px 0;
+    }
+    .stat {
+      min-width:0;
+      padding:14px;
+      border-radius:12px;
+      background:#ffffff;
+      border-top:4px solid var(--blue);
+      box-shadow:0 7px 20px rgba(15,23,42,.08);
+    }
+    .stat:nth-child(2) { border-color:#16a34a; }
+    .stat:nth-child(3) { border-color:#7c3aed; }
+    .stat:nth-child(4) { border-color:#d97706; }
+    .stat small { display:block; color:var(--muted); font-weight:bold; text-transform:uppercase; }
+    .stat strong { display:block; margin-top:5px; font-size:26px; }
+    .panel {
+      margin-top:16px;
+      padding:17px;
+      border-radius:14px;
+      background:rgba(255,255,255,.98);
+      box-shadow:0 8px 24px rgba(15,23,42,.09);
+    }
+    .filters {
+      display:grid;
+      grid-template-columns:minmax(230px, 2fr) repeat(4, minmax(150px, 1fr));
+      gap:10px;
+      align-items:end;
+    }
+    label { display:grid; gap:5px; color:#475569; font-size:12px; font-weight:bold; }
+    input,
+    select {
+      width:100%;
+      min-height:42px;
+      padding:10px 11px;
+      border:1px solid #cbd5e1;
+      border-radius:9px;
+      background:#ffffff;
+      color:var(--ink);
+      font:inherit;
+    }
+    .status-line { margin-top:12px; color:#475569; font-size:13px; font-weight:bold; }
+    .status-line.error { color:#b91c1c; }
+    .history { display:grid; gap:13px; margin-top:16px; }
+    details { overflow:hidden; }
+    summary { list-style:none; }
+    summary::-webkit-details-marker { display:none; }
+    .store-group {
+      border:1px solid #dbe2ea;
+      border-left:6px solid var(--blue);
+      border-radius:13px;
+      background:#ffffff;
+      box-shadow:0 7px 20px rgba(15,23,42,.07);
+    }
+    .store-summary {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      padding:15px 17px;
+      cursor:pointer;
+    }
+    .store-summary:hover { background:#f8fafc; }
+    .store-title { font-size:18px; font-weight:bold; }
+    .store-address { margin-top:5px; color:var(--muted); font-size:13px; }
+    .count-pill {
+      flex:none;
+      padding:6px 10px;
+      border-radius:999px;
+      color:#1e3a8a;
+      background:#dbeafe;
+      font-size:12px;
+      font-weight:bold;
+    }
+    .store-content { display:grid; gap:10px; padding:0 14px 14px; }
+    .equipment-group {
+      border:1px solid #e2e8f0;
+      border-radius:10px;
+      background:#f8fafc;
+    }
+    .equipment-summary {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      padding:12px;
+      cursor:pointer;
+      font-weight:bold;
+    }
+    .equipment-summary:hover { background:#f1f5f9; }
+    .equipment-meta { display:block; margin-top:4px; color:var(--muted); font-size:12px; font-weight:normal; }
+    .repair-list { display:grid; gap:9px; padding:0 10px 10px; }
+    .repair-card {
+      border:1px solid #dbe2ea;
+      border-radius:9px;
+      background:#ffffff;
+    }
+    .repair-card.completed { border-left:5px solid #16a34a; }
+    .repair-card.open { border-left:5px solid #d97706; }
+    .repair-summary {
+      display:grid;
+      grid-template-columns:minmax(0, 1fr) auto;
+      gap:10px;
+      padding:12px;
+      cursor:pointer;
+    }
+    .repair-summary:hover { background:#fafafa; }
+    .repair-title { font-weight:bold; }
+    .repair-subtitle { margin-top:5px; color:var(--muted); font-size:12px; }
+    .status-pill {
+      align-self:start;
+      padding:5px 9px;
+      border-radius:999px;
+      color:#92400e;
+      background:#fef3c7;
+      font-size:11px;
+      font-weight:bold;
+      text-align:center;
+    }
+    .repair-card.completed .status-pill { color:#166534; background:#dcfce7; }
+    .repair-detail {
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:9px;
+      padding:0 12px 12px;
+    }
+    .detail-item {
+      min-width:0;
+      padding:10px;
+      border-radius:8px;
+      background:#f8fafc;
+      border:1px solid #e5e7eb;
+    }
+    .detail-item.full { grid-column:1 / -1; }
+    .detail-label { display:block; margin-bottom:5px; color:#475569; font-size:11px; font-weight:bold; text-transform:uppercase; }
+    .detail-value { overflow-wrap:anywhere; white-space:pre-wrap; font-size:13px; line-height:1.42; }
+    .record-actions { grid-column:1 / -1; display:flex; gap:8px; flex-wrap:wrap; }
+    .media-btn { background:#0f766e; }
+    .map-link {
+      display:inline-block;
+      margin-top:7px;
+      color:#2563eb;
+      font-size:12px;
+      font-weight:bold;
+      text-decoration:none;
+    }
+    .empty { padding:38px; color:var(--muted); text-align:center; }
+    .warning { margin-top:10px; color:#92400e; font-size:12px; font-weight:bold; }
+
+    @media (max-width:920px) {
+      .filters { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+      .filters label:first-child { grid-column:1 / -1; }
+    }
+    @media (max-width:620px) {
+      body { padding:10px; }
+      .hero { align-items:flex-start; flex-direction:column; padding:17px; }
+      .hero h1 { font-size:23px; }
+      .hero button { width:100%; }
+      .stats { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+      .filters { grid-template-columns:1fr; }
+      .filters label:first-child { grid-column:auto; }
+      .repair-detail { grid-template-columns:1fr; }
+      .detail-item.full,
+      .record-actions { grid-column:auto; }
+      .store-summary { align-items:flex-start; }
+    }
+  </style>
+  <?!= include("AppWatermark"); ?>
+</head>
+
+<body class="app-watermark" style="--company-watermark-logo:<?!= watermarkLogoCss ?>;">
+  <?!= include("AppBackButton"); ?>
+
+  <main class="shell">
+    <section class="hero">
+      <div>
+        <h1>Historial de Trabajo</h1>
+        <p id="companyLabel">Reparaciones organizadas por tienda, equipo y modelo.</p>
+      </div>
+      <button class="refresh" type="button" onclick="loadHistory()">Actualizar</button>
+    </section>
+
+    <section class="stats">
+      <div class="stat"><small>Trabajos</small><strong id="statRecords">0</strong></div>
+      <div class="stat"><small>Tiendas</small><strong id="statStores">0</strong></div>
+      <div class="stat"><small>Equipos / modelos</small><strong id="statEquipment">0</strong></div>
+      <div class="stat"><small>Completados</small><strong id="statCompleted">0</strong></div>
+    </section>
+
+    <section class="panel">
+      <div class="filters">
+        <label>
+          Buscar
+          <input id="searchFilter" type="search" placeholder="WO, NSN, equipo, modelo, problema..." oninput="renderHistory()">
+        </label>
+        <label>
+          Tienda
+          <select id="storeFilter" onchange="onStoreFilterChanged()">
+            <option value="">Todas</option>
+          </select>
+        </label>
+        <label>
+          Equipo
+          <select id="equipmentFilter" onchange="renderHistory()">
+            <option value="">Todos</option>
+          </select>
+        </label>
+        <label>
+          Modelo
+          <select id="modelFilter" onchange="renderHistory()">
+            <option value="">Todos</option>
+          </select>
+        </label>
+        <label>
+          Estado
+          <select id="statusFilter" onchange="renderHistory()">
+            <option value="">Todos</option>
+            <option value="completed">Completados</option>
+            <option value="open">Abiertos / en proceso</option>
+          </select>
+        </label>
+      </div>
+      <div id="statusLine" class="status-line">Cargando historial...</div>
+      <div id="limitWarning" class="warning"></div>
+    </section>
+
+    <div id="history" class="history"></div>
+  </main>
+
+  <script>
+    const BASE_URL = "<?= baseUrl ?>";
+    const TEMPLATE_COMPANY_ID = String("<?= companyId ?>").trim().toUpperCase();
+    let HISTORY_RECORDS = [];
+    let HISTORY_RESULT = null;
+    let HISTORY_REQUEST_ID = 0;
+    let HISTORY_LOAD_TIMER = null;
+
+    function navigateApp(url) {
+      const target = String(url || "").trim();
+      if (!target) return;
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type:"PPS_NAVIGATE", url:target }, "*");
+          setTimeout(function() {
+            try { window.open(target, "_top"); }
+            catch (err) { window.location.href = target; }
+          }, 250);
+          return;
+        }
+      } catch (err) {}
+      try { window.open(target, "_top"); }
+      catch (err) { window.location.href = target; }
+    }
+
+    const TOP_NAV = { set href(url) { navigateApp(url); } };
+
+    function getStoredUser() {
+      try { return JSON.parse(getAppSessionItem("pps_user") || "{}"); }
+      catch (err) { return {}; }
+    }
+
+    function getSessionToken() {
+      const user = getStoredUser();
+      return String(getAppSessionItem("pps_session_token") || user.sessionToken || user.SESSION_TOKEN || "").trim();
+    }
+
+    function getCompanyId() {
+      const user = getStoredUser();
+      const params = new URLSearchParams(window.location.search || "");
+      return String(
+        TEMPLATE_COMPANY_ID ||
+        params.get("companyId") ||
+        user.companyId ||
+        user.COMPANY_ID ||
+        getAppSessionItem("pps_login_company") ||
+        ""
+      ).trim().toUpperCase();
+    }
+
+    function requireAccess() {
+      const user = getStoredUser();
+      const role = String(user.role || user.ROLE || "").trim().toUpperCase();
+      const allowed = ["TECH", "ADMIN", "ORDENES", "OWNER"];
+      if (!getSessionToken() || allowed.indexOf(role) === -1) {
+        setStatus("No autorizado. Este modulo es para TECH, ADMIN, ORDENES y OWNER.", true);
+        return false;
+      }
+      return true;
+    }
+
+    function loadHistory() {
+      if (!requireAccess()) return;
+      const companyId = getCompanyId();
+      const requestId = ++HISTORY_REQUEST_ID;
+      if (HISTORY_LOAD_TIMER) clearTimeout(HISTORY_LOAD_TIMER);
+      setStatus("Cargando historial...", false);
+      document.getElementById("history").innerHTML = "";
+      HISTORY_LOAD_TIMER = setTimeout(function() {
+        if (requestId !== HISTORY_REQUEST_ID) return;
+        setStatus("La carga esta tardando mas de lo esperado. Presiona Actualizar para intentar nuevamente.", true);
+      }, 45000);
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (requestId !== HISTORY_REQUEST_ID) return;
+          if (HISTORY_LOAD_TIMER) clearTimeout(HISTORY_LOAD_TIMER);
+          HISTORY_LOAD_TIMER = null;
+          HISTORY_RESULT = result || {};
+          HISTORY_RECORDS = Array.isArray(HISTORY_RESULT.records) ? HISTORY_RESULT.records : [];
+          document.getElementById("companyLabel").textContent =
+            (HISTORY_RESULT.companyName || companyId) + " - reparaciones por tienda, equipo y modelo.";
+          renderStats(HISTORY_RESULT.totals || {});
+          populateFilters();
+          renderHistory();
+          document.getElementById("limitWarning").textContent = HISTORY_RESULT.truncated
+            ? "Se muestran los " + HISTORY_RECORDS.length + " trabajos mas recientes de " + HISTORY_RESULT.availableRecords + "."
+            : "";
+        })
+        .withFailureHandler(function(err) {
+          if (requestId !== HISTORY_REQUEST_ID) return;
+          if (HISTORY_LOAD_TIMER) clearTimeout(HISTORY_LOAD_TIMER);
+          HISTORY_LOAD_TIMER = null;
+          HISTORY_RESULT = null;
+          HISTORY_RECORDS = [];
+          renderStats({});
+          setStatus("ERROR: " + getErrorMessage(err), true);
+          document.getElementById("history").innerHTML =
+            '<div class="empty">No se pudo cargar el historial.</div>';
+        })
+        .getWorkHistory(companyId, getSessionToken());
+    }
+
+    function renderStats(totals) {
+      document.getElementById("statRecords").textContent = Number(totals.records || 0);
+      document.getElementById("statStores").textContent = Number(totals.stores || 0);
+      document.getElementById("statEquipment").textContent = Number(totals.equipment || 0);
+      document.getElementById("statCompleted").textContent = Number(totals.completed || 0);
+    }
+
+    function populateFilters() {
+      fillSelect("storeFilter", uniqueOptions(HISTORY_RECORDS, "nsn", function(record) {
+        return record.storeLabel || record.nsn || "Sin tienda";
+      }), "Todas");
+      refreshDependentFilters();
+    }
+
+    function onStoreFilterChanged() {
+      refreshDependentFilters();
+      renderHistory();
+    }
+
+    function refreshDependentFilters() {
+      const storeValue = document.getElementById("storeFilter").value;
+      const scoped = HISTORY_RECORDS.filter(function(record) {
+        return !storeValue || String(record.nsn || "") === storeValue;
+      });
+      fillSelect("equipmentFilter", uniqueOptions(scoped, "equipmentType"), "Todos");
+      const modelOptions = uniqueOptions(scoped, "equipmentModel", function(record) {
+        return record.equipmentModel || "Modelo no registrado";
+      }).map(function(option) {
+        if (option.value === "") option.value = "__NO_MODEL__";
+        return option;
+      });
+      fillSelect("modelFilter", modelOptions, "Todos");
+    }
+
+    function uniqueOptions(records, key, labelBuilder) {
+      const map = {};
+      records.forEach(function(record) {
+        const value = String(record[key] || "");
+        if (map[value]) return;
+        map[value] = labelBuilder ? labelBuilder(record) : (value || "No registrado");
+      });
+      return Object.keys(map).map(function(value) {
+        return { value:value, label:map[value] };
+      }).sort(function(a, b) {
+        return String(a.label).localeCompare(String(b.label), undefined, { numeric:true });
+      });
+    }
+
+    function fillSelect(id, options, firstLabel) {
+      const select = document.getElementById(id);
+      const previous = select.value;
+      select.innerHTML = '<option value="">' + escapeHtml(firstLabel) + '</option>' +
+        options.map(function(option) {
+          return '<option value="' + escapeAttr(option.value) + '">' + escapeHtml(option.label) + '</option>';
+        }).join("");
+      if (options.some(function(option) { return option.value === previous; })) {
+        select.value = previous;
+      }
+    }
+
+    function getFilteredRecords() {
+      const query = normalizeText(document.getElementById("searchFilter").value);
+      const store = document.getElementById("storeFilter").value;
+      const equipment = document.getElementById("equipmentFilter").value;
+      const model = document.getElementById("modelFilter").value;
+      const status = document.getElementById("statusFilter").value;
+
+      return HISTORY_RECORDS.filter(function(record) {
+        if (store && String(record.nsn || "") !== store) return false;
+        if (equipment && String(record.equipmentType || "") !== equipment) return false;
+        if (model === "__NO_MODEL__" && String(record.equipmentModel || "")) return false;
+        if (model && model !== "__NO_MODEL__" && String(record.equipmentModel || "") !== model) return false;
+        if (status === "completed" && !record.completed) return false;
+        if (status === "open" && record.completed) return false;
+        if (query && normalizeText([
+          record.woNumber,
+          record.nsn,
+          record.storeLabel,
+          record.storeAddress,
+          record.technician,
+          record.equipmentType,
+          record.equipmentMake,
+          record.equipmentModel,
+          record.equipmentSerial,
+          record.reportedProblem,
+          record.problemFound,
+          record.proposedSolution,
+          record.completionResult,
+          record.workPerformed,
+          record.materialsUsed,
+          record.invoiceNumber,
+          record.status
+        ].join(" ")).indexOf(query) === -1) return false;
+        return true;
+      });
+    }
+
+    function renderHistory() {
+      const records = getFilteredRecords();
+      setStatus(records.length + (records.length === 1 ? " trabajo encontrado" : " trabajos encontrados"), false);
+      const history = document.getElementById("history");
+      if (!records.length) {
+        history.innerHTML = '<div class="panel empty">No hay reparaciones que coincidan con los filtros.</div>';
+        return;
+      }
+
+      const stores = groupRecords(records, function(record) {
+        return String(record.nsn || record.storeLabel || "SIN_TIENDA");
+      });
+
+      history.innerHTML = Object.keys(stores).sort(function(a, b) {
+        return a.localeCompare(b, undefined, { numeric:true });
+      }).map(function(storeKey) {
+        return renderStoreGroup(stores[storeKey]);
+      }).join("");
+    }
+
+    function groupRecords(records, keyBuilder) {
+      const grouped = {};
+      records.forEach(function(record) {
+        const key = keyBuilder(record);
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(record);
+      });
+      return grouped;
+    }
+
+    function renderStoreGroup(records) {
+      const first = records[0] || {};
+      const equipmentGroups = groupRecords(records, function(record) {
+        return [
+          record.equipmentType,
+          record.equipmentMake,
+          record.equipmentModel || "NO_MODEL",
+          record.equipmentSerial || "NO_SERIAL"
+        ].join("|");
+      });
+      const address = String(first.storeAddress || "").trim();
+
+      return `
+        <details class="store-group">
+          <summary class="store-summary">
+            <div>
+              <div class="store-title">${escapeHtml(first.storeLabel || "Tienda sin identificar")}</div>
+              <div class="store-address">
+                ${escapeHtml(address || "Direccion no registrada")}
+                ${address ? renderMapLink(address) : ""}
+              </div>
+            </div>
+            <span class="count-pill">${records.length} trabajo${records.length === 1 ? "" : "s"}</span>
+          </summary>
+          <div class="store-content">
+            ${Object.keys(equipmentGroups).sort().map(function(key) {
+              return renderEquipmentGroup(equipmentGroups[key]);
+            }).join("")}
+          </div>
+        </details>
+      `;
+    }
+
+    function renderEquipmentGroup(records) {
+      const first = records[0] || {};
+      const model = first.equipmentModel || "Modelo no registrado";
+      const identity = [
+        first.equipmentMake,
+        "Modelo " + model,
+        first.equipmentSerial ? "Serie " + first.equipmentSerial : ""
+      ].filter(Boolean).join(" | ");
+
+      return `
+        <details class="equipment-group">
+          <summary class="equipment-summary">
+            <div>
+              ${escapeHtml(first.equipmentType || "Equipo no especificado")}
+              <span class="equipment-meta">${escapeHtml(identity)}</span>
+            </div>
+            <span class="count-pill">${records.length}</span>
+          </summary>
+          <div class="repair-list">
+            ${records.map(renderRepairCard).join("")}
+          </div>
+        </details>
+      `;
+    }
+
+    function renderRepairCard(record) {
+      const detailSections = [];
+      addDetail(detailSections, "Problema reportado", record.reportedProblem, true);
+      addDetail(detailSections, "Problema encontrado", record.problemFound, true);
+      addDetail(detailSections, "Solucion prevista", record.proposedSolution, true);
+      addDetail(detailSections, "Resultado final", record.completionResult, true);
+      if (!record.completionResult) {
+        addDetail(detailSections, "Trabajo realizado", record.workPerformed, true);
+      }
+      addDetail(detailSections, "Materiales / piezas usadas", record.materialsUsed, true);
+      addDetail(detailSections, "Notas", record.notes, true);
+      addDetail(detailSections, "Tecnico", record.technician || "No registrado", false);
+      addDetail(detailSections, "Horas", record.hours || "No registradas", false);
+      addDetail(detailSections, "Invoice", record.invoiceNumber || "Pendiente / no registrado", false);
+      addDetail(detailSections, "WO type", record.woType || "No registrado", false);
+
+      return `
+        <details class="repair-card ${record.completed ? "completed" : "open"}">
+          <summary class="repair-summary">
+            <div>
+              <div class="repair-title">${escapeHtml(record.woNumber || "Sin WO")}</div>
+              <div class="repair-subtitle">
+                ${escapeHtml(record.date || "Sin fecha")} | ${escapeHtml(record.technician || "Sin tecnico")}
+              </div>
+            </div>
+            <span class="status-pill">${escapeHtml(record.status || "SIN ESTADO")}</span>
+          </summary>
+          <div class="repair-detail">
+            ${detailSections.join("") || '<div class="detail-item full"><div class="detail-value">No hay detalles adicionales registrados.</div></div>'}
+            ${Number(record.attachmentCount || 0) > 0 ? `
+              <div class="record-actions">
+                <button class="media-btn" type="button" onclick="openWorkHistoryGallery(${Number(record.rowNumber)}, '${escapeJs(record.woNumber)}')">
+                  Fotos / Videos (${Number(record.attachmentCount || 0)})
+                </button>
+              </div>
+            ` : ""}
+          </div>
+        </details>
+      `;
+    }
+
+    function addDetail(target, label, value, full) {
+      value = String(value || "").trim();
+      if (!value) return;
+      target.push(
+        '<div class="detail-item' + (full ? " full" : "") + '">' +
+          '<span class="detail-label">' + escapeHtml(label) + '</span>' +
+          '<div class="detail-value">' + escapeHtml(value) + '</div>' +
+        '</div>'
+      );
+    }
+
+    function openWorkHistoryGallery(row, woNumber) {
+      const returnUrl = BASE_URL +
+        "?view=workHistory&companyId=" + encodeURIComponent(getCompanyId());
+      TOP_NAV.href = BASE_URL +
+        "?view=orderFiles" +
+        "&row=" + encodeURIComponent(row) +
+        "&wo=" + encodeURIComponent(woNumber || "") +
+        "&companyId=" + encodeURIComponent(getCompanyId()) +
+        "&returnTo=" + encodeURIComponent(returnUrl);
+    }
+
+    function renderMapLink(address) {
+      const url = "https:" + String.fromCharCode(47, 47) +
+        "www.google.com/maps/search/?api=1&query=" + encodeURIComponent(address);
+      return '<br><a class="map-link" href="' + escapeAttr(url) + '" target="_blank" rel="noopener noreferrer">Google Maps</a>';
+    }
+
+    function setStatus(message, isError) {
+      const status = document.getElementById("statusLine");
+      status.textContent = message || "";
+      status.classList.toggle("error", Boolean(isError));
+    }
+
+    function normalizeText(value) {
+      return String(value || "")
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+    }
+
+    function getErrorMessage(err) {
+      return err && err.message ? err.message : String(err || "Ocurrio un error.");
+    }
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function escapeAttr(value) { return escapeHtml(value); }
+
+    function escapeJs(value) {
+      return String(value || "")
+        .replace(/\\/g, "\\\\")
+        .replace(/'/g, "\\'")
+        .replace(/\r?\n/g, " ");
+    }
+
+    document.addEventListener("DOMContentLoaded", loadHistory);
+  </script>
+</body>
+</html>

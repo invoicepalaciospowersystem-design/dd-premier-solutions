@@ -124,6 +124,7 @@ if (
       });
 
       shEco.appendRow(newRow);
+      touchAppCacheVersion_();
       return true;
     }
   }
@@ -324,6 +325,7 @@ function updateEconomyRow(rowNumber, updates, sessionToken) {
     fields: Object.keys(updates || {})
   });
 
+  touchAppCacheVersion_();
   return true;
 }
 
@@ -1037,6 +1039,7 @@ if (invType === "PM") continue;
     });
   }
 
+  touchAppCacheVersion_();
   return {
     syncedRows: syncedRows,
     createdRows: createdRows,
@@ -1082,6 +1085,7 @@ function repairEconomyDuplicatesAfterClose(companyId, sessionToken) {
   const result = repairEconomyRowsAfterClose_(sh, companyId, session, period);
 
   addAuditLog_("ECONOMY", "ECONOMY_DUPLICATES_REPAIRED", companyId, "ECONOMY", period.label, session, result);
+  touchAppCacheVersion_();
   return result;
 }
 
@@ -1543,6 +1547,8 @@ function closeEconomyMonth(sessionToken) {
       pmMarkerRow: pmMarkerRow,
       invoiceMarkerRow: invoiceMarkerRow
     });
+
+    touchAppCacheVersion_();
 
     return {
       month: month,

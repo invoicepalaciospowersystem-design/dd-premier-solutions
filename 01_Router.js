@@ -6,6 +6,11 @@ function doGet(e) {
   try {
     e = e || { parameter: {} };
     const p = e.parameter || {};
+
+    if (isWhatsAppWebhookRequest_(p)) {
+      return handleWhatsAppWebhookVerification_(e);
+    }
+
     const ownerPortal = isOwnerPortalRequest_(p);
     const baseUrl = getWebAppBaseUrl_(p.companyId, ownerPortal);
 
@@ -96,6 +101,66 @@ function doGet(e) {
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
 
+    if (p.view === "manualInvoice") {
+      const template = HtmlService.createTemplateFromFile("ManualInvoice");
+      applyTemplateDefaults_(template, p, baseUrl);
+      template.baseUrl = baseUrl;
+      template.companyId = p.companyId || "";
+      template.ownerOnly = ownerPortal ? "true" : "";
+
+      return template.evaluate()
+        .setTitle("D&D Manual Invoice")
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
+
+    if (p.view === "invoiceReview") {
+      const template = HtmlService.createTemplateFromFile("InvoiceReview");
+      applyTemplateDefaults_(template, p, baseUrl);
+      template.baseUrl = baseUrl;
+      template.companyId = p.companyId || "";
+      template.ownerOnly = ownerPortal ? "true" : "";
+
+      return template.evaluate()
+        .setTitle("Invoice pendientes de facturacion")
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
+
+    if (p.view === "equipmentManuals") {
+      const template = HtmlService.createTemplateFromFile("EquipmentManuals");
+      applyTemplateDefaults_(template, p, baseUrl);
+      template.baseUrl = baseUrl;
+      template.companyId = p.companyId || "";
+      template.ownerOnly = ownerPortal ? "true" : "";
+
+      return template.evaluate()
+        .setTitle("Manuales Tecnicos")
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
+
+    if (p.view === "workHistory") {
+      const template = HtmlService.createTemplateFromFile("WorkHistory");
+      applyTemplateDefaults_(template, p, baseUrl);
+      template.baseUrl = baseUrl;
+      template.companyId = p.companyId || "";
+      template.ownerOnly = ownerPortal ? "true" : "";
+
+      return template.evaluate()
+        .setTitle("Historial de Trabajo")
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
+
+    if (p.view === "techStores") {
+      const template = HtmlService.createTemplateFromFile("TechStores");
+      applyTemplateDefaults_(template, p, baseUrl);
+      template.baseUrl = baseUrl;
+      template.companyId = p.companyId || "";
+      template.ownerOnly = ownerPortal ? "true" : "";
+
+      return template.evaluate()
+        .setTitle("McDonald's Stores")
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
+
     if (p.view === "stores") {
       const template = HtmlService.createTemplateFromFile("Stores");
       applyTemplateDefaults_(template, p, baseUrl);
@@ -145,6 +210,21 @@ function doGet(e) {
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
 
+    if (p.view === "startWork") {
+      const template = HtmlService.createTemplateFromFile("StartWork");
+      applyTemplateDefaults_(template, p, baseUrl);
+      template.row = p.row || "";
+      template.wo = p.wo || "";
+      template.techName = p.tech || "";
+      template.baseUrl = baseUrl;
+      template.companyId = p.companyId || "";
+      template.returnTo = p.returnTo || "";
+
+      return template.evaluate()
+        .setTitle("Start Work Order")
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
+
         if (p.view === "pm_report") {
       const template = HtmlService.createTemplateFromFile("PM_Report");
       applyTemplateDefaults_(template, p, baseUrl);
@@ -168,6 +248,20 @@ function doGet(e) {
 
       return template.evaluate()
         .setTitle("Create Work Order")
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
+
+    if (p.view === "orderFiles") {
+      const template = HtmlService.createTemplateFromFile("WorkOrderFiles");
+      applyTemplateDefaults_(template, p, baseUrl);
+      template.row = p.row || "";
+      template.wo = p.wo || "";
+      template.companyId = p.companyId || "";
+      template.baseUrl = baseUrl;
+      template.returnTo = p.returnTo || "";
+
+      return template.evaluate()
+        .setTitle("Work Order Photos and Videos")
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
 
@@ -206,6 +300,32 @@ function doGet(e) {
     )
       .setTitle(CFG.APP_NAME)
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
+}
+
+function doPost(e) {
+  try {
+    e = e || { parameter: {} };
+    const p = e.parameter || {};
+
+    if (isWhatsAppWebhookRequest_(p)) {
+      return handleWhatsAppWebhookEvent_(e);
+    }
+
+    return whatsappJsonOutput_({
+      ok: false,
+      error: "UNKNOWN_POST_ROUTE"
+    });
+  } catch (err) {
+    notifySystemError_("WEB_APP_DOPOST_ERROR", err, {
+      module: "ROUTER",
+      parameters: e && e.parameter ? e.parameter : {}
+    });
+
+    return whatsappJsonOutput_({
+      ok: false,
+      error: err && err.message ? err.message : String(err)
+    });
   }
 }
 

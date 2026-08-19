@@ -95,13 +95,6 @@
         <label>PHONE</label>
         <input id="PHONE" placeholder="+17869674478">
       </div>
-      <div>
-        <label>SMS_ENABLED</label>
-        <select id="SMS_ENABLED">
-          <option value="YES">YES</option>
-          <option value="NO">NO</option>
-        </select>
-      </div>
 
       <div>
         <label>ADDRESS</label>
@@ -118,10 +111,6 @@
       <div>
         <label>ZIP</label>
         <input id="ZIP" placeholder="33055">
-      </div>
-      <div>
-        <label>TWILIO_FROM</label>
-        <input id="TWILIO_FROM" placeholder="+17279149164">
       </div>
 
       <div class="section-title">Login y marca</div>
@@ -222,7 +211,7 @@ const BASE_URL = "<?= baseUrl ?>";
 const COMPANY_FIELDS = [
   "COMPANY_ID", "COMPANY_NAME", "LEGAL_NAME", "EIN", "WEBSITE_URL",
   "MAIN_EMAIL", "PHONE", "ADDRESS", "CITY", "STATE", "ZIP",
-  "TWILIO_FROM", "SMS_ENABLED", "LOGIN_TITLE", "LOGIN_SUBTITLE",
+  "LOGIN_TITLE", "LOGIN_SUBTITLE",
   "LOGIN_OWNER_NAME", "LOGIN_PRIMARY_COLOR", "LOGIN_ACCENT_COLOR",
   "LOGIN_LOGO_FILE_ID", "LOGIN_LOGO_URL", "LOGIN_BACKGROUND_FILE_ID",
   "LOGIN_BACKGROUND_URL", "NOTES", "ACTIVE"
@@ -299,7 +288,6 @@ function card(company) {
       <div class="line"><b>Website:</b> ${escapeHtml(company.WEBSITE_URL || "")}</div>
       <div class="line"><b>Email:</b> ${escapeHtml(company.MAIN_EMAIL || "")}</div>
       <div class="line"><b>Phone:</b> ${escapeHtml(company.PHONE || "")}</div>
-      <div class="line"><b>SMS:</b> ${escapeHtml(company.SMS_ENABLED || "")} ${company.TWILIO_FROM ? "/ " + escapeHtml(company.TWILIO_FROM) : ""}</div>
       <div class="line"><b>Login:</b> ${escapeHtml(company.LOGIN_TITLE || "")}</div>
       <div class="line"><b>Active:</b> ${escapeHtml(company.ACTIVE || "")}</div>
       <div class="actions" style="margin-top:12px;">
@@ -347,7 +335,6 @@ function save() {
 
   data.COMPANY_ID = String(data.COMPANY_ID || "").toUpperCase();
   data.ACTIVE = String(data.ACTIVE || "YES").toUpperCase();
-  data.SMS_ENABLED = String(data.SMS_ENABLED || "YES").toUpperCase();
 
   if (!data.COMPANY_ID || !data.COMPANY_NAME) {
     alert("COMPANY_ID y COMPANY_NAME son obligatorios.");
@@ -384,7 +371,6 @@ function clearForm() {
   });
 
   document.getElementById("ACTIVE").value = "YES";
-  document.getElementById("SMS_ENABLED").value = "YES";
 }
 
 function cancelEdit() {
