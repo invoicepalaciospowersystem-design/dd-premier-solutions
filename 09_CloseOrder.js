@@ -342,21 +342,62 @@ function saveCloseOrder_(data) {
     SIGNATURE: data.SIGNATURE || ""
   };
 
-  if (approvedWorkPerformed) {
-    ensureSheetColumns_(shWO, ["WORK_PERFORMED"]);
+  if (approvedWorkPerformed || finalizeInvoice) {
+    const columnsToSync = ["WORK_PERFORMED"];
+    if (finalizeInvoice) {
+      columnsToSync.push(
+        "EQUIPMENT_MAKE",
+        "EQUIPMENT_MODEL",
+        "EQUIPMENT_SERIAL",
+        "SIGNATURE"
+      );
+    }
+    ensureSheetColumns_(shWO, columnsToSync);
     const currentWorkOrderHeaders = shWO
       .getRange(1, 1, 1, shWO.getLastColumn())
       .getValues()[0]
       .map(function(header) {
         return String(header || "").trim();
       });
-    setCellByHeader_(
-      shWO,
-      rowNumber,
-      currentWorkOrderHeaders,
-      "WORK_PERFORMED",
-      fullWorkPerformed
-    );
+    if (approvedWorkPerformed) {
+      setCellByHeader_(
+        shWO,
+        rowNumber,
+        currentWorkOrderHeaders,
+        "WORK_PERFORMED",
+        fullWorkPerformed
+      );
+    }
+    if (finalizeInvoice) {
+      setCellByHeader_(
+        shWO,
+        rowNumber,
+        currentWorkOrderHeaders,
+        "EQUIPMENT_MAKE",
+        invoiceRow.EQUIPMENT_MAKE
+      );
+      setCellByHeader_(
+        shWO,
+        rowNumber,
+        currentWorkOrderHeaders,
+        "EQUIPMENT_MODEL",
+        invoiceRow.EQUIPMENT_MODEL
+      );
+      setCellByHeader_(
+        shWO,
+        rowNumber,
+        currentWorkOrderHeaders,
+        "EQUIPMENT_SERIAL",
+        invoiceRow.EQUIPMENT_SERIAL
+      );
+      setCellByHeader_(
+        shWO,
+        rowNumber,
+        currentWorkOrderHeaders,
+        "SIGNATURE",
+        invoiceRow.SIGNATURE
+      );
+    }
   }
 
   try {

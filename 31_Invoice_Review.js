@@ -377,6 +377,9 @@ function finalizeInvoiceDraft(data, sessionToken) {
   let originalWorkPerformed = "";
   let approvedWorkPerformed = "";
   let workReportChanged = false;
+  let originalInvoiceDetails = null;
+  let approvedInvoiceDetails = null;
+  let invoiceDetailsChanged = false;
 
   try {
     const sh = ensureInvoiceDraftSheet_();
@@ -431,6 +434,47 @@ function finalizeInvoiceDraft(data, sessionToken) {
     }
     workReportChanged = approvedWorkPerformed !== originalWorkPerformed;
 
+    originalInvoiceDetails = {
+      equipmentMake: String(draft.EQUIPMENT_MAKE || "").trim(),
+      equipmentModel: String(draft.EQUIPMENT_MODEL || "").trim(),
+      equipmentSerial: String(draft.EQUIPMENT_SERIAL || "").trim(),
+      signature: String(draft.SIGNATURE || "").trim()
+    };
+    approvedInvoiceDetails = {
+      equipmentMake: normalizeInvoiceDraftEditableText_(
+        data,
+        "EQUIPMENT_MAKE",
+        originalInvoiceDetails.equipmentMake,
+        200,
+        "La marca del equipo"
+      ),
+      equipmentModel: normalizeInvoiceDraftEditableText_(
+        data,
+        "EQUIPMENT_MODEL",
+        originalInvoiceDetails.equipmentModel,
+        200,
+        "El modelo del equipo"
+      ),
+      equipmentSerial: normalizeInvoiceDraftEditableText_(
+        data,
+        "EQUIPMENT_SERIAL",
+        originalInvoiceDetails.equipmentSerial,
+        250,
+        "El numero de serie"
+      ),
+      signature: normalizeInvoiceDraftEditableText_(
+        data,
+        "SIGNATURE",
+        originalInvoiceDetails.signature,
+        300,
+        "El nombre o la firma del manager",
+        true
+      )
+    };
+    invoiceDetailsChanged = Object.keys(originalInvoiceDetails).some(function(key) {
+      return originalInvoiceDetails[key] !== approvedInvoiceDetails[key];
+    });
+
     const techHours = Number(draft.TECH_HOURS || 0);
     const hoursChanged = Math.abs(finalHours - techHours) > 0.0001;
     const changeReason = String(data.HOURS_CHANGE_REASON || "").trim();
@@ -441,6 +485,10 @@ function finalizeInvoiceDraft(data, sessionToken) {
     draft.STATUS = "PROCESSING";
     draft.FINAL_HOURS = finalHours;
     draft.WORK_PERFORMED = approvedWorkPerformed;
+    draft.EQUIPMENT_MAKE = approvedInvoiceDetails.equipmentMake;
+    draft.EQUIPMENT_MODEL = approvedInvoiceDetails.equipmentModel;
+    draft.EQUIPMENT_SERIAL = approvedInvoiceDetails.equipmentSerial;
+    draft.SIGNATURE = approvedInvoiceDetails.signature;
     draft.UPDATED_AT = new Date();
     draft.UPDATED_BY = getSessionActorLabel_(session);
     writeInvoiceDraft_(sh, headers, found.rowNumber, draft);
@@ -506,6 +554,22 @@ function finalizeInvoiceDraft(data, sessionToken) {
           woNumber: draft.WO_NUMBER,
           previousReport: originalWorkPerformed,
           approvedReport: approvedWorkPerformed
+        }
+      );
+    }
+
+    if (invoiceDetailsChanged) {
+      addAuditLog_(
+        "INVOICE",
+        "INVOICE_DETAILS_EDITED",
+        draft.COMPANY_ID,
+        "INVOICE_DRAFT",
+        draftId,
+        session,
+        {
+          woNumber: draft.WO_NUMBER,
+          previousDetails: originalInvoiceDetails,
+          approvedDetails: approvedInvoiceDetails
         }
       );
     }
@@ -638,6 +702,19 @@ function normalizeInvoiceDraftItem_(data, number) {
     unit: roundCloseOrderMoney_(unit),
     amount: roundCloseOrderMoney_(qty * unit)
   };
+}
+
+function normalizeInvoiceDraftEditableText_(data, key, fallback, maxLength, label, required) {
+  const hasValue = Object.prototype.hasOwnProperty.call(data, key);
+  const value = String(hasValue ? data[key] : (fallback || "")).trim();
+
+  if (required && !value) {
+    throw new Error(label + " es obligatorio.");
+  }
+  if (value.length > maxLength) {
+    throw new Error(label + " no puede exceder " + maxLength + " caracteres.");
+  }
+  return value;
 }
 
 function validateInvoiceDraftHours_(value) {

@@ -190,6 +190,12 @@
       line-height:1.4;
     }
 
+    .equipment-editor {
+      display:grid;
+      grid-template-columns:repeat(3, minmax(0, 1fr));
+      gap:10px;
+    }
+
     input,
     textarea,
     select {
@@ -374,6 +380,7 @@
       .hero h1 { font-size:21px; }
       .info-grid,
       .form-grid,
+      .equipment-editor,
       .special-fields { grid-template-columns:1fr; }
       .info.full,
       .field.full { grid-column:auto; }
@@ -472,16 +479,37 @@
               </p>
             </div>
             <div class="info full">
-              <span class="label">Equipo</span>
-              <div id="infoEquipment" class="value"></div>
+              <span class="label">Datos del equipo (editables)</span>
+              <div class="equipment-editor">
+                <div>
+                  <label for="equipmentMakeEditor">Marca</label>
+                  <input id="equipmentMakeEditor" type="text" maxlength="200" placeholder="Marca del equipo">
+                </div>
+                <div>
+                  <label for="equipmentModelEditor">Modelo</label>
+                  <input id="equipmentModelEditor" type="text" maxlength="200" placeholder="Modelo del equipo">
+                </div>
+                <div>
+                  <label for="equipmentSerialEditor">Numero de serie</label>
+                  <input id="equipmentSerialEditor" type="text" maxlength="250" placeholder="Numero de serie">
+                </div>
+              </div>
+              <p class="editor-help">Los cambios se guardaran en la orden y apareceran en el PDF final.</p>
             </div>
             <div class="info full">
               <span class="label">Notas</span>
               <div id="infoNotes" class="value"></div>
             </div>
             <div class="info full">
-              <span class="label">Firma del cliente</span>
-              <div id="infoSignature" class="value"></div>
+              <label for="managerSignatureEditor">Nombre / firma del manager (editable)</label>
+              <input
+                id="managerSignatureEditor"
+                type="text"
+                maxlength="300"
+                placeholder="Nombre del manager que aprobo y firmo"
+                required
+              >
+              <p class="editor-help">Este nombre aparecera como la firma del manager en el invoice.</p>
             </div>
           </div>
         </div>
@@ -795,16 +823,15 @@ function selectDraft(draftId) {
   setText("infoCompletionResult", SELECTED_DRAFT.WORK_COMPLETION_RESULT || "No registrado");
   document.getElementById("workPerformedEditor").value =
     SELECTED_DRAFT.WORK_PERFORMED || "";
-  setText(
-    "infoEquipment",
-    [
-      SELECTED_DRAFT.EQUIPMENT_MAKE,
-      SELECTED_DRAFT.EQUIPMENT_MODEL,
-      SELECTED_DRAFT.EQUIPMENT_SERIAL
-    ].filter(Boolean).join(" / ") || "No especificado"
-  );
+  document.getElementById("equipmentMakeEditor").value =
+    SELECTED_DRAFT.EQUIPMENT_MAKE || "";
+  document.getElementById("equipmentModelEditor").value =
+    SELECTED_DRAFT.EQUIPMENT_MODEL || "";
+  document.getElementById("equipmentSerialEditor").value =
+    SELECTED_DRAFT.EQUIPMENT_SERIAL || "";
   setText("infoNotes", SELECTED_DRAFT.NOTES || "Sin notas");
-  setText("infoSignature", SELECTED_DRAFT.SIGNATURE);
+  document.getElementById("managerSignatureEditor").value =
+    SELECTED_DRAFT.SIGNATURE || "";
 
   document.getElementById("techHours").value = SELECTED_DRAFT.TECH_HOURS || "";
   document.getElementById("finalHours").value =
@@ -928,6 +955,16 @@ function createInvoice() {
     return;
   }
 
+  const equipmentMake = document.getElementById("equipmentMakeEditor").value.trim();
+  const equipmentModel = document.getElementById("equipmentModelEditor").value.trim();
+  const equipmentSerial = document.getElementById("equipmentSerialEditor").value.trim();
+  const managerSignature = document.getElementById("managerSignatureEditor").value.trim();
+  if (!managerSignature) {
+    showMessage("Escribe el nombre o la firma del manager.", "error");
+    document.getElementById("managerSignatureEditor").focus();
+    return;
+  }
+
   const special = document.getElementById("specialInvoice").checked;
   const manualParts = Number(document.getElementById("manualPartsTotal").value || 0);
   const manualSubtotal = Number(document.getElementById("manualSubTotal").value || 0);
@@ -949,6 +986,10 @@ function createInvoice() {
     FINAL_HOURS: finalHours,
     HOURS_CHANGE_REASON: reason,
     WORK_PERFORMED: workPerformed,
+    EQUIPMENT_MAKE: equipmentMake,
+    EQUIPMENT_MODEL: equipmentModel,
+    EQUIPMENT_SERIAL: equipmentSerial,
+    SIGNATURE: managerSignature,
     PURCHASE_RECEIPT: document.getElementById("purchaseReceipt").value.trim(),
     PURCHASE_LOCATION: document.getElementById("purchaseLocation").value,
     SPECIAL_INVOICE: special ? "YES" : "",
@@ -966,7 +1007,7 @@ function createInvoice() {
 
   IS_CREATING = true;
   document.getElementById("createBtn").disabled = true;
-  document.getElementById("workPerformedEditor").disabled = true;
+  setFinalizationEditorsDisabled(true);
   document.getElementById("createBtn").textContent = "Creando PDF y enviando...";
   showMessage("Procesando invoice. No cierres esta pantalla.", "success");
 
@@ -974,7 +1015,7 @@ function createInvoice() {
     .withSuccessHandler(function(result) {
       IS_CREATING = false;
       document.getElementById("createBtn").disabled = false;
-      document.getElementById("workPerformedEditor").disabled = false;
+      setFinalizationEditorsDisabled(false);
       document.getElementById("createBtn").textContent = "Crear PDF y enviar invoice";
       const invoiceNumber = result && result.invoiceNumber ? result.invoiceNumber : "";
       alert("Invoice " + invoiceNumber + " creado correctamente.");
@@ -985,11 +1026,24 @@ function createInvoice() {
     .withFailureHandler(function(err) {
       IS_CREATING = false;
       document.getElementById("createBtn").disabled = false;
-      document.getElementById("workPerformedEditor").disabled = false;
+      setFinalizationEditorsDisabled(false);
       document.getElementById("createBtn").textContent = "Crear PDF y enviar invoice";
       showMessage(getErrorMessage(err), "error");
     })
     .finalizeInvoiceDraft(payload, getSessionToken());
+}
+
+function setFinalizationEditorsDisabled(disabled) {
+  [
+    "workPerformedEditor",
+    "equipmentMakeEditor",
+    "equipmentModelEditor",
+    "equipmentSerialEditor",
+    "managerSignatureEditor"
+  ].forEach(function(id) {
+    const field = document.getElementById(id);
+    if (field) field.disabled = disabled;
+  });
 }
 
 function setText(id, value) {
